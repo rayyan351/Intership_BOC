@@ -1,0 +1,14 @@
+.footer { position: relative; overflow: hidden; background: var(--color-black); color: white; }
+.inner { width: min(var(--content-width), calc(100% - 40px)); min-height: 390px; margin: 0 auto; display: grid; grid-template-columns: 1.4fr .75fr .9fr 1fr; align-items: center; gap: 64px; padding: 62px 0; }
+.brand img { width: 250px; height: auto; }
+.brand p { max-width: 360px; color: #b9b9b9; line-height: 1.6; }
+.inner > div:not(.brand):not(.appVisual) { display: grid; align-content: center; gap: 13px; }
+.inner h2 { margin: 0 0 8px; font-size: 1.05rem; }
+.inner a, .inner span { color: #ececec; }
+.inner a:hover { color: var(--color-yellow); }
+.appVisual { position: relative; min-height: 330px; }
+.appVisual img { object-fit: contain; transform: rotate(-7deg); }
+.bottom { min-height: 58px; display: flex; align-items: center; justify-content: center; gap: 50px; padding: 10px 20px; background: var(--color-yellow); color: var(--color-black); font-size: .78rem; font-weight: 700; }
+.bottom div { display: flex; gap: 18px; }
+@media (max-width: 900px) { .inner { grid-template-columns: 1fr 1fr; gap: 34px; } .appVisual { min-height: 250px; } }
+@media (max-width: 620px) { .inner { grid-template-columns: 1fr; padding: 48px 0; } .appVisual { display: none; } .bottom { flex-direction: column; gap: 7px; text-align: center; } }

@@ -1,0 +1,20 @@
+.searchSection { padding: 46px 20px 24px; }
+.searchBox { width: min(100%, 500px); min-height: 54px; margin: 0 auto; display: flex; align-items: center; gap: 14px; padding: 4px 5px 4px 18px; border: 2px solid var(--color-yellow); border-radius: 999px; background: white; }
+.searchBox input { flex: 1; min-width: 0; border: 0; outline: 0; font: inherit; }
+.searchBox button { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 50%; background: var(--color-yellow); }
+.menuSection { width: min(var(--content-width), calc(100% - 40px)); margin: 0 auto; padding: 56px 0 32px; scroll-margin-top: 78px; }
+.categoryBanner { position: relative; height: clamp(150px, 15vw, 220px); margin-bottom: 36px; overflow: hidden; border: 9px solid #242424; border-radius: 24px; background: #eee; }
+.categoryBanner img { object-fit: cover; }
+.sectionHeader { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+.sectionHeader div { position: relative; }
+.sectionHeader h2 { margin: 0; font-size: clamp(1.6rem, 2.4vw, 2.2rem); text-transform: uppercase; }
+.sectionHeader p { margin: 4px 0 0; color: var(--color-muted); }
+.sectionHeader a { color: var(--color-muted); font-size: .82rem; }
+.flame { position: absolute; left: -25px; top: 2px; color: var(--color-yellow); font-size: 1.1rem; }
+.grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.popularGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.catalogNotice { width: min(var(--content-width), calc(100% - 40px)); margin: 40px auto 80px; padding: 20px 24px; border-left: 5px solid var(--color-yellow); background: var(--color-soft); color: var(--color-muted); line-height: 1.65; }
+.noResults { width: min(var(--content-width), calc(100% - 40px)); margin: 50px auto; padding: 50px; text-align: center; background: var(--color-soft); border-radius: 18px; }
+.noResults button { margin-top: 16px; padding: 12px 20px; border-radius: 999px; background: var(--color-yellow); font-weight: 800; }
+@media (max-width: 1000px) { .grid, .popularGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .menuSection { width: calc(100% - 24px); padding-top: 38px; } .grid, .popularGrid { grid-template-columns: 1fr; } .categoryBanner { height: 140px; border-width: 6px; border-radius: 18px; } .sectionHeader { align-items: start; } .sectionHeader a { display: none; } }
