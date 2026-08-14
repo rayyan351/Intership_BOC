@@ -10,6 +10,7 @@ export const dealCategoryApi = createApi({
       query: () => '/deal-categories',
       providesTags: ['DealCategories'],
     }),
+<<<<<<< HEAD
     createDealCategory: builder.mutation({
       query: (body) => ({
         url: '/deal-categories',
@@ -42,3 +43,9 @@ export const {
   useUpdateDealCategoryMutation,
   useDeleteDealCategoryMutation,
 } = dealCategoryApi;
+=======
+  }),
+});
+
+export const { useGetDealCategoriesQuery } = dealCategoryApi;
+>>>>>>> baf2848896e6108aa861d756300fb09f633993ac
