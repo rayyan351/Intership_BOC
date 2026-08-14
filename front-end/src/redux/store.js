@@ -1,0 +1,30 @@
+import { configureStore } from '@reduxjs/toolkit';
+import cartReducer from './cart/cartSlice';
+import { authApi } from '@/services/authApi'; // Adjust import path if needed
+import { productApi } from '@/services/productApi';
+import { categoryApi } from '@/services/categoryApi';
+import { dealApi } from '@/services/dealApi';
+import { sectionApi } from '@/services/sectionApi';
+import { dealCategoryApi } from '@/services/dealCategoryApi';
+
+export const store = configureStore({
+  reducer: {
+    cart: cartReducer,
+    // 1. Add the RTK Query API reducer dynamically using its reducerPath
+    [authApi.reducerPath]: authApi.reducer,
+    [productApi.reducerPath]: productApi.reducer,
+    [categoryApi.reducerPath]: categoryApi.reducer,
+    [dealApi.reducerPath]: dealApi.reducer,
+    [sectionApi.reducerPath]: sectionApi.reducer,
+    [dealCategoryApi.reducerPath]:dealCategoryApi.reducer,
+  },
+  // 2. Add the RTK Query middleware for caching, invalidation, and polling support
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware()
+     .concat(authApi.middleware)
+     .concat(productApi.middleware)
+     .concat(categoryApi.middleware)
+     .concat(dealApi.middleware)
+     .concat(sectionApi.middleware)
+     .concat(dealCategoryApi.middleware),
+});
