@@ -1,7 +1,8 @@
+// front-end/src/app/admin/products/deals/page.jsx
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Button, Tag, Space, Image, Tooltip } from 'antd';
+import { Table, Button, Tag, Space, Image } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import PageLayout from '../../../_components/layout/PageLayout';
 import ConfirmModal from '../../../_components/modal/ConfirmModal';
@@ -92,6 +93,7 @@ export default function DealsPage() {
     {
       title: 'Deal',
       key: 'deal',
+      width: 220,
       render: (_, record) => (
         <div className="flex items-center gap-3">
           <Image
@@ -99,11 +101,11 @@ export default function DealsPage() {
             alt={record.title}
             width={48}
             height={48}
-            className="rounded-lg object-cover border border-gray-100"
+            className="rounded-lg object-cover border border-gray-100 min-w-[48px]"
             fallback="/placeholder.png"
           />
-          <div>
-            <span className="font-bold text-gray-900 block">{record.title}</span>
+          <div className="min-w-0">
+            <span className="font-bold text-gray-900 block truncate">{record.title}</span>
             <span className="text-xs text-gray-500 line-clamp-1">{record.description}</span>
           </div>
         </div>
@@ -113,14 +115,15 @@ export default function DealsPage() {
       title: 'Type',
       dataIndex: 'dealType',
       key: 'dealType',
+      width: 140,
       render: (type) => <Tag color="purple">{type}</Tag>,
     },
     {
       title: 'Inclusions & Choices',
       key: 'inclusions',
+      width: 320,
       render: (_, record) => (
-        <div className="space-y-1 max-w-xs">
-          {/* Fixed Inclusions */}
+        <div className="space-y-1">
           {record.fixedItems?.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {record.fixedItems.map((item, idx) => (
@@ -131,9 +134,8 @@ export default function DealsPage() {
             </div>
           )}
 
-          {/* Choice Groups */}
           {record.choiceGroups?.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
+            <div className="flex flex-wrap gap-1">
               {record.choiceGroups.map((cg, idx) => (
                 <Tag key={idx} color="purple" className="text-xs">
                   {cg.selectCount}x {cg.title} ({cg.options?.length || 0} options)
@@ -151,17 +153,21 @@ export default function DealsPage() {
     {
       title: 'Pricing',
       key: 'pricing',
+      width: 150,
       render: (_, record) => {
-        const discount = Math.round(
-          ((record.originalPrice - record.dealPrice) / record.originalPrice) * 100
-        );
+        const discount =
+          record.originalPrice > 0
+            ? Math.round(((record.originalPrice - record.dealPrice) / record.originalPrice) * 100)
+            : 0;
         return (
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <span className="font-bold text-gray-900">Rs. {record.dealPrice}</span>
-              {discount > 0 && <Tag color="green" className="text-xs">{discount}% OFF</Tag>}
+              {discount > 0 && <Tag color="green" className="text-[10px] px-1 py-0">{discount}% OFF</Tag>}
             </div>
-            <span className="text-xs text-gray-400 line-through">Rs. {record.originalPrice}</span>
+            {record.originalPrice > 0 && (
+              <span className="text-xs text-gray-400 line-through">Rs. {record.originalPrice}</span>
+            )}
           </div>
         );
       },
@@ -170,6 +176,7 @@ export default function DealsPage() {
       title: 'Status',
       dataIndex: 'isShown',
       key: 'isShown',
+      width: 120,
       render: (isShown, record) => (
         <Space size="small">
           <CustomSwitch
@@ -187,8 +194,9 @@ export default function DealsPage() {
       title: 'Last Updated',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
+      width: 120,
       render: (dateStr) => (
-        <span className="text-gray-600 text-xs font-medium bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">
+        <span className="text-gray-600 text-xs font-medium bg-gray-50 px-2 py-1 rounded border border-gray-100 whitespace-nowrap">
           {formatRelativeTime(dateStr)}
         </span>
       ),
@@ -196,8 +204,10 @@ export default function DealsPage() {
     {
       title: 'Actions',
       key: 'actions',
+      fixed: 'right', // Pinned to right
+      width: 90,
       render: (_, record) => (
-        <Space size="middle">
+        <Space size="small">
           <Button
             type="text"
             icon={<EditOutlined className="text-gray-600" />}
@@ -235,14 +245,17 @@ export default function DealsPage() {
         onSearch={setSearchTerm}
         searchPlaceholder="Search deals..."
       >
-        <Table
-          columns={columns}
-          dataSource={filteredDeals}
-          rowKey="_id"
-          loading={isLoading}
-          pagination={{ pageSize: 8 }}
-          bordered={false}
-        />
+        <div className="w-full overflow-hidden">
+          <Table
+            columns={columns}
+            dataSource={filteredDeals}
+            rowKey="_id"
+            loading={isLoading}
+            pagination={{ pageSize: 8 }}
+            scroll={{ x: 1100 }} // Horizontal scroll container
+            bordered={false}
+          />
+        </div>
 
         <DealModal
           open={isModalOpen}

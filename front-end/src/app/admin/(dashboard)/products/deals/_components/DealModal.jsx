@@ -1,7 +1,7 @@
 // front-end/src/app/admin/products/deals/_components/DealModal.jsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Space, Button, InputNumber, Select, Tag, Input } from 'antd';
 import { PlusOutlined, DeleteOutlined, AppstoreAddOutlined } from '@ant-design/icons';
 import { useForm, useWatch } from 'react-hook-form';
@@ -37,15 +37,24 @@ const schema = yup.object().shape({
 });
 
 export default function DealModal({ open, onClose, onSubmit, loading, initialValues }) {
-  const { data: products = [], isLoading: fetchingProducts } = useGetProductsQuery(undefined, { skip: !open });
+  const { data: products = [] } = useGetProductsQuery(undefined, { skip: !open });
   const { data: dealCategories = [], isLoading: fetchingDealCategories } = useGetDealCategoriesQuery(
     undefined,
     { skip: !open }
   );
 
   const [fixedItems, setFixedItems] = useState([]);
-  // Normalized options structure: { productId: string | null, name: string, extraPrice: number }
   const [choiceGroups, setChoiceGroups] = useState([]);
+
+  // Fast ID Lookup Map
+  const productMap = useMemo(() => {
+    const map = new Map();
+    products.forEach((p) => {
+      map.set(String(p._id), p);
+      if (p.id) map.set(String(p.id), p);
+    });
+    return map;
+  }, [products]);
 
   const { control, handleSubmit, reset, setValue } = useForm({
     resolver: yupResolver(schema),
@@ -67,23 +76,31 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
     value: cat.label,
   }));
 
-  // 1. Calculate sum from fixed items
+  // Clean String ID extractor
+  const extractId = (val) => {
+    if (!val) return null;
+    if (typeof val === 'string') return val;
+    if (typeof val === 'object' && val._id) return String(val._id);
+    return null;
+  };
+
+  // 1. Fixed Items Sum
   const fixedItemsSum = fixedItems.reduce((sum, item) => {
-    const prod = products.find((p) => p._id === item.productId);
+    const prod = productMap.get(String(item.productId));
     return sum + (prod ? prod.price * (item.quantity || 1) : 0);
   }, 0);
 
-  // 2. Calculate baseline sum from choice groups
+  // 2. Choice Groups Baseline Sum
   const choiceGroupsSum = choiceGroups.reduce((sum, group) => {
     const groupPrices = (group.options || []).map((opt) => {
       if (opt.productId) {
-        const prod = products.find((p) => p._id === opt.productId);
+        const prod = productMap.get(String(opt.productId));
         return prod ? prod.price : 0;
       }
       return 0;
     });
 
-    const maxPriceInGroup = groupPrices.length > 0 ? Math.max(...groupPrices) : 0;
+    const maxPriceInGroup = groupPrices.length > 0 ? Math.max(...groupPrices, 0) : 0;
     return sum + maxPriceInGroup * (group.selectCount || 1);
   }, 0);
 
@@ -117,26 +134,26 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
           image: null,
         });
 
-        // 1. Map Fixed items cleanly
-        const mappedFixed = (initialValues.fixedItems || initialValues.items || []).map((item) => ({
-          productId: typeof item.product === 'object' ? item.product?._id : item.product,
+        // 1. Map Fixed items
+        const rawFixed = initialValues.fixedItems || initialValues.items || [];
+        const mappedFixed = rawFixed.map((item) => ({
+          productId: extractId(item.product) || extractId(item),
           quantity: item.quantity || 1,
         }));
         setFixedItems(mappedFixed);
 
-        // 2. Map Choice groups cleanly (Extract ID string and exact product name)
-        const mappedChoices = (initialValues.choiceGroups || []).map((cg) => ({
+        // 2. Map Choice Groups (Persist productId regardless of productMap loading state)
+        const rawChoiceGroups = initialValues.choiceGroups || [];
+        const mappedChoices = rawChoiceGroups.map((cg) => ({
           title: cg.title || '',
           selectCount: cg.selectCount || 1,
           options: (cg.options || []).map((opt) => {
-            const rawProd = opt.product;
-            const prodId = rawProd ? (typeof rawProd === 'object' ? rawProd._id : rawProd) : null;
-            const matchedProd = prodId ? products.find((p) => p._id === prodId) : null;
-            const optName = opt.name || rawProd?.name || matchedProd?.name || 'Item';
+            const rawId = extractId(opt.product) || (opt.productId ? String(opt.productId) : null);
+            const isCustomWithoutId = !rawId && opt.name && opt.name !== 'Item';
 
             return {
-              productId: prodId,
-              name: optName,
+              productId: isCustomWithoutId ? null : rawId,
+              name: opt.name || 'Item',
               extraPrice: opt.extraPrice || 0,
             };
           }),
@@ -155,18 +172,18 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
         setChoiceGroups([]);
       }
     }
-  }, [open, initialValues, reset, dealCategories]);
+  }, [open, initialValues, reset]);
 
   useEffect(() => {
     if (autoCalculatedTotal > 0 && (!customOriginalPrice || customOriginalPrice === '')) {
       setValue('customOriginalPrice', autoCalculatedTotal);
     }
-  }, [autoCalculatedTotal, setValue]);
+  }, [autoCalculatedTotal, setValue, customOriginalPrice]);
 
   // Fixed items helpers
   const handleAddFixedItem = () => {
     if (products.length === 0) return;
-    setFixedItems((prev) => [...prev, { productId: products[0]._id, quantity: 1 }]);
+    setFixedItems((prev) => [...prev, { productId: String(products[0]._id), quantity: 1 }]);
   };
 
   const handleRemoveFixedItem = (index) => {
@@ -197,19 +214,28 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
     );
   };
 
-  // Multi-select menu products handler
+  // Handle Multi-Select Product Pool
   const handleProductSelectChange = (groupIndex, selectedProductIds) => {
     setChoiceGroups((prev) =>
       prev.map((cg, i) => {
         if (i !== groupIndex) return cg;
-        const currentCustomOptions = cg.options.filter((opt) => !opt.productId);
 
-        const newProductOptions = selectedProductIds.map((prodId) => {
-          const existing = cg.options.find((opt) => opt.productId === prodId);
-          if (existing) return existing;
-          const prod = products.find((p) => p._id === prodId);
+        // Retain any custom dips/sauces (options without productId)
+        const customItems = (cg.options || []).filter((opt) => !opt.productId);
+
+        const productItems = selectedProductIds.map((prodId) => {
+          const existing = (cg.options || []).find((opt) => String(opt.productId) === String(prodId));
+          if (existing) {
+            const prod = productMap.get(String(prodId));
+            return {
+              ...existing,
+              name: prod?.name || existing.name,
+            };
+          }
+
+          const prod = productMap.get(String(prodId));
           return {
-            productId: prodId,
+            productId: String(prodId),
             name: prod?.name || 'Item',
             extraPrice: 0,
           };
@@ -217,24 +243,26 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
 
         return {
           ...cg,
-          options: [...newProductOptions, ...currentCustomOptions],
+          options: [...productItems, ...customItems],
         };
       })
     );
   };
 
-  // Add Dip Preset / Custom non-menu option
+  // Quick Add Custom Dips
   const handleAddCustomOption = (groupIndex, customName) => {
     if (!customName || !customName.trim()) return;
     setChoiceGroups((prev) =>
       prev.map((cg, i) => {
         if (i !== groupIndex) return cg;
-        if (cg.options.some((opt) => opt.name.toLowerCase() === customName.trim().toLowerCase())) {
-          return cg;
-        }
+        const exists = (cg.options || []).some(
+          (opt) => opt.name?.toLowerCase() === customName.trim().toLowerCase()
+        );
+        if (exists) return cg;
+
         return {
           ...cg,
-          options: [...cg.options, { productId: null, name: customName.trim(), extraPrice: 0 }],
+          options: [...(cg.options || []), { productId: null, name: customName.trim(), extraPrice: 0 }],
         };
       })
     );
@@ -244,7 +272,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
     setChoiceGroups((prev) =>
       prev.map((cg, i) => {
         if (i !== groupIndex) return cg;
-        const updatedOptions = cg.options.map((opt, oi) =>
+        const updatedOptions = (cg.options || []).map((opt, oi) =>
           oi === optionIndex ? { ...opt, extraPrice: extraPrice || 0 } : opt
         );
         return { ...cg, options: updatedOptions };
@@ -256,7 +284,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
     setChoiceGroups((prev) =>
       prev.map((cg, i) => {
         if (i !== groupIndex) return cg;
-        return { ...cg, options: cg.options.filter((_, oi) => oi !== optionIndex) };
+        return { ...cg, options: (cg.options || []).filter((_, oi) => oi !== optionIndex) };
       })
     );
   };
@@ -279,11 +307,14 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
       title: cg.title,
       selectCount: cg.selectCount,
       required: true,
-      options: cg.options.map((opt) => ({
-        product: opt.productId || null,
-        name: opt.name,
-        extraPrice: Number(opt.extraPrice) || 0,
-      })),
+      options: (cg.options || []).map((opt) => {
+        const prod = opt.productId ? productMap.get(String(opt.productId)) : null;
+        return {
+          product: opt.productId || null,
+          name: prod?.name || opt.name, // Guarantee exact product name on save
+          extraPrice: Number(opt.extraPrice) || 0,
+        };
+      }),
     }));
     formData.append('choiceGroups', JSON.stringify(formattedChoices));
 
@@ -292,6 +323,24 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
     }
 
     onSubmit(formData);
+  };
+
+  // Renders the tags cleanly inside the Select component
+  const renderProductTag = ({ label, value, closable, onClose }) => {
+    // If label is resolved by Ant Design, use it; otherwise fallback to productMap
+    const prod = productMap.get(String(value));
+    const display = label || prod?.name || value;
+
+    return (
+      <Tag
+        closable={closable}
+        onClose={onClose}
+        style={{ marginRight: 4 }}
+        className="text-xs font-semibold text-gray-800 bg-gray-100 border-gray-200"
+      >
+        {display}
+      </Tag>
+    );
   };
 
   return (
@@ -325,7 +374,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
               size="small"
               icon={<PlusOutlined />}
               onClick={handleAddFixedItem}
-              disabled={fetchingProducts || products.length === 0}
+              disabled={products.length === 0}
             >
               Add Fixed Item
             </Button>
@@ -344,7 +393,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                     value={item.productId}
                     onChange={(val) => handleFixedItemChange(index, 'productId', val)}
                     options={products.map((p) => ({
-                      value: p._id,
+                      value: String(p._id),
                       label: `${p.name} ${p.price > 0 ? `(Rs. ${p.price})` : ''}`,
                     }))}
                   />
@@ -393,10 +442,10 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
           ) : (
             <div className="space-y-4">
               {choiceGroups.map((cg, groupIndex) => {
-                // Extract clean product string IDs to pre-fill the select field correctly
+                // Collect purely valid product IDs that belong to the DB
                 const selectedProductIds = (cg.options || [])
-                  .filter((opt) => Boolean(opt.productId))
-                  .map((opt) => opt.productId);
+                  .filter((opt) => opt.productId && productMap.has(String(opt.productId)))
+                  .map((opt) => String(opt.productId));
 
                 return (
                   <div key={groupIndex} className="bg-white p-4 rounded-lg border border-purple-200 space-y-3 shadow-xs">
@@ -427,6 +476,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                     </div>
 
                     {/* Multi-Select Menu Products */}
+                    {/* Multi-Select Menu Products */}
                     <div>
                       <span className="text-xs text-gray-500 mb-1 block">Add Regular Menu Products to Choice Pool:</span>
                       <Select
@@ -436,10 +486,11 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                         maxTagCount="responsive"
                         className="w-full"
                         placeholder="Type to search burgers, fries, drinks..."
-                        value={selectedProductIds}
+                        value={(cg.options || []).filter((opt) => opt.productId).map((opt) => String(opt.productId))}
+                        tagRender={renderProductTag}
                         onChange={(vals) => handleProductSelectChange(groupIndex, vals)}
                         options={products.map((p) => ({
-                          value: p._id,
+                          value: String(p._id),
                           label: `${p.name} (Rs. ${p.price})`,
                         }))}
                       />
@@ -462,48 +513,54 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                       </div>
                     </div>
 
-                    {/* Option Details & +Extra Price Configuration */}
-                    {cg.options.length > 0 && (
+                    {/* Configured Options & Upgrade Prices */}
+                    {cg.options && cg.options.length > 0 && (
                       <div className="pt-2 border-t border-gray-100">
                         <span className="text-xs font-semibold text-gray-700 block mb-2">
                           Configured Options & Upgrade Prices:
                         </span>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {cg.options.map((opt, optIdx) => (
-                            <div
-                              key={optIdx}
-                              className="flex items-center justify-between bg-gray-50 px-2.5 py-1.5 rounded-md border border-gray-200 text-xs"
-                            >
-                              <div className="flex items-center gap-1.5 truncate max-w-42.5">
-                                <Tag color={opt.productId ? 'blue' : 'orange'} className="text-[10px] px-1 py-0 m-0">
-                                  {opt.productId ? 'Item' : 'Dip'}
-                                </Tag>
-                                <span className="font-medium text-gray-800 truncate" title={opt.name}>
-                                  {opt.name}
-                                </span>
-                              </div>
+                          {cg.options.map((opt, optIdx) => {
+                            const isProductItem = opt.productId && productMap.has(String(opt.productId));
+                            const prod = isProductItem ? productMap.get(String(opt.productId)) : null;
+                            const optionDisplayName = prod?.name || opt.name;
 
-                              <div className="flex items-center gap-1">
-                                <span className="text-gray-500 text-[11px]">+Rs.</span>
-                                <InputNumber
-                                  size="small"
-                                  min={0}
-                                  max={2000}
-                                  placeholder="0"
-                                  value={opt.extraPrice}
-                                  onChange={(val) => handleOptionExtraPriceChange(groupIndex, optIdx, val)}
-                                  style={{ width: 60 }}
-                                />
-                                <Button
-                                  type="text"
-                                  size="small"
-                                  danger
-                                  icon={<DeleteOutlined className="text-xs" />}
-                                  onClick={() => handleRemoveOption(groupIndex, optIdx)}
-                                />
+                            return (
+                              <div
+                                key={optIdx}
+                                className="flex items-center justify-between bg-gray-50 px-2.5 py-1.5 rounded-md border border-gray-200 text-xs"
+                              >
+                                <div className="flex items-center gap-1.5 truncate max-w-[170px]">
+                                  <Tag color={isProductItem ? 'blue' : 'orange'} className="text-[10px] px-1 py-0 m-0">
+                                    {isProductItem ? 'Item' : 'Dip'}
+                                  </Tag>
+                                  <span className="font-medium text-gray-800 truncate" title={optionDisplayName}>
+                                    {optionDisplayName}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  <span className="text-gray-500 text-[11px]">+Rs.</span>
+                                  <InputNumber
+                                    size="small"
+                                    min={0}
+                                    max={2000}
+                                    placeholder="0"
+                                    value={opt.extraPrice}
+                                    onChange={(val) => handleOptionExtraPriceChange(groupIndex, optIdx, val)}
+                                    style={{ width: 60 }}
+                                  />
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    danger
+                                    icon={<DeleteOutlined className="text-xs" />}
+                                    onClick={() => handleRemoveOption(groupIndex, optIdx)}
+                                  />
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
