@@ -1,4 +1,3 @@
-// back-end/controllers/productController.js
 const Product = require('../models/Product');
 const path = require('path');
 
@@ -14,10 +13,27 @@ const parseCategories = (input) => {
   }
 };
 
+// Helper to safely parse booleans from FormData
+const parseBoolean = (val, defaultValue = false) => {
+  if (val === undefined || val === null) return defaultValue;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'string') return val.toLowerCase() === 'true';
+  return Boolean(val);
+};
+
 // GET all products
 const getProducts = async (req, res) => {
   try {
-    const products = await Product.find({}).sort({ createdAt: -1 });
+    const { publicOnly } = req.query;
+    const filter = {};
+
+    // If public storefront requests products, exclude deal-only items
+    if (publicOnly === 'true') {
+      filter.isDealOnly = { $ne: true };
+      filter.isShown = true;
+    }
+
+    const products = await Product.find(filter).sort({ createdAt: -1 });
     res.status(200).json(products);
   } catch (error) {
     res.status(500).json({ message: 'Server error fetching products', error: error.message });
@@ -27,7 +43,17 @@ const getProducts = async (req, res) => {
 // POST create new product
 const createProduct = async (req, res) => {
   try {
-    const { name, categories, category, price, description } = req.body;
+    const { name, categories, category, price, description, isShown, isDealOnly } = req.body;
+
+    const isDealOnlyBool = parseBoolean(isDealOnly, false);
+    const parsedPrice = Number(price);
+
+    // Validate price: deal-only items can be 0, standard menu items must be > 0
+    if (!isDealOnlyBool && (isNaN(parsedPrice) || parsedPrice <= 0)) {
+      return res.status(400).json({
+        message: 'Regular menu products must have a price greater than 0. Enable "Deal-Only" if this item is free or exclusive to bundles.',
+      });
+    }
 
     const generatedId = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
 
@@ -51,12 +77,13 @@ const createProduct = async (req, res) => {
 
     const newProduct = new Product({
       id: generatedId,
-      name,
+      name: name.trim(),
       categories: finalCategories,
-      price: Number(price),
+      price: isNaN(parsedPrice) ? 0 : parsedPrice,
       description,
       image: imagePath,
-      isShown: true,
+      isShown: parseBoolean(isShown, true),
+      isDealOnly: isDealOnlyBool,
     });
 
     const savedProduct = await newProduct.save();
@@ -77,16 +104,28 @@ const createProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, categories, category, price, description, isShown } = req.body;
+    const { name, categories, category, price, description, isShown, isDealOnly } = req.body;
 
     const product = await Product.findById(id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Update text & array fields if provided
+    if (isDealOnly !== undefined) {
+      product.isDealOnly = parseBoolean(isDealOnly, false);
+    }
+
+    if (price !== undefined) {
+      const parsedPrice = Number(price);
+      if (!product.isDealOnly && parsedPrice <= 0) {
+        return res.status(400).json({
+          message: 'Regular menu products must have a price greater than 0.',
+        });
+      }
+      product.price = parsedPrice;
+    }
+
     if (name) product.name = name.trim();
-    if (price) product.price = Number(price);
     if (description !== undefined) product.description = description;
 
     const rawCategoryInput = categories !== undefined ? categories : category;
@@ -95,7 +134,7 @@ const updateProduct = async (req, res) => {
     }
 
     if (isShown !== undefined) {
-      product.isShown = typeof isShown === 'string' ? isShown === 'true' : Boolean(isShown);
+      product.isShown = parseBoolean(isShown, true);
     }
 
     if (req.file) {

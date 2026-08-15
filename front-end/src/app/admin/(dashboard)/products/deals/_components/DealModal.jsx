@@ -461,7 +461,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                         <span className="text-xs text-purple-700 font-semibold">Pick Count:</span>
                         <InputNumber
                           min={1}
-                          max={10}
+                          max={16}
                           value={cg.selectCount}
                           onChange={(val) => handleChoiceGroupFieldChange(groupIndex, 'selectCount', val || 1)}
                           style={{ width: 55 }}
