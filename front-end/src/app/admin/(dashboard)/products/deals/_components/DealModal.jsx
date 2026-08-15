@@ -1,4 +1,3 @@
-// front-end/src/app/admin/products/deals/_components/DealModal.jsx
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -17,6 +16,7 @@ import { useGetProductsQuery } from '@/services/productApi';
 import { useGetDealCategoriesQuery } from '@/services/dealCategoryApi';
 
 const DIP_PRESETS = ['Chili Garlic Dip', 'Chipotle Mayo Dip', 'Mayo Garlic Dip'];
+const KIDDY_BOX_PRESETS = ['Kitty Box', 'Dinosaur Box', 'Unicorn Box', 'Cool Toy'];
 
 const schema = yup.object().shape({
   title: yup.string().required('Deal title is required'),
@@ -45,6 +45,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
 
   const [fixedItems, setFixedItems] = useState([]);
   const [choiceGroups, setChoiceGroups] = useState([]);
+  const [customInputDrafts, setCustomInputDrafts] = useState({});
 
   // Fast ID Lookup Map
   const productMap = useMemo(() => {
@@ -76,7 +77,6 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
     value: cat.label,
   }));
 
-  // Clean String ID extractor
   const extractId = (val) => {
     if (!val) return null;
     if (typeof val === 'string') return val;
@@ -134,7 +134,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
           image: null,
         });
 
-        // 1. Map Fixed items
+        // Map Fixed items
         const rawFixed = initialValues.fixedItems || initialValues.items || [];
         const mappedFixed = rawFixed.map((item) => ({
           productId: extractId(item.product) || extractId(item),
@@ -142,18 +142,19 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
         }));
         setFixedItems(mappedFixed);
 
-        // 2. Map Choice Groups (Persist productId regardless of productMap loading state)
+        // Map Choice Groups
         const rawChoiceGroups = initialValues.choiceGroups || [];
         const mappedChoices = rawChoiceGroups.map((cg) => ({
           title: cg.title || '',
           selectCount: cg.selectCount || 1,
           options: (cg.options || []).map((opt) => {
             const rawId = extractId(opt.product) || (opt.productId ? String(opt.productId) : null);
-            const isCustomWithoutId = !rawId && opt.name && opt.name !== 'Item';
+            const isCustom = !rawId && opt.name;
 
             return {
-              productId: isCustomWithoutId ? null : rawId,
+              productId: isCustom ? null : rawId,
               name: opt.name || 'Item',
+              image: opt.image || null,
               extraPrice: opt.extraPrice || 0,
             };
           }),
@@ -214,29 +215,30 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
     );
   };
 
-  // Handle Multi-Select Product Pool
+  // Product Selection Change
   const handleProductSelectChange = (groupIndex, selectedProductIds) => {
     setChoiceGroups((prev) =>
       prev.map((cg, i) => {
         if (i !== groupIndex) return cg;
 
-        // Retain any custom dips/sauces (options without productId)
+        // Keep non-product items (boxes, custom toys, dips)
         const customItems = (cg.options || []).filter((opt) => !opt.productId);
 
         const productItems = selectedProductIds.map((prodId) => {
           const existing = (cg.options || []).find((opt) => String(opt.productId) === String(prodId));
+          const prod = productMap.get(String(prodId));
+
           if (existing) {
-            const prod = productMap.get(String(prodId));
             return {
               ...existing,
               name: prod?.name || existing.name,
             };
           }
 
-          const prod = productMap.get(String(prodId));
           return {
             productId: String(prodId),
             name: prod?.name || 'Item',
+            image: prod?.image || null,
             extraPrice: 0,
           };
         });
@@ -249,8 +251,8 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
     );
   };
 
-  // Quick Add Custom Dips
-  const handleAddCustomOption = (groupIndex, customName) => {
+  // Add Custom Option (Box, Toy, Dip, etc.)
+  const handleAddCustomOption = (groupIndex, customName, customImage = null) => {
     if (!customName || !customName.trim()) return;
     setChoiceGroups((prev) =>
       prev.map((cg, i) => {
@@ -262,7 +264,10 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
 
         return {
           ...cg,
-          options: [...(cg.options || []), { productId: null, name: customName.trim(), extraPrice: 0 }],
+          options: [
+            ...(cg.options || []),
+            { productId: null, name: customName.trim(), image: customImage, extraPrice: 0 },
+          ],
         };
       })
     );
@@ -311,7 +316,8 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
         const prod = opt.productId ? productMap.get(String(opt.productId)) : null;
         return {
           product: opt.productId || null,
-          name: prod?.name || opt.name, // Guarantee exact product name on save
+          name: prod?.name || opt.name,
+          image: opt.image || prod?.image || null,
           extraPrice: Number(opt.extraPrice) || 0,
         };
       }),
@@ -325,9 +331,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
     onSubmit(formData);
   };
 
-  // Renders the tags cleanly inside the Select component
   const renderProductTag = ({ label, value, closable, onClose }) => {
-    // If label is resolved by Ant Design, use it; otherwise fallback to productMap
     const prod = productMap.get(String(value));
     const display = label || prod?.name || value;
 
@@ -351,7 +355,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
       width={780}
     >
       <form onSubmit={handleSubmit(handleFinish)} className="mt-4 space-y-5 max-h-[78vh] overflow-y-auto pr-1">
-        <FormInput name="title" label="Deal Title" placeholder="e.g. Sliders Party Box, Super Savor 1" control={control} />
+        <FormInput name="title" label="Deal Title" placeholder="e.g. Sliders Party Box, Burger Meal (Kiddy)" control={control} />
 
         <FormSelect
           name="dealType"
@@ -367,7 +371,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
           <div className="flex justify-between items-center mb-3">
             <div>
               <span className="text-sm font-semibold text-gray-800 block">Fixed Items (Always Included)</span>
-              <span className="text-xs text-gray-500">Items that come automatically with this meal</span>
+              <span className="text-xs text-gray-500">Items that come automatically with this meal (e.g. Burger, Fries, Milk)</span>
             </div>
             <Button
               type="dashed"
@@ -423,8 +427,8 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
         <div className="border border-purple-200 rounded-lg p-4 bg-purple-50/30">
           <div className="flex justify-between items-center mb-3">
             <div>
-              <span className="text-sm font-semibold text-purple-900 block">Customer Choice Groups & Upgrades</span>
-              <span className="text-xs text-purple-600">e.g. "Choose Fries (+Rs. 300 for Loaded)", "Select 3 Dips"</span>
+              <span className="text-sm font-semibold text-purple-900 block">Customer Choice Groups & Options</span>
+              <span className="text-xs text-purple-600">e.g. "Meal Box" (Pick 1), "Surprise" (Pick 1), "Choose 3 Dips"</span>
             </div>
             <Button
               type="primary"
@@ -438,21 +442,22 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
           </div>
 
           {choiceGroups.length === 0 ? (
-            <p className="text-xs text-purple-400 italic py-2 text-center">No customizable choice rules added.</p>
+            <p className="text-xs text-purple-400 italic py-2 text-center">No choice groups added.</p>
           ) : (
             <div className="space-y-4">
               {choiceGroups.map((cg, groupIndex) => {
-                // Collect purely valid product IDs that belong to the DB
                 const selectedProductIds = (cg.options || [])
-                  .filter((opt) => opt.productId && productMap.has(String(opt.productId)))
+                  .filter((opt) => opt.productId)
                   .map((opt) => String(opt.productId));
+
+                const draftName = customInputDrafts[groupIndex] || '';
 
                 return (
                   <div key={groupIndex} className="bg-white p-4 rounded-lg border border-purple-200 space-y-3 shadow-xs">
                     {/* Header: Title & Pick Count */}
                     <div className="flex items-center gap-3">
                       <Input
-                        placeholder="e.g. Choose Your Fries OR Select 3 Dips"
+                        placeholder="e.g. Meal Box OR Surprise OR Choose Fries"
                         value={cg.title}
                         onChange={(e) => handleChoiceGroupFieldChange(groupIndex, 'title', e.target.value)}
                         className="font-medium text-gray-800"
@@ -461,7 +466,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                         <span className="text-xs text-purple-700 font-semibold">Pick Count:</span>
                         <InputNumber
                           min={1}
-                          max={16}
+                          max={10}
                           value={cg.selectCount}
                           onChange={(val) => handleChoiceGroupFieldChange(groupIndex, 'selectCount', val || 1)}
                           style={{ width: 55 }}
@@ -476,53 +481,79 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                     </div>
 
                     {/* Multi-Select Menu Products */}
-                    {/* Multi-Select Menu Products */}
                     <div>
-                      <span className="text-xs text-gray-500 mb-1 block">Add Regular Menu Products to Choice Pool:</span>
+                      <span className="text-xs text-gray-500 mb-1 block">Add Menu Products / Sliders to Pool:</span>
                       <Select
                         mode="multiple"
                         showSearch
                         optionFilterProp="label"
                         maxTagCount="responsive"
                         className="w-full"
-                        placeholder="Type to search burgers, fries, drinks..."
-                        value={(cg.options || []).filter((opt) => opt.productId).map((opt) => String(opt.productId))}
+                        placeholder="Select products..."
+                        value={selectedProductIds}
                         tagRender={renderProductTag}
                         onChange={(vals) => handleProductSelectChange(groupIndex, vals)}
                         options={products.map((p) => ({
                           value: String(p._id),
-                          label: `${p.name} (Rs. ${p.price})`,
+                          label: `${p.name} ${p.isDealOnly ? '(Deal Only)' : `(Rs. ${p.price})`}`,
                         }))}
                       />
                     </div>
 
-                    {/* Quick Add Dips Presets */}
+                    {/* Presets / Quick Add */}
                     <div>
-                      <span className="text-xs text-gray-500 mb-1 block">Or Quick Add Dips / Sauces (Non-Menu Items):</span>
+                      <span className="text-xs text-gray-500 mb-1 block">Quick Add Presets:</span>
                       <div className="flex flex-wrap gap-1.5 items-center">
-                        {DIP_PRESETS.map((dipName) => (
+                        {[...KIDDY_BOX_PRESETS, ...DIP_PRESETS].map((preset) => (
                           <Button
-                            key={dipName}
+                            key={preset}
                             size="small"
-                            onClick={() => handleAddCustomOption(groupIndex, dipName)}
+                            onClick={() => handleAddCustomOption(groupIndex, preset)}
                             className="text-xs"
                           >
-                            + {dipName}
+                            + {preset}
                           </Button>
                         ))}
                       </div>
                     </div>
 
-                    {/* Configured Options & Upgrade Prices */}
+                    {/* Custom Text/Box/Toy Add Field */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <Input
+                        size="small"
+                        placeholder="Add custom option (e.g. Robot Box, Glow Toy)..."
+                        value={draftName}
+                        onChange={(e) =>
+                          setCustomInputDrafts((prev) => ({ ...prev, [groupIndex]: e.target.value }))
+                        }
+                        onPressEnter={() => {
+                          handleAddCustomOption(groupIndex, draftName);
+                          setCustomInputDrafts((prev) => ({ ...prev, [groupIndex]: '' }));
+                        }}
+                      />
+                      <Button
+                        size="small"
+                        type="primary"
+                        onClick={() => {
+                          handleAddCustomOption(groupIndex, draftName);
+                          setCustomInputDrafts((prev) => ({ ...prev, [groupIndex]: '' }));
+                        }}
+                        disabled={!draftName.trim()}
+                      >
+                        Add Option
+                      </Button>
+                    </div>
+
+                    {/* Configured Options List */}
                     {cg.options && cg.options.length > 0 && (
                       <div className="pt-2 border-t border-gray-100">
                         <span className="text-xs font-semibold text-gray-700 block mb-2">
-                          Configured Options & Upgrade Prices:
+                          Configured Options & Upgrades:
                         </span>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                           {cg.options.map((opt, optIdx) => {
-                            const isProductItem = opt.productId && productMap.has(String(opt.productId));
-                            const prod = isProductItem ? productMap.get(String(opt.productId)) : null;
+                            const isProduct = Boolean(opt.productId && productMap.has(String(opt.productId)));
+                            const prod = isProduct ? productMap.get(String(opt.productId)) : null;
                             const optionDisplayName = prod?.name || opt.name;
 
                             return (
@@ -531,8 +562,11 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                                 className="flex items-center justify-between bg-gray-50 px-2.5 py-1.5 rounded-md border border-gray-200 text-xs"
                               >
                                 <div className="flex items-center gap-1.5 truncate max-w-[170px]">
-                                  <Tag color={isProductItem ? 'blue' : 'orange'} className="text-[10px] px-1 py-0 m-0">
-                                    {isProductItem ? 'Item' : 'Dip'}
+                                  <Tag
+                                    color={isProduct ? 'blue' : 'green'}
+                                    className="text-[10px] px-1 py-0 m-0"
+                                  >
+                                    {isProduct ? 'Product' : 'Option'}
                                   </Tag>
                                   <span className="font-medium text-gray-800 truncate" title={optionDisplayName}>
                                     {optionDisplayName}
@@ -577,7 +611,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
             name="customOriginalPrice"
             label="Original Value (Rs)"
             type="number"
-            placeholder="e.g. 748"
+            placeholder="e.g. 599"
             control={control}
           />
 
@@ -585,7 +619,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
             name="discountPercentage"
             label="Discount (%)"
             type="number"
-            placeholder="e.g. 20"
+            placeholder="e.g. 0"
             control={control}
           />
 
@@ -603,7 +637,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
         </div>
 
         <FormImageUpload name="image" label="Deal Banner / Image" control={control} />
-        <FormInput name="description" label="Description" placeholder="e.g. 1 Value Burger + 1 Drink + 3 Dips" control={control} />
+        <FormInput name="description" label="Description" placeholder="e.g. 1 fried chicken burger, 1 fries, 1 flavored milk, and 1 surprise cool toy." control={control} />
 
         <div className="flex justify-end pt-4 mt-6 border-t border-gray-100">
           <Space size="middle">

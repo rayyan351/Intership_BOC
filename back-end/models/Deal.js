@@ -1,4 +1,3 @@
-// back-end/models/Deal.js
 const mongoose = require('mongoose');
 
 const fixedItemSchema = new mongoose.Schema(
@@ -27,7 +26,12 @@ const choiceOptionSchema = new mongoose.Schema(
     },
     name: {
       type: String,
-      required: true, // e.g. "Chipotle Mayo Dip" or "Cheese Burger Fries"
+      required: true, // e.g. "Kitty Box", "Cool Toy", "Chipotle Mayo Dip"
+      trim: true,
+    },
+    image: {
+      type: String,
+      default: null, // Stores optional icon/thumbnail URL for packaging boxes, toys, etc.
     },
     extraPrice: {
       type: Number,
@@ -42,7 +46,8 @@ const choiceGroupSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: true,
+      required: true, // e.g. "Meal Box", "Surprise", "Choose Your Drink"
+      trim: true,
     },
     selectCount: {
       type: Number,
