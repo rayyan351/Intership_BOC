@@ -1,3 +1,4 @@
+// src/app/(site)/_components/layout/SiteHeader.js
 "use client";
 
 import Image from "next/image";
@@ -8,92 +9,11 @@ import { useSelector, useDispatch } from "react-redux";
 import { setIsCartOpen } from "@/redux/cart/cartSlice";
 import { useLocation } from "@/context/LocationContext";
 import { DISPLAY_PHONE, ORDER_PHONE } from "@/lib/site";
-import styles from "./SiteHeader.module.css";
 
 const drawerLinks = [
   { label: "Blogs", href: "#blogs", icon: "document" },
   { label: "Our Locations", href: "#locations", icon: "location" },
 ];
-
-function DocumentIcon({ size = 19 }) {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      height={size}
-      viewBox="0 0 24 24"
-      width={size}
-    >
-      <path
-        d="M7 3.75h7.25L19 8.5v11.75H7a2 2 0 0 1-2-2V5.75a2 2 0 0 1 2-2Z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M14 4v5h5M9 13h6M9 16.5h6"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
-function ExternalLinkIcon({ size = 18 }) {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      height={size}
-      viewBox="0 0 24 24"
-      width={size}
-    >
-      <path
-        d="M14 5h5v5M19 5l-8 8"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
-function BellIcon({ size = 18 }) {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      height={size}
-      viewBox="0 0 24 24"
-      width={size}
-    >
-      <path
-        d="M18 9a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M10 21h4"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
 
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -102,14 +22,11 @@ export function SiteHeader() {
   const drawerRef = useRef(null);
   const dispatch = useDispatch();
 
-  // Pick calculated total quantity directly from state
   const totalQuantity = useSelector((state) => state.cart.totalQuantity);
-  
   const { selectedBranch, setIsLocationOpen } = useLocation();
 
   const closeMenu = useCallback((restoreFocus = true) => {
     setMenuOpen(false);
-
     if (restoreFocus) {
       window.requestAnimationFrame(() => menuButtonRef.current?.focus());
     }
@@ -128,11 +45,10 @@ export function SiteHeader() {
         return;
       }
 
-      // Keep keyboard focus inside the open navigation drawer.
       if (event.key !== "Tab" || !drawerRef.current) return;
 
       const focusableElements = drawerRef.current.querySelectorAll(
-        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
       );
 
       if (!focusableElements.length) return;
@@ -159,12 +75,15 @@ export function SiteHeader() {
 
   return (
     <>
-      <header className={styles.header}>
-        <div className={styles.inner}>
-          <div className={styles.brandGroup}>
+      {/* Header Container (Notice: no high z-index, allowing the hero carousel to overlap on top) */}
+      <header className="relative min-h-[102px] sm:min-h-[136px] -mb-[18px] sm:-mb-[36px] rounded-b-[28px] sm:rounded-b-[46px] bg-black text-white overflow-hidden">
+        <div className="flex w-[calc(100%-24px)] md:w-[min(100%-32px,1120px)] lg:w-[min(1120px,calc(100%-48px))] min-h-[84px] sm:min-h-[100px] items-center justify-between gap-2 md:gap-7 mx-auto">
+          
+          {/* Brand Group */}
+          <div className="flex items-center min-w-0 gap-[7px] sm:gap-3">
             <Link
               aria-label="Burger O'Clock home"
-              className={styles.logoLink}
+              className="inline-flex shrink-0"
               href="/"
             >
               <Image
@@ -173,83 +92,98 @@ export function SiteHeader() {
                 priority
                 src="/images/brand/BurgerO'clock logo.webp"
                 width={136}
+                className="w-[92px] min-[430px]:w-[100px] sm:w-[120px] h-auto object-contain"
               />
             </Link>
 
+            {/* Location Selector */}
             <button
               aria-label={`Change delivery location. Current location: ${selectedBranch.name}`}
-              className={styles.locationButton}
+              className="grid min-h-[38px] sm:min-h-[40px] max-w-[110px] min-[430px]:max-w-[132px] sm:max-w-none sm:min-w-[176px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[7px] px-[7px] sm:pl-2 sm:pr-3 py-[5px] text-left border border-[#F4C61A] rounded-full bg-transparent text-[#F4C61A] transition-all duration-200 hover:-translate-y-[1px] hover:bg-[#F4C61A] hover:text-black group"
               onClick={() => setIsLocationOpen(true)}
               type="button"
             >
-              <span className={styles.locationIcon}>
-                <Icon name="location" size={15} strokeWidth={2.2} />
+              <span className="grid w-[22px] h-[22px] sm:w-6 sm:h-6 place-items-center rounded-full bg-current shrink-0">
+                <span className="text-black group-hover:text-black flex items-center justify-center">
+                  <Icon name="location" size={15} strokeWidth={2.2} />
+                </span>
               </span>
 
-              <span className={styles.locationCopy}>
-                <small>Change location</small>
-                <strong>{selectedBranch.name}</strong>
+              <span className="grid min-w-0 leading-[1.02]">
+                <small className="hidden sm:block text-[0.65rem] font-extrabold tracking-[0.015em] normal-case text-inherit">
+                  Change location
+                </small>
+                <strong className="max-w-[58px] min-[430px]:max-w-[76px] sm:max-w-[108px] sm:mt-[3px] truncate text-[0.67rem] sm:text-[0.7rem] font-extrabold text-inherit">
+                  {selectedBranch.name}
+                </strong>
               </span>
 
-              <Icon
-                className={styles.locationChevron}
-                name="chevronDown"
-                size={14}
-              />
+              <span className="hidden sm:inline-flex shrink-0">
+                <Icon name="chevronDown" size={14} />
+              </span>
             </button>
 
+            {/* Phone Button */}
             <a
               aria-label={`Call Burger O'Clock at ${DISPLAY_PHONE}`}
-              className={styles.phoneButton}
+              className="hidden min-[680px]:inline-flex items-center gap-[7px] min-h-[40px] px-3 border border-[#F4C61A] rounded-full bg-transparent text-[#F4C61A] text-[0.7rem] font-extrabold whitespace-nowrap transition-all duration-200 hover:-translate-y-[1px] hover:bg-[#F4C61A] hover:text-black"
               href={`tel:${ORDER_PHONE}`}
             >
               <Icon name="phone" size={16} strokeWidth={2.1} />
-              <span>{DISPLAY_PHONE}</span>
+              <span className="hidden md:inline">{DISPLAY_PHONE}</span>
             </a>
           </div>
 
-          <div className={styles.actionGroup}>
+          {/* Action Group */}
+          <div className="flex items-center shrink-0 gap-[2px] sm:gap-[7px]">
+            {/* Cart Trigger */}
             <button
               aria-label={`Open cart with ${totalQuantity} ${totalQuantity === 1 ? "item" : "items"}`}
-              className={styles.cartButton}
+              className="relative grid place-items-center w-[43px] h-[43px] sm:w-12 sm:h-12 shrink-0 p-0 rounded-full bg-transparent transition-transform duration-200 hover:-translate-y-[2px]"
               onClick={() => dispatch(setIsCartOpen(true))}
               type="button"
             >
               <Image
                 alt=""
                 aria-hidden="true"
-                className={styles.cartImage}
+                className="w-[39px] h-[39px] sm:w-11 sm:h-11 object-contain"
                 height={44}
                 src="/images/brand/Cart-icon.webp"
                 width={44}
               />
-              <span className={styles.cartBadge}>{totalQuantity}</span>
+              <span className="absolute -top-[2px] sm:-top-[1px] -left-[2px] sm:-left-[1px] grid place-items-center min-w-[18px] h-[18px] px-1 border-2 border-black rounded-full bg-[#F4C61A] text-black text-[0.61rem] font-black leading-none">
+                {totalQuantity}
+              </span>
             </button>
 
+            {/* Hamburger Button */}
             <button
               aria-controls="site-navigation-drawer"
               aria-expanded={menuOpen}
               aria-label="Open website menu"
-              className={styles.menuButton}
+              className="group grid place-content-center w-9 h-[42px] sm:w-10 sm:h-11 shrink-0 p-0 rounded-full bg-transparent gap-[5px]"
               onClick={() => setMenuOpen(true)}
               ref={menuButtonRef}
               type="button"
             >
-              <span />
-              <span />
-              <span />
+              <span className="block w-[22px] sm:w-6 h-[2px] rounded-full bg-[#F4C61A] transition-all duration-200" />
+              <span className="block w-4 sm:w-[18px] h-[2px] rounded-full bg-[#F4C61A] justify-self-end transition-all duration-200 group-hover:w-[22px] sm:group-hover:w-6" />
+              <span className="block w-[22px] sm:w-6 h-[2px] rounded-full bg-[#F4C61A] transition-all duration-200" />
             </button>
           </div>
         </div>
       </header>
 
+      {/* Drawer Layer (Keeps high z-index for modal overlay) */}
       <div
         aria-hidden={!menuOpen}
-        className={`${styles.drawerLayer} ${menuOpen ? styles.drawerLayerOpen : ""}`}
+        className={`fixed inset-0 z-[500] transition-[visibility,opacity] duration-300 ${
+          menuOpen ? "visible opacity-100 pointer-events-auto" : "invisible opacity-0 pointer-events-none"
+        }`}
       >
         <button
           aria-label="Close website menu"
-          className={styles.drawerBackdrop}
+          className="absolute inset-0 w-full h-full p-0 bg-black/40 backdrop-blur-[7px] transition-opacity duration-200"
           onClick={() => closeMenu()}
           tabIndex={-1}
           type="button"
@@ -258,17 +192,21 @@ export function SiteHeader() {
         <aside
           aria-labelledby="site-navigation-title"
           aria-modal="true"
-          className={styles.drawer}
+          className={`absolute top-1 right-0 flex flex-col w-[min(312px,calc(100%-56px))] h-[calc(100dvh-4px)] overflow-hidden bg-white text-[#101010] shadow-[-24px_0_70px_rgba(0,0,0,0.18)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            menuOpen ? "translate-x-0" : "translate-x-[102%]"
+          }`}
           id="site-navigation-drawer"
           ref={drawerRef}
           role="dialog"
         >
-          <div className={styles.drawerHeader}>
-            <h2 id="site-navigation-title">Burger O&apos;Clock</h2>
+          <div className="flex items-center justify-between min-h-[64px] px-3.5 py-2 border-b border-[#eeeeee]">
+            <h2 id="site-navigation-title" className="m-0 text-[0.88rem] font-bold tracking-[-0.015em] text-[#101010]">
+              Burger O&apos;Clock
+            </h2>
 
             <button
               aria-label="Close website menu"
-              className={styles.closeButton}
+              className="grid place-items-center w-9 h-9 border border-[#eeeeee] rounded-full bg-white text-[#111111] shadow-[0_3px_12px_rgba(0,0,0,0.05)] transition-all duration-200 hover:rotate-6 hover:bg-[#f6f6f6]"
               onClick={() => closeMenu()}
               ref={closeButtonRef}
               tabIndex={menuOpen ? 0 : -1}
@@ -278,26 +216,23 @@ export function SiteHeader() {
             </button>
           </div>
 
-          <nav aria-label="Website menu" className={styles.drawerNavigation}>
+          <nav aria-label="Website menu" className="grid gap-2 p-3">
             {drawerLinks.map((item) => (
               <a
                 href={item.href}
                 key={item.label}
                 onClick={() => closeMenu()}
                 tabIndex={menuOpen ? 0 : -1}
+                className="grid grid-cols-[24px_minmax(0,1fr)_20px] items-center gap-2 min-h-[44px] px-[11px] rounded-[11px] bg-[#f8f8f8] text-[#171717] transition-all duration-200 hover:-translate-x-[2px] hover:bg-[#f1f1f1]"
               >
-                <span className={styles.drawerLinkIcon}>
-                  {item.icon === "document" ? (
-                    <DocumentIcon />
-                  ) : (
-                    <Icon name="location" size={19} strokeWidth={1.8} />
-                  )}
+                <span className="grid place-items-center text-[#171717]">
+                  <Icon name={item.icon} size={19} strokeWidth={1.8} />
                 </span>
 
-                <strong>{item.label}</strong>
+                <strong className="text-[0.82rem] font-medium">{item.label}</strong>
 
-                <span className={styles.externalIcon}>
-                  <ExternalLinkIcon />
+                <span className="grid place-items-center text-[#777777]">
+                  <Icon name="externalLink" size={18} strokeWidth={1.8} />
                 </span>
               </a>
             ))}
@@ -305,16 +240,18 @@ export function SiteHeader() {
 
           <button
             aria-label="Open notifications"
-            className={styles.notificationButton}
+            className="absolute right-[18px] bottom-[57px] grid place-items-center w-[34px] h-[34px] border-[3px] border-[#f4c61a] rounded-full bg-[#fff6bf] text-[#9c8417] shadow-[0_4px_14px_rgba(0,0,0,0.13)]"
             tabIndex={menuOpen ? 0 : -1}
             type="button"
           >
-            <BellIcon />
+            <Icon name="bell" size={18} strokeWidth={1.8} />
           </button>
 
-          <footer className={styles.drawerFooter}>
+          <footer className="flex items-center justify-center gap-[7px] min-h-[52px] mt-auto pr-[52px] pl-4 pb-2 pt-2 text-[0.66rem] text-[#4e4e4e]">
             <span>Powered By</span>
-            <strong>indolj</strong>
+            <strong className="text-[0.8rem] font-bold text-[#1d1d1d] underline underline-offset-[3px] decoration-[#cfcfcf]">
+              indolj
+            </strong>
           </footer>
         </aside>
       </div>

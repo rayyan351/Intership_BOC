@@ -21,4 +21,7 @@ export const endpoints = {
   sections: {
     base: "/sections",
   },
-}
+  menu:{
+    feed: '/menu-feed',
+  },
+};

@@ -1,8 +1,0 @@
-.cityTabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 5px; border-radius: 999px; background: var(--color-soft); }
-.cityTabs button { min-height: 42px; border-radius: 999px; background: transparent; font-weight: 800; }
-.cityTabs .active { background: var(--color-yellow); }
-.branchList { display: grid; gap: 10px; margin-top: 20px; }
-.branchList > button { display: grid; gap: 5px; padding: 17px 18px; border: 1px solid var(--color-border); border-radius: 14px; background: white; text-align: left; }
-.branchList > button:hover, .branchList .selected { border-color: var(--color-yellow-dark); box-shadow: 0 0 0 2px rgb(255 196 0 / 16%); }
-.branchList span { color: var(--color-muted); font-size: .8rem; line-height: 1.45; }
-.branchList small { color: #676e7a; font-weight: 700; }

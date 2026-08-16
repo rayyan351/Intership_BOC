@@ -1,3 +1,4 @@
+// src/app/(site)/_components/cart/CartToast.jsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -9,7 +10,6 @@ export function CartToast() {
   const cartItems = useSelector((state) => state.cart.items);
   const totalQuantity = useSelector((state) => state.cart.totalQuantity);
 
-  // Trigger toast whenever total quantity increases
   useEffect(() => {
     if (totalQuantity > 0) {
       const lastItem = cartItems[cartItems.length - 1];
@@ -19,7 +19,7 @@ export function CartToast() {
 
         const timer = setTimeout(() => {
           setVisible(false);
-        }, 3000); // Hide after 3 seconds
+        }, 3000);
 
         return () => clearTimeout(timer);
       }
@@ -29,8 +29,8 @@ export function CartToast() {
   if (!visible) return null;
 
   return (
-    <div className="toastContainer">
-      <p>{toastMessage}</p>
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] px-6 py-3 rounded-full bg-neutral-900 text-white font-bold text-sm shadow-[0_10px_25px_rgba(0,0,0,0.2)] animate-in fade-in slide-in-from-bottom-5 duration-300 pointer-events-none">
+      <p className="m-0 leading-none">{toastMessage}</p>
     </div>
   );
 }

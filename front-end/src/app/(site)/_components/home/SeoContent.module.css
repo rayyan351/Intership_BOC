@@ -1,8 +1,0 @@
-.section { padding: 56px 20px 64px; background: white; }
-.inner { width: min(1080px, 100%); margin: 0 auto; padding: 34px; border-radius: 18px; background: #f6f7f9; }
-.inner article + article { margin-top: 28px; }
-.inner h2 { margin: 0 0 10px; font-size: clamp(1.25rem, 2vw, 1.7rem); }
-.inner p { margin: 0; color: #272b34; line-height: 1.65; }
-.inner p + p { margin-top: 12px; }
-.inner button { display: inline-flex; align-items: center; gap: 6px; margin-top: 24px; color: #485267; background: transparent; font-weight: 700; }
-.rotated { transform: rotate(180deg); }
