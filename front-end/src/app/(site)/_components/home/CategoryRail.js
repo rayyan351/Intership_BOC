@@ -1,17 +1,84 @@
 // src/app/(site)/_components/home/CategoryRail.js
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { menuCategories } from "@/data/menuCategories";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useGetMenuFeedQuery } from "@/services/menuApi";
 import { Icon } from "@/components/ui/Icons";
 
 export function CategoryRail() {
-  const [activeId, setActiveId] = useState(menuCategories[0]?.id || "");
+  const { data: feedData } = useGetMenuFeedQuery();
+  const [activeId, setActiveId] = useState("");
   const railRef = useRef(null);
 
+  // Helper string normalizer matching MenuExplorer
+  const normalizeKey = (val) =>
+    (val || "")
+      .toString()
+      .toLowerCase()
+      .replace(/[\s_-]+/g, "");
+
+  // 1. Build the exact categories/sections that MenuExplorer renders
+  const categories = useMemo(() => {
+    const rawSections = feedData?.data?.sections || [];
+    const rawCategories = feedData?.data?.categories || [];
+    const products = feedData?.data?.products || [];
+    const deals = feedData?.data?.deals || [];
+    const allItems = [...products, ...deals];
+
+    // If Admin configured dynamic Sections, use them
+    if (rawSections.length > 0) {
+      return rawSections
+        .filter((sec) => (sec.items || []).length > 0)
+        .map((sec) => ({
+          id: sec.slug || sec._id || sec.id,
+          label: sec.title || sec.name,
+        }));
+    }
+
+    // Otherwise, match against standard categories that have items
+    return rawCategories
+      .map((cat) => {
+        const normKey = normalizeKey(cat.id || cat.slug || cat._id);
+        const normLabel = normalizeKey(cat.label || cat.name);
+        const isPopular = normKey === "popularitems" || normKey === "popular";
+
+        const hasItems = allItems.some((item) => {
+          if (isPopular) return Boolean(item.popular || item.isPopular);
+          if (item.isDeal) {
+            const dType = normalizeKey(item.dealType);
+            if (dType === normKey || dType === normLabel) return true;
+          }
+          if (Array.isArray(item.categories)) {
+            return item.categories.some((c) => {
+              const cNorm = normalizeKey(c);
+              return cNorm === normKey || cNorm === normLabel || c === cat._id?.toString();
+            });
+          }
+          return false;
+        });
+
+        return {
+          id: cat.id || cat.slug || cat._id,
+          label: cat.label || cat.name,
+          hasItems,
+        };
+      })
+      .filter((cat) => cat.hasItems);
+  }, [feedData]);
+
+  // Set default active ID once loaded
   useEffect(() => {
-    const sections = menuCategories
-      .map((category) => document.getElementById(category.id))
+    if (categories.length > 0 && !activeId) {
+      setActiveId(categories[0].id);
+    }
+  }, [categories, activeId]);
+
+  // 2. IntersectionObserver to highlight current visible section on scroll
+  useEffect(() => {
+    if (categories.length === 0) return;
+
+    const elements = categories
+      .map((cat) => document.getElementById(cat.id))
       .filter(Boolean);
 
     const observer = new IntersectionObserver(
@@ -19,18 +86,36 @@ export function CategoryRail() {
         const visible = entries
           .filter((entry) => entry.isIntersecting)
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible) setActiveId(visible.target.id);
+
+        if (visible) {
+          setActiveId(visible.target.id);
+        }
       },
-      { rootMargin: "-25% 0px -60%", threshold: [0.08, 0.25, 0.5] }
+      { rootMargin: "-20% 0px -60% 0px", threshold: [0.1, 0.3, 0.6] }
     );
 
-    sections.forEach((section) => observer.observe(section));
+    elements.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, []);
+  }, [categories]);
+
+  // 3. Smooth programmatic scroll handler
+  const handleScrollTo = (e, id) => {
+    e.preventDefault();
+    setActiveId(id);
+
+    const targetEl = document.getElementById(id);
+    if (targetEl) {
+      const yOffset = -90; // Adjust for sticky header + category rail height
+      const y = targetEl.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
+  };
 
   const scrollRail = (direction) => {
-    railRef.current?.scrollBy({ left: direction * 420, behavior: "smooth" });
+    railRef.current?.scrollBy({ left: direction * 300, behavior: "smooth" });
   };
+
+  if (categories.length === 0) return null;
 
   return (
     <div className="sticky top-0 z-40 border-y border-neutral-200 bg-white/95 backdrop-blur-md">
@@ -51,19 +136,19 @@ export function CategoryRail() {
           className="flex items-center gap-2.5 py-3 px-3.5 sm:px-0 overflow-x-auto scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           ref={railRef}
         >
-          {menuCategories.map((category) => {
+          {categories.map((category) => {
             const isActive = activeId === category.id;
             return (
               <a
                 aria-current={isActive ? "true" : undefined}
-                className={`shrink-0 px-5 py-[9px] border rounded-full text-[0.78rem] font-extrabold whitespace-nowrap transition-all duration-200 ${
+                className={`shrink-0 px-5 py-[9px] border rounded-full text-[0.78rem] font-extrabold whitespace-nowrap transition-all duration-200 cursor-pointer ${
                   isActive
                     ? "border-[#E0B210] bg-[#F4C61A] text-black shadow-xs"
                     : "border-black bg-transparent text-neutral-900 hover:border-[#E0B210] hover:bg-[#F4C61A] hover:text-black"
                 }`}
                 href={`#${category.id}`}
                 key={category.id}
-                onClick={() => setActiveId(category.id)}
+                onClick={(e) => handleScrollTo(e, category.id)}
               >
                 {category.label}
               </a>
