@@ -4,6 +4,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { formatPrice } from "@/lib/currency";
+import { AddToCartButton } from "@/components/ui/AddToCartButton";
 import { DealCustomizerModal } from "./DealCustomizerModal";
 
 export function DealCard({ deal }) {
@@ -12,12 +13,7 @@ export function DealCard({ deal }) {
   const dealTitle = deal.title || deal.name || "Special Deal";
   const dealPrice = deal.dealPrice || deal.price || 0;
   const originalPrice = deal.originalPrice || 0;
-  const dealImg =
-    deal.image ||
-    deal.banner ||
-    deal.imageUrl ||
-    deal.dealImage ||
-    "";
+  const dealImg = deal.image || deal.banner || deal.imageUrl || deal.dealImage || "";
 
   const discountPercent =
     originalPrice && dealPrice && originalPrice > dealPrice
@@ -28,73 +24,66 @@ export function DealCard({ deal }) {
     <>
       <article
         onClick={() => setModalOpen(true)}
-        className="group flex flex-col h-full min-w-0 overflow-hidden rounded-[18px] border border-amber-300 bg-white shadow-[0_8px_20px_rgba(23,27,34,0.04)] transition-all duration-200 hover:-translate-y-[5px] hover:shadow-[0_18px_36px_rgba(23,27,34,0.12)] cursor-pointer"
+        className="group relative flex flex-col h-full overflow-hidden rounded-2xl bg-white border border-neutral-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 cursor-pointer"
       >
-        {/* Deal Image Wrap */}
-        <div className="relative aspect-[1.15/1] w-full overflow-hidden bg-neutral-900">
+        {/* Poster Image Container */}
+        <div className="relative aspect-[1/1] w-full overflow-hidden bg-neutral-50 p-2.5">
           {discountPercent > 0 && (
-            <span className="absolute top-3 right-2.5 z-10 rounded-[7px] bg-[#F4C61A] px-2.5 py-[7px] text-[0.7rem] font-black text-black leading-none shadow-sm">
+            <span className="absolute top-3 right-3 z-10 rounded-md bg-[#F4C61A] px-2 py-0.5 text-[11px] font-black text-neutral-950 shadow-xs">
               {discountPercent}% OFF
             </span>
           )}
+
           {dealImg ? (
             <Image
               alt={dealTitle}
               fill
               unoptimized
-              sizes="(max-width: 640px) 85vw, (max-width: 1100px) 45vw, 300px"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               src={dealImg}
-              className="object-cover p-1 transition-transform duration-250 group-hover:scale-[1.03]"
+              className="object-contain p-2 transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
-            <div className="grid h-full w-full place-items-center bg-neutral-800 text-xs font-semibold text-neutral-400">
+            <div className="grid h-full w-full place-items-center text-xs font-semibold text-neutral-400">
               No Image Available
             </div>
           )}
         </div>
 
         {/* Content Body */}
-        <div className="grid flex-1 gap-3.5 p-4 pb-3.5">
-          <div>
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                {deal.dealType || "Deal / Bundle"}
+        <div className="flex flex-1 flex-col p-4 sm:p-5 pt-2.5">
+          <h3 className="text-base font-bold text-neutral-900 leading-snug line-clamp-1 group-hover:text-amber-600 transition-colors">
+            {dealTitle}
+          </h3>
+
+          <p className="mt-1.5 text-xs text-neutral-500 line-clamp-2 leading-relaxed min-h-[36px]">
+            {deal.description || "Special curated combo with fresh sides & drink."}
+          </p>
+
+          {/* Pricing & Button */}
+          <div className="mt-auto pt-4 flex flex-col gap-3">
+            <div className="flex items-baseline gap-2">
+              <span className="text-lg font-black text-neutral-950">
+                {formatPrice(dealPrice)}
               </span>
+              {originalPrice > dealPrice && (
+                <del className="text-xs font-semibold text-neutral-400">
+                  {formatPrice(originalPrice)}
+                </del>
+              )}
             </div>
-            <h3 className="m-0 text-base font-bold text-neutral-900 leading-[1.35]">
-              {dealTitle}
-            </h3>
-            <p className="mt-1.5 text-[0.78rem] text-neutral-500 leading-[1.55] line-clamp-2">
-              {deal.description}
-            </p>
-          </div>
 
-          {/* Pricing & Customize CTA */}
-          <div className="flex items-baseline gap-2 mt-auto">
-            <strong className="text-base font-black text-neutral-900">
-              {formatPrice(dealPrice)}
-            </strong>
-            {originalPrice > dealPrice && (
-              <del className="text-xs text-[#89909c]">
-                {formatPrice(originalPrice)}
-              </del>
-            )}
+            <AddToCartButton
+              label="Customize & Add"
+              onClick={(e) => {
+                e.stopPropagation();
+                setModalOpen(true);
+              }}
+            />
           </div>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setModalOpen(true);
-            }}
-            type="button"
-            className="self-end w-full min-h-[42px] rounded-full bg-[#F4C61A] px-4 text-[0.75rem] font-black uppercase tracking-wider text-black transition-colors hover:bg-[#E0B210]"
-          >
-            Customize & Add
-          </button>
         </div>
       </article>
 
-      {/* Deal Customizer Drawer */}
       <DealCustomizerModal
         deal={deal}
         open={modalOpen}

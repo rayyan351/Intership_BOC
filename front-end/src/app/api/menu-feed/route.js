@@ -21,6 +21,7 @@ export async function GET() {
       Product.find({ isShown: { $ne: false }, isDealOnly: { $ne: true } }).lean().catch(() => []),
       Deal.find({ isShown: { $ne: false } })
         .populate({ path: "fixedItems.product", select: "name price image" })
+        .populate({ path: "choiceGroups.options.product", select: "name price image" })
         .lean()
         .catch(() => []),
       Section.find({ isShown: { $ne: false } })
@@ -32,14 +33,16 @@ export async function GET() {
         .populate({
           path: "deals",
           match: { isShown: { $ne: false } },
-          populate: { path: "fixedItems.product", select: "name price image" },
+          populate: [
+            { path: "fixedItems.product", select: "name price image" },
+            { path: "choiceGroups.options.product", select: "name price image" }
+          ],
         })
         .lean()
         .catch(() => []),
     ]);
 
-    // Helper to resolve deal images across possible admin schemas
-    const resolveDealImage = (d) =>
+    const resolveImg = (d) =>
       d?.image ||
       d?.banner ||
       d?.imageUrl ||
@@ -62,7 +65,7 @@ export async function GET() {
         name: d.title || d.name || "Special Deal",
         price: d.dealPrice || d.price,
         dealPrice: d.dealPrice || d.price,
-        image: resolveDealImage(d),
+        image: resolveImg(d),
         categories: dealCatList,
       };
     });
@@ -85,7 +88,7 @@ export async function GET() {
         name: d.title || d.name || "Special Deal",
         price: d.dealPrice || d.price,
         dealPrice: d.dealPrice || d.price,
-        image: resolveDealImage(d),
+        image: resolveImg(d),
       }));
 
       return {
