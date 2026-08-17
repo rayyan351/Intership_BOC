@@ -1,26 +1,23 @@
-// src/app/(site)/_components/home/MenuExplorer.js
+// src/app/(site)/_components/home/MenuExplorer.jsx
 "use client";
 
 import { useMemo, useState } from "react";
-import { useGetMenuFeedQuery } from "@/services/menuApi";
-import { MenuSkeleton } from "./MenuSkeleton";
 import { MenuSection } from "./MenuSection";
 import { MenuSearchHeader } from "./MenuSearchHeader";
 import { MenuEmptyState } from "./MenuEmptyState";
 
-export function MenuExplorer() {
+export function MenuExplorer({
+  categories = [],
+  sections = [],
+  products = [],
+  deals = [],
+}) {
   const [query, setQuery] = useState("");
   const normalizedQuery = query.trim().toLowerCase();
 
-  const { data: feedData, isLoading, isError } = useGetMenuFeedQuery();
-
-  const categories = useMemo(() => feedData?.data?.categories || [], [feedData]);
-  const sections = useMemo(() => feedData?.data?.sections || [], [feedData]);
-
   const allItems = useMemo(() => {
-    if (!feedData?.data) return [];
-    return [...(feedData.data.products || []), ...(feedData.data.deals || [])];
-  }, [feedData]);
+    return [...(products || []), ...(deals || [])];
+  }, [products, deals]);
 
   const normalizeKey = (val) =>
     (val || "")
@@ -124,23 +121,9 @@ export function MenuExplorer() {
     });
   }, [sections, categories, allItems, normalizedQuery]);
 
-  const populatedCategories = groupedCategories.filter((cat) => cat.items.length > 0);
-
-  if (isLoading) {
-    return (
-      <main id="menu">
-        <MenuSkeleton />
-      </main>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="w-[min(1120px,calc(100%-40px))] mx-auto my-16 p-8 text-center rounded-2xl bg-red-50 text-red-700">
-        <p className="font-bold">Failed to load the menu feed. Please refresh the page.</p>
-      </div>
-    );
-  }
+  const populatedCategories = groupedCategories.filter(
+    (cat) => cat.items && cat.items.length > 0
+  );
 
   return (
     <main id="menu">
@@ -155,7 +138,7 @@ export function MenuExplorer() {
       ) : (
         populatedCategories.map((category, categoryIndex) => (
           <MenuSection
-            key={category._id || category.id}
+            key={category._id || category.id || categoryIndex}
             category={category}
             categoryIndex={categoryIndex}
           />

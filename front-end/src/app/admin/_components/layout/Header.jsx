@@ -19,7 +19,6 @@ export default function AdminHeader() {
   
   const [messageApi, contextHolder] = message.useMessage();
 
-  // Load active user details from local storage or API
   useEffect(() => {
     const storedUser = localStorage.getItem('adminUser');
     if (storedUser) {
@@ -33,7 +32,6 @@ export default function AdminHeader() {
   }, []);
 
   const handleLogout = () => {
-    // Clear storage completely so ProtectedRoute blocks access
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminUser');
     
@@ -79,7 +77,6 @@ export default function AdminHeader() {
         throw new Error(data.message || 'Failed to update profile');
       }
 
-      // Update Local State & Storage
       const updatedUser = {
         _id: data._id,
         name: data.name,
@@ -128,16 +125,18 @@ export default function AdminHeader() {
         style={{ backgroundColor: '#000000' }}
         className="border-b border-zinc-800 px-6 flex items-center justify-between sticky top-0 z-50 h-16"
       >
-        <div className="flex items-center gap-3">
-          <Image
-            src="/images/brand/BurgerO'clock logo.webp"
-            alt="Admin Logo"
-            width={40}
-            height={40}
-            style={{height:'auto', width:'auto'}}
-            className="object-contain"
-          />
-          <span className="font-bold text-lg tracking-wide uppercase text-white hidden sm:inline">
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="relative h-9 w-28 sm:w-32 shrink-0">
+            <Image
+              src="/images/brand/BurgerO'clock logo.webp"
+              alt="Admin Logo"
+              fill
+              priority
+              sizes="128px"
+              className="object-contain object-left"
+            />
+          </div>
+          <span className="font-bold text-sm tracking-widest uppercase text-white/90 hidden sm:inline border-l border-zinc-800 pl-3">
             Admin Panel
           </span>
         </div>

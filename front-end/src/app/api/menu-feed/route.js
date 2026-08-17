@@ -10,7 +10,8 @@ import Deal from "@/models/Deal";
 import Category from "@/models/Category";
 import Section from "@/models/Section";
 
-export const dynamic = "force-dynamic";
+// Cache this API route response on the server for 1 hour (3600 seconds)
+export const revalidate = 3600;
 
 export async function GET() {
   try {
@@ -35,7 +36,7 @@ export async function GET() {
           match: { isShown: { $ne: false } },
           populate: [
             { path: "fixedItems.product", select: "name price image" },
-            { path: "choiceGroups.options.product", select: "name price image" }
+            { path: "choiceGroups.options.product", select: "name price image" },
           ],
         })
         .lean()
@@ -43,62 +44,46 @@ export async function GET() {
     ]);
 
     const resolveImg = (d) =>
-      d?.image ||
-      d?.banner ||
-      d?.imageUrl ||
-      d?.dealImage ||
-      (Array.isArray(d?.images) ? d.images[0] : "") ||
-      "";
+      d?.image || d?.banner || d?.imageUrl || d?.dealImage || "";
 
-    // Format top-level deals
-    const formattedDeals = deals.map((d) => {
-      const dealCatList = [];
-      if (d.dealType) dealCatList.push(d.dealType);
-      dealCatList.push("deals");
+    const formattedDeals = deals.map((d) => ({
+      ...d,
+      _id: d._id?.toString(),
+      id: d.id || d._id?.toString(),
+      isDeal: true,
+      title: d.title || d.name || "Special Deal",
+      name: d.title || d.name || "Special Deal",
+      price: d.dealPrice || d.price,
+      dealPrice: d.dealPrice || d.price,
+      image: resolveImg(d),
+      categories: d.dealType ? [d.dealType, "deals"] : ["deals"],
+    }));
 
-      return {
-        ...d,
-        _id: d._id?.toString(),
-        id: d.id || d._id?.toString(),
-        isDeal: true,
-        title: d.title || d.name || "Special Deal",
-        name: d.title || d.name || "Special Deal",
-        price: d.dealPrice || d.price,
-        dealPrice: d.dealPrice || d.price,
-        image: resolveImg(d),
-        categories: dealCatList,
-      };
-    });
-
-    // Format dynamic sections
-    const formattedSections = sections.map((sec) => {
-      const sectionProducts = (sec.products || []).map((p) => ({
-        ...p,
-        _id: p._id?.toString(),
-        id: p.id || p._id?.toString(),
-        isDeal: false,
-      }));
-
-      const sectionDeals = (sec.deals || []).map((d) => ({
-        ...d,
-        _id: d._id?.toString(),
-        id: d.id || d._id?.toString(),
-        isDeal: true,
-        title: d.title || d.name || "Special Deal",
-        name: d.title || d.name || "Special Deal",
-        price: d.dealPrice || d.price,
-        dealPrice: d.dealPrice || d.price,
-        image: resolveImg(d),
-      }));
-
-      return {
-        _id: sec._id?.toString(),
-        id: sec.slug || sec._id?.toString(),
-        title: sec.title,
-        subtitle: sec.subtitle || "",
-        items: [...sectionProducts, ...sectionDeals],
-      };
-    });
+    const formattedSections = sections.map((sec) => ({
+      _id: sec._id?.toString(),
+      id: sec.slug || sec._id?.toString(),
+      title: sec.title,
+      subtitle: sec.subtitle || "",
+      items: [
+        ...(sec.products || []).map((p) => ({
+          ...p,
+          _id: p._id?.toString(),
+          id: p.id || p._id?.toString(),
+          isDeal: false,
+        })),
+        ...(sec.deals || []).map((d) => ({
+          ...d,
+          _id: d._id?.toString(),
+          id: d.id || d._id?.toString(),
+          isDeal: true,
+          title: d.title || d.name || "Special Deal",
+          name: d.title || d.name || "Special Deal",
+          price: d.dealPrice || d.price,
+          dealPrice: d.dealPrice || d.price,
+          image: resolveImg(d),
+        })),
+      ],
+    }));
 
     return NextResponse.json(
       {
@@ -110,10 +95,15 @@ export async function GET() {
           sections: formattedSections,
         },
       },
-      { status: 200 }
+      {
+        status: 200,
+        headers: {
+          // Tell browser and CDN edges to cache for 1 hour, stale-while-revalidate for 1 day
+          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      }
     );
   } catch (error) {
-    console.error("Error fetching menu feed:", error);
     return NextResponse.json(
       { success: false, message: error.message },
       { status: 500 }

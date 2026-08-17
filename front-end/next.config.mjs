@@ -3,6 +3,7 @@ const nextConfig = {
   /* config options here */
   images: {
     unoptimized: process.env.NODE_ENV === "development",
+    minimumCacheTTL: 3600,
     remotePatterns: [
       {
         protocol: "http",

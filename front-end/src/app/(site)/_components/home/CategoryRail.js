@@ -1,12 +1,15 @@
-// src/app/(site)/_components/home/CategoryRail.js
+// src/app/(site)/_components/home/CategoryRail.jsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useGetMenuFeedQuery } from "@/services/menuApi";
 import { Icon } from "@/components/ui/Icons";
 
-export function CategoryRail() {
-  const { data: feedData } = useGetMenuFeedQuery();
+export function CategoryRail({
+  categories: rawCategories = [],
+  sections: rawSections = [],
+  products = [],
+  deals = [],
+}) {
   const [activeId, setActiveId] = useState("");
   const railRef = useRef(null);
 
@@ -17,16 +20,12 @@ export function CategoryRail() {
       .toLowerCase()
       .replace(/[\s_-]+/g, "");
 
-  // 1. Build the exact categories/sections that MenuExplorer renders
+  // 1. Build the exact categories/sections that MenuExplorer renders (using static props)
   const categories = useMemo(() => {
-    const rawSections = feedData?.data?.sections || [];
-    const rawCategories = feedData?.data?.categories || [];
-    const products = feedData?.data?.products || [];
-    const deals = feedData?.data?.deals || [];
-    const allItems = [...products, ...deals];
+    const allItems = [...(products || []), ...(deals || [])];
 
     // If Admin configured dynamic Sections, use them
-    if (rawSections.length > 0) {
+    if (rawSections && rawSections.length > 0) {
       return rawSections
         .filter((sec) => (sec.items || []).length > 0)
         .map((sec) => ({
@@ -51,7 +50,11 @@ export function CategoryRail() {
           if (Array.isArray(item.categories)) {
             return item.categories.some((c) => {
               const cNorm = normalizeKey(c);
-              return cNorm === normKey || cNorm === normLabel || c === cat._id?.toString();
+              return (
+                cNorm === normKey ||
+                cNorm === normLabel ||
+                c === cat._id?.toString()
+              );
             });
           }
           return false;
@@ -64,7 +67,7 @@ export function CategoryRail() {
         };
       })
       .filter((cat) => cat.hasItems);
-  }, [feedData]);
+  }, [rawSections, rawCategories, products, deals]);
 
   // Set default active ID once loaded
   useEffect(() => {

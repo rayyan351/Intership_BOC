@@ -10,6 +10,7 @@ import {
   TagsOutlined,
   GiftOutlined,
   LayoutOutlined,
+  PictureOutlined,
   UsergroupAddOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
@@ -42,7 +43,7 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
           icon: <TagsOutlined />,
           label: 'Categories',
         },
-         {
+        {
           key: '/admin/products/dealcategories',
           icon: <TagsOutlined />,
           label: 'Deal Categories',
@@ -58,11 +59,16 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
           label: 'All Products',
         },
         {
-          key: '/admin/products/deals', // Added Deals submenu item
+          key: '/admin/products/deals',
           icon: <GiftOutlined />,
           label: 'Deals & Bundles',
         },
       ],
+    },
+    {
+      key: '/admin/banners',
+      icon: <PictureOutlined />,
+      label: 'Hero Banners',
     },
     {
       key: '/admin/users',
@@ -76,7 +82,8 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
     },
   ];
 
-  const isProductRoute = pathname.startsWith('/admin/products') || pathname.startsWith('/admin/categories');
+  const isProductRoute =
+    pathname.startsWith('/admin/products') || pathname.startsWith('/admin/categories');
 
   return (
     <Sider
