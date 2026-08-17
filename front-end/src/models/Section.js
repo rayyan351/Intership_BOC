@@ -5,6 +5,7 @@ const sectionSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
+    banner: { type: String, default: "" },
     subtitle: { type: String },
     displayOrder: { type: Number, default: 0 },
     isShown: { type: Boolean, default: true },

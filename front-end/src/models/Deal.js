@@ -103,6 +103,30 @@ const dealSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    // --- Time & Seasonal Restrictions ---
+    availabilityType: {
+      type: String,
+      enum: ["always", "time_window", "date_range"],
+      default: "always",
+    },
+    startTime: {
+      type: String,
+      default: "", // e.g. "00:00"
+    },
+    endTime: {
+      type: String,
+      default: "", // e.g. "04:00"
+    },
+    startDate: {
+      type: Date,
+      default: null,
+    },
+    endDate: {
+      type: Date,
+      default: null,
+    },
+
     fixedItems: [fixedItemSchema],
     choiceGroups: [choiceGroupSchema],
   },

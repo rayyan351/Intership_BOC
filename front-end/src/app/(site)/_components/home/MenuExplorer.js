@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { MenuSection } from "./MenuSection";
 import { MenuSearchHeader } from "./MenuSearchHeader";
 import { MenuEmptyState } from "./MenuEmptyState";
+import { isItemCurrentlyAvailable } from "@/utils/availability";
 
 export function MenuExplorer({
   categories = [],
@@ -29,7 +30,11 @@ export function MenuExplorer({
     // 1. Curated Dynamic Sections from Admin
     if (sections && sections.length > 0) {
       return sections.map((sec) => {
-        const secItems = sec.items || [];
+        const secItems = (sec.items || []).filter((item) => {
+          const { available } = isItemCurrentlyAvailable(item);
+          return available;
+        });
+
         const visibleItems = normalizedQuery
           ? secItems.filter((item) =>
               `${item.title || item.name || ""} ${item.description || ""}`
@@ -64,6 +69,10 @@ export function MenuExplorer({
         normCatLabel === "popularitems";
 
       const categoryItems = allItems.filter((item) => {
+        // Enforce time/date availability
+        const { available } = isItemCurrentlyAvailable(item);
+        if (!available) return false;
+
         if (isPopularCategory) {
           return Boolean(item.popular || item.isPopular);
         }

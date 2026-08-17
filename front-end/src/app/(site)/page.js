@@ -25,7 +25,7 @@ async function getHomeData() {
     await dbConnect();
 
     const [dbCategories, products, deals, sections, banners] = await Promise.all([
-      Category.find({ isShown: { $ne: false } }).lean().catch(() => []),
+      Category.find({ isShown: { $ne: false } }).sort({ displayOrder: 1 }).lean().catch(() => []),
       Product.find({ isShown: { $ne: false }, isDealOnly: { $ne: true } }).lean().catch(() => []),
       Deal.find({ isShown: { $ne: false } })
         .populate({ path: "fixedItems.product", select: "name price image" })
@@ -75,6 +75,7 @@ async function getHomeData() {
       id: sec.slug || sec._id?.toString(),
       title: sec.title,
       subtitle: sec.subtitle || "",
+      banner: sec.banner || "", // <-- Added banner field
       items: [
         ...(sec.products || []).map((p) => ({
           ...p,

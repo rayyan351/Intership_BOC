@@ -1,3 +1,4 @@
+// front-end/src/services/sectionApi.js
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { siteConfig } from '@/config/site';
 import { endpoints } from './api';
@@ -14,18 +15,18 @@ export const sectionApi = createApi({
       providesTags: ['Sections'],
     }),
     createSection: builder.mutation({
-      query: (body) => ({
+      query: (formData) => ({
         url: endpoints.sections.base,
         method: 'POST',
-        body,
+        body: formData,
       }),
       invalidatesTags: ['Sections'],
     }),
     updateSection: builder.mutation({
-      query: ({ id, ...body }) => ({
+      query: ({ id, formData, ...rest }) => ({
         url: `${endpoints.sections.base}/${id}`,
         method: 'PUT',
-        body,
+        body: formData || rest,
       }),
       invalidatesTags: ['Sections'],
     }),

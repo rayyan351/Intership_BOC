@@ -10,12 +10,15 @@ import { formatPrice } from "@/lib/currency";
 import { ModalActionButtons } from "@/components/ui/ModalActionsButton";
 import { QuantitySelector } from "@/components/ui/QuantitySelector";
 import { ChoiceOptionCard } from "../home/ChoiceOptionCard";
+import { isItemCurrentlyAvailable } from "@/utils/availability";
 
 export function DealCustomizerModal({ deal, open, onClose }) {
   const dispatch = useDispatch();
   const [quantity, setQuantity] = useState(1);
   const [instructions, setInstructions] = useState("");
   const [selectedChoices, setSelectedChoices] = useState({});
+
+  const availability = isItemCurrentlyAvailable(deal);
 
   const getGroupKey = (group, index) =>
     group._id?.toString() || group.id?.toString() || `${group.title}_${index}`;
@@ -54,12 +57,14 @@ export function DealCustomizerModal({ deal, open, onClose }) {
   const singleUnitDealPrice = dealPrice + extraOptionsPrice;
   const grandTotalPrice = singleUnitDealPrice * quantity;
 
-  const isFormValid = (deal.choiceGroups || []).every((group, idx) => {
-    if (!group.required) return true;
-    const key = getGroupKey(group, idx);
-    const currentPicks = selectedChoices[key] || [];
-    return currentPicks.length === (group.selectCount || 1);
-  });
+  const isFormValid =
+    availability.available &&
+    (deal.choiceGroups || []).every((group, idx) => {
+      if (!group.required) return true;
+      const key = getGroupKey(group, idx);
+      const currentPicks = selectedChoices[key] || [];
+      return currentPicks.length === (group.selectCount || 1);
+    });
 
   const handleSelectSingleOption = (groupKey, option) => {
     setSelectedChoices((prev) => ({
@@ -191,6 +196,14 @@ export function DealCustomizerModal({ deal, open, onClose }) {
               {/* Action Buttons */}
               <ModalActionButtons onClose={onClose} onShare={handleShare} />
             </div>
+
+            {/* Time Window Restriction Notice */}
+            {!availability.available && (
+              <div className="mt-3 flex items-center gap-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold">
+                <Icon name="clock" size={16} className="shrink-0 text-amber-700" />
+                <span>{availability.reason}</span>
+              </div>
+            )}
           </div>
 
           {/* Scrollable Choices Area */}
@@ -221,7 +234,6 @@ export function DealCustomizerModal({ deal, open, onClose }) {
               const currentPicks = selectedChoices[groupKey] || [];
               const isSingle = group.selectCount === 1;
               const maxReached = currentPicks.length >= (group.selectCount || 1);
-              const isComplete = currentPicks.length === group.selectCount;
 
               return (
                 <div key={groupKey} className="space-y-3">
@@ -241,7 +253,6 @@ export function DealCustomizerModal({ deal, open, onClose }) {
                     </div>
                   </div>
 
-                  {/* Options List */}
                   <div className="flex flex-col gap-2.5">
                     {group.options.map((opt, optIdx) => {
                       const optionCount = currentPicks.filter((o) => o.name === opt.name).length;
@@ -305,7 +316,13 @@ export function DealCustomizerModal({ deal, open, onClose }) {
             >
               <span>{formatPrice(grandTotalPrice)}</span>
               <span className="opacity-40">|</span>
-              <span>{isFormValid ? "Add to Cart" : "Choose Options"}</span>
+              <span>
+                {!availability.available
+                  ? "Currently Unavailable"
+                  : isFormValid
+                  ? "Add to Cart"
+                  : "Choose Options"}
+              </span>
               <Icon name="chevronRight" size={14} strokeWidth={3} />
             </button>
           </div>

@@ -1,3 +1,4 @@
+// src/app/admin/banners/_components/BannerModal.jsx
 'use client';
 
 import React, { useEffect } from 'react';
@@ -7,15 +8,15 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 
 import FormInput from '@/app/admin/_components/formElements/inputfield/Forminput';
+import FormSelect from '@/app/admin/_components/formElements/select/FormSelect';
 import FormImageUpload from '@/app/admin/_components/formElements/imageUpload/FormImageUpload';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
 import CustomModal from '@/app/admin/_components/modal/CustomModal';
+import { useGetTargetOptionsQuery } from '@/services/bannerApi';
 
 const schema = yup.object().shape({
-  title: yup.string().required('Please enter banner headline/title'),
-  eyebrow: yup.string().optional(),
-  description: yup.string().optional(),
-  link: yup.string().optional(),
+  title: yup.string().required('Please enter banner reference title'),
+  link: yup.string().required('Please select a target destination section'),
   ctaText: yup.string().optional(),
   image: yup.mixed().nullable(),
 });
@@ -29,13 +30,14 @@ export default function BannerModal({
 }) {
   const isEditMode = Boolean(initialValues);
 
+  const { data: targetOptions = [], isLoading: fetchingOptions } =
+    useGetTargetOptionsQuery(undefined, { skip: !open });
+
   const { control, handleSubmit, reset } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
       title: '',
-      eyebrow: '',
-      description: '',
-      link: '',
+      link: undefined,
       ctaText: '',
       image: null,
     },
@@ -46,19 +48,15 @@ export default function BannerModal({
       if (initialValues) {
         reset({
           title: initialValues.title || '',
-          eyebrow: initialValues.eyebrow || '',
-          description: initialValues.description || '',
-          link: initialValues.link || '',
+          link: initialValues.link || undefined,
           ctaText: initialValues.ctaText || '',
           image: null,
         });
       } else {
         reset({
           title: '',
-          eyebrow: "BURGER O'CLOCK EXCLUSIVE",
-          description: '',
-          link: '/#deals',
-          ctaText: 'Explore Category',
+          link: undefined,
+          ctaText: '',
           image: null,
         });
       }
@@ -68,9 +66,7 @@ export default function BannerModal({
   const handleFinish = (values) => {
     const formData = new FormData();
     formData.append('title', values.title);
-    formData.append('eyebrow', values.eyebrow || '');
-    formData.append('description', values.description || '');
-    formData.append('link', values.link || '');
+    formData.append('link', values.link);
     formData.append('ctaText', values.ctaText || '');
 
     if (values.image) {
@@ -85,48 +81,35 @@ export default function BannerModal({
       title={isEditMode ? 'Edit Hero Banner' : 'Add New Hero Banner'}
       open={open}
       onCancel={onClose}
-      width="60%"
+      width="50%"
     >
       <form onSubmit={handleSubmit(handleFinish)} className="mt-4 space-y-4">
         <FormInput
-          name="eyebrow"
-          label="Badge / Eyebrow Text (Optional)"
-          placeholder="e.g. LIMITED TIME OFFER, BURGER O'CLOCK EXCLUSIVE"
-          control={control}
-        />
-
-        <FormInput
           name="title"
-          label="Banner Headline Title"
-          placeholder="e.g. CHICKEN SLIDERS COMBO"
+          label="Internal Reference Title"
+          placeholder="e.g. Share Box Deal Banner"
           control={control}
+        />
+
+        <FormSelect
+          name="link"
+          label="Target Menu Section (Clicking the slide glides here)"
+          placeholder={fetchingOptions ? 'Loading sections...' : 'Select a menu section or category'}
+          options={targetOptions}
+          control={control}
+          loading={fetchingOptions}
         />
 
         <FormInput
-          name="description"
-          label="Promo Description"
-          placeholder="e.g. 4 juicy chicken sliders with loaded fries & 2 soft drinks."
+          name="ctaText"
+          label="CTA Button Text (Optional)"
+          placeholder="e.g. Order Now, Explore Deals (leave blank for no button)"
           control={control}
         />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormInput
-            name="ctaText"
-            label="CTA Button Text (Optional)"
-            placeholder="e.g. Order Now, Explore Category"
-            control={control}
-          />
-          <FormInput
-            name="link"
-            label="Target Link (Optional)"
-            placeholder="e.g. /#deals, /#burgers, or https://..."
-            control={control}
-          />
-        </div>
 
         <FormImageUpload
           name="image"
-          label="Banner Background Image (Landscape recommended)"
+          label="Banner Graphic / Artwork"
           control={control}
         />
 

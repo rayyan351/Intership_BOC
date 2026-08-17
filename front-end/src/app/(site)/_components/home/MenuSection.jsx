@@ -6,23 +6,42 @@ import { ProductCard } from "../products/ProductCard";
 import { DealCard } from "../deals/DealCard";
 
 export function MenuSection({ category, categoryIndex = 0 }) {
-  const sectionId = category.id || category.slug || category._id;
-  const sectionTitle = category.name || category.label;
+  const sectionTitle = category.name || category.label || "";
   const items = category.items || [];
+
+  const rawId = String(category.id || category.slug || category._id || `section_${categoryIndex}`);
+  const mongoId = String(category._id || "");
+  const slug = String(category.slug || "");
+
+  // Safe resolver for Express backend asset URLs
+  const resolveBannerUrl = (url) => {
+    if (!url) return "";
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    return `http://localhost:5000${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
+  const bannerSrc = resolveBannerUrl(category.banner);
 
   return (
     <section
-      className="w-[calc(100%-24px)] md:w-[min(1120px,calc(100%-40px))] mx-auto pt-10 md:pt-14 pb-8 scroll-mt-20"
-      id={sectionId}
+      className="w-[calc(100%-24px)] md:w-[min(1120px,calc(100%-40px))] mx-auto pt-10 md:pt-14 pb-8 scroll-mt-24 menu-section-container"
+      id={rawId}
+      data-section-id={mongoId || rawId}
+      data-mongo-id={mongoId}
+      data-slug={slug}
+      data-title={sectionTitle.toLowerCase()}
     >
-      {category.banner && (
-        <div className="relative h-[140px] md:h-[clamp(150px,15vw,220px)] mb-9 overflow-hidden rounded-[18px] md:rounded-[24px] border-[6px] md:border-[9px] border-[#242424] bg-neutral-200">
+      {/* Section Divider Banner (e.g. The Classics / Loaded Fries) */}
+      {bannerSrc && (
+        <div className="relative w-full h-[130px] sm:h-[160px] md:h-[clamp(160px,18vw,240px)] mb-9 overflow-hidden rounded-[18px] md:rounded-[26px] border-[6px] md:border-[10px] border-[#242424] bg-neutral-900 shadow-md">
           <Image
-            alt={`${sectionTitle} category banner`}
+            alt={`${sectionTitle} section banner`}
             fill
+            unoptimized
             sizes="(max-width: 1440px) 100vw, 1280px"
-            src={category.banner}
-            className="object-cover"
+            src={bannerSrc}
+            className="object-cover object-center"
+            priority={categoryIndex === 0}
           />
         </div>
       )}

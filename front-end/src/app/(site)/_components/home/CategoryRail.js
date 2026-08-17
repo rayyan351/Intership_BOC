@@ -13,18 +13,15 @@ export function CategoryRail({
   const [activeId, setActiveId] = useState("");
   const railRef = useRef(null);
 
-  // Helper string normalizer matching MenuExplorer
   const normalizeKey = (val) =>
     (val || "")
       .toString()
       .toLowerCase()
       .replace(/[\s_-]+/g, "");
 
-  // 1. Build the exact categories/sections that MenuExplorer renders (using static props)
   const categories = useMemo(() => {
     const allItems = [...(products || []), ...(deals || [])];
 
-    // If Admin configured dynamic Sections, use them
     if (rawSections && rawSections.length > 0) {
       return rawSections
         .filter((sec) => (sec.items || []).length > 0)
@@ -34,7 +31,6 @@ export function CategoryRail({
         }));
     }
 
-    // Otherwise, match against standard categories that have items
     return rawCategories
       .map((cat) => {
         const normKey = normalizeKey(cat.id || cat.slug || cat._id);
@@ -61,7 +57,7 @@ export function CategoryRail({
         });
 
         return {
-          id: cat.id || cat.slug || cat._id,
+          id: cat.slug || cat.id || cat._id,
           label: cat.label || cat.name,
           hasItems,
         };
@@ -69,14 +65,12 @@ export function CategoryRail({
       .filter((cat) => cat.hasItems);
   }, [rawSections, rawCategories, products, deals]);
 
-  // Set default active ID once loaded
   useEffect(() => {
     if (categories.length > 0 && !activeId) {
       setActiveId(categories[0].id);
     }
   }, [categories, activeId]);
 
-  // 2. IntersectionObserver to highlight current visible section on scroll
   useEffect(() => {
     if (categories.length === 0) return;
 
@@ -101,14 +95,16 @@ export function CategoryRail({
     return () => observer.disconnect();
   }, [categories]);
 
-  // 3. Smooth programmatic scroll handler
   const handleScrollTo = (e, id) => {
     e.preventDefault();
     setActiveId(id);
 
+    // Cleanly set only the hash, stripping stray query parameters
+    window.history.replaceState(null, "", `${window.location.pathname}#${id}`);
+
     const targetEl = document.getElementById(id);
     if (targetEl) {
-      const yOffset = -90; // Adjust for sticky header + category rail height
+      const yOffset = -90;
       const y = targetEl.getBoundingClientRect().top + window.pageYOffset + yOffset;
       window.scrollTo({ top: y, behavior: "smooth" });
     }
@@ -123,17 +119,15 @@ export function CategoryRail({
   return (
     <div className="sticky top-0 z-40 border-y border-neutral-200 bg-white/95 backdrop-blur-md">
       <div className="w-full sm:w-[min(1120px,calc(100%-24px))] mx-auto grid grid-cols-1 sm:grid-cols-[38px_minmax(0,1fr)_38px] items-center gap-2">
-        {/* Left Arrow Button */}
         <button
           aria-label="Scroll categories left"
-          className="hidden sm:grid w-[34px] h-[34px] place-items-center rounded-full bg-transparent text-neutral-800 hover:bg-neutral-100 transition-colors"
+          className="hidden sm:grid w-[34px] h-[34px] place-items-center rounded-full bg-transparent text-neutral-800 hover:bg-neutral-100 transition-colors cursor-pointer"
           onClick={() => scrollRail(-1)}
           type="button"
         >
           <Icon name="chevronLeft" size={18} />
         </button>
 
-        {/* Scrollable Category Nav */}
         <nav
           aria-label="Menu categories"
           className="flex items-center gap-2.5 py-3 px-3.5 sm:px-0 overflow-x-auto scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
@@ -159,10 +153,9 @@ export function CategoryRail({
           })}
         </nav>
 
-        {/* Right Arrow Button */}
         <button
           aria-label="Scroll categories right"
-          className="hidden sm:grid w-[34px] h-[34px] place-items-center rounded-full bg-transparent text-neutral-800 hover:bg-neutral-100 transition-colors"
+          className="hidden sm:grid w-[34px] h-[34px] place-items-center rounded-full bg-transparent text-neutral-800 hover:bg-neutral-100 transition-colors cursor-pointer"
           onClick={() => scrollRail(1)}
           type="button"
         >

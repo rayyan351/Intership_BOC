@@ -1,3 +1,4 @@
+// src/services/bannerApi.js
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 export const bannerApi = createApi({
@@ -9,6 +10,10 @@ export const bannerApi = createApi({
       query: () => '/banners',
       transformResponse: (res) => res?.data || [],
       providesTags: ['Banners'],
+    }),
+    getTargetOptions: builder.query({
+      query: () => '/menu-sections-list',
+      transformResponse: (res) => res?.data || [],
     }),
     createBanner: builder.mutation({
       query: (formData) => ({
@@ -46,6 +51,7 @@ export const bannerApi = createApi({
 
 export const {
   useGetBannersQuery,
+  useGetTargetOptionsQuery,
   useCreateBannerMutation,
   useUpdateBannerMutation,
   useDeleteBannerMutation,

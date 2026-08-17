@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { Space, Button, InputNumber, Select, Tag, Input } from 'antd';
-import { PlusOutlined, DeleteOutlined, AppstoreAddOutlined } from '@ant-design/icons';
-import { useForm, useWatch } from 'react-hook-form';
+import { Space, Button, InputNumber, Select, Tag, Input, Radio, TimePicker, DatePicker } from 'antd';
+import { PlusOutlined, DeleteOutlined, AppstoreAddOutlined, ClockCircleOutlined, CalendarOutlined } from '@ant-design/icons';
+import { useForm, useWatch, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
+import dayjs from 'dayjs';
 
 import FormInput from '@/app/admin/_components/formElements/inputfield/Forminput';
 import FormSelect from '@/app/admin/_components/formElements/select/FormSelect';
@@ -32,6 +33,11 @@ const schema = yup.object().shape({
     .min(0, 'Discount cannot be negative')
     .max(100, 'Discount cannot exceed 100%')
     .required('Discount percentage is required'),
+  availabilityType: yup.string().default('always'),
+  startTime: yup.string().optional(),
+  endTime: yup.string().optional(),
+  startDate: yup.mixed().optional().nullable(),
+  endDate: yup.mixed().optional().nullable(),
   description: yup.string().optional(),
   image: yup.mixed().nullable(),
 });
@@ -64,6 +70,11 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
       dealType: '',
       customOriginalPrice: '',
       discountPercentage: 0,
+      availabilityType: 'always',
+      startTime: '',
+      endTime: '',
+      startDate: null,
+      endDate: null,
       description: '',
       image: null,
     },
@@ -71,6 +82,11 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
 
   const discountPercentage = useWatch({ control, name: 'discountPercentage' }) || 0;
   const customOriginalPrice = useWatch({ control, name: 'customOriginalPrice' });
+  const availabilityType = useWatch({ control, name: 'availabilityType' });
+  const watchedStartTime = useWatch({ control, name: 'startTime' });
+  const watchedEndTime = useWatch({ control, name: 'endTime' });
+  const watchedStartDate = useWatch({ control, name: 'startDate' });
+  const watchedEndDate = useWatch({ control, name: 'endDate' });
 
   const dealTypeOptions = dealCategories.map((cat) => ({
     label: cat.label,
@@ -130,6 +146,11 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
           dealType: initialValues.dealType || (dealTypeOptions[0]?.value || ''),
           customOriginalPrice: initialValues.originalPrice || '',
           discountPercentage: existingDiscount || 0,
+          availabilityType: initialValues.availabilityType || 'always',
+          startTime: initialValues.startTime || '',
+          endTime: initialValues.endTime || '',
+          startDate: initialValues.startDate ? dayjs(initialValues.startDate) : null,
+          endDate: initialValues.endDate ? dayjs(initialValues.endDate) : null,
           description: initialValues.description || '',
           image: null,
         });
@@ -166,6 +187,11 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
           dealType: dealTypeOptions[0]?.value || '',
           customOriginalPrice: '',
           discountPercentage: 0,
+          availabilityType: 'always',
+          startTime: '00:00',
+          endTime: '04:00',
+          startDate: null,
+          endDate: null,
           description: '',
           image: null,
         });
@@ -221,7 +247,6 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
       prev.map((cg, i) => {
         if (i !== groupIndex) return cg;
 
-        // Keep non-product items (boxes, custom toys, dips)
         const customItems = (cg.options || []).filter((opt) => !opt.productId);
 
         const productItems = selectedProductIds.map((prodId) => {
@@ -301,6 +326,15 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
     formData.append('originalPrice', effectiveOriginalPrice);
     formData.append('dealPrice', calculatedDealPrice);
     formData.append('description', values.description || '');
+    formData.append('availabilityType', values.availabilityType || 'always');
+
+    if (values.availabilityType === 'time_window') {
+      formData.append('startTime', values.startTime || '');
+      formData.append('endTime', values.endTime || '');
+    } else if (values.availabilityType === 'date_range') {
+      formData.append('startDate', values.startDate ? new Date(values.startDate).toISOString() : '');
+      formData.append('endDate', values.endDate ? new Date(values.endDate).toISOString() : '');
+    }
 
     const formattedFixed = fixedItems.map((item) => ({
       product: item.productId,
@@ -355,7 +389,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
       width={780}
     >
       <form onSubmit={handleSubmit(handleFinish)} className="mt-4 space-y-5 max-h-[78vh] overflow-y-auto pr-1">
-        <FormInput name="title" label="Deal Title" placeholder="e.g. Sliders Party Box, Burger Meal (Kiddy)" control={control} />
+        <FormInput name="title" label="Deal Title" placeholder="e.g. Sliders Party Box, Midnight Deals Box" control={control} />
 
         <FormSelect
           name="dealType"
@@ -365,6 +399,69 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
           options={dealTypeOptions}
           loading={fetchingDealCategories}
         />
+
+        {/* TIME & SCHEDULE RESTRICTIONS */}
+        <div className="border border-amber-200 rounded-lg p-4 bg-amber-50/40 space-y-3">
+          <div>
+            <span className="text-sm font-semibold text-amber-900 block">Deal Availability & Schedule</span>
+            <span className="text-xs text-amber-700">Choose when this deal appears and is orderable on the storefront.</span>
+          </div>
+
+          <Controller
+            name="availabilityType"
+            control={control}
+            render={({ field }) => (
+              <Radio.Group {...field} className="flex flex-wrap gap-3">
+                <Radio value="always">Always Available (24/7)</Radio>
+                <Radio value="time_window">Daily Time Window (e.g. Midnight Deal)</Radio>
+                <Radio value="date_range">Seasonal / Date Range (e.g. Ramadan, Eid)</Radio>
+              </Radio.Group>
+            )}
+          />
+
+          {availabilityType === 'time_window' && (
+            <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-md border border-amber-200">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-900 whitespace-nowrap">
+                <ClockCircleOutlined /> Active Daily Hours:
+              </div>
+              <TimePicker.RangePicker
+                format="HH:mm"
+                value={[
+                  watchedStartTime ? dayjs(watchedStartTime, 'HH:mm') : null,
+                  watchedEndTime ? dayjs(watchedEndTime, 'HH:mm') : null,
+                ]}
+                onChange={(times, timeStrings) => {
+                  setValue('startTime', timeStrings[0] || '');
+                  setValue('endTime', timeStrings[1] || '');
+                }}
+                className="w-full sm:w-auto"
+              />
+              <span className="text-[11px] text-gray-500 italic">
+                (Supports overnight windows like 23:30 to 04:00)
+              </span>
+            </div>
+          )}
+
+          {availabilityType === 'date_range' && (
+            <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-md border border-amber-200">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-900 whitespace-nowrap">
+                <CalendarOutlined /> Active Date Range:
+              </div>
+              <DatePicker.RangePicker
+                showTime
+                value={[
+                  watchedStartDate ? dayjs(watchedStartDate) : null,
+                  watchedEndDate ? dayjs(watchedEndDate) : null,
+                ]}
+                onChange={(dates) => {
+                  setValue('startDate', dates ? dates[0] : null);
+                  setValue('endDate', dates ? dates[1] : null);
+                }}
+                className="w-full sm:w-auto"
+              />
+            </div>
+          )}
+        </div>
 
         {/* 1. FIXED INCLUSIONS */}
         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50/60">

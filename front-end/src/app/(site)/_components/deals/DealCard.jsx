@@ -10,6 +10,20 @@ import { DealCustomizerModal } from "./DealCustomizerModal";
 export function DealCard({ deal }) {
   const [modalOpen, setModalOpen] = useState(false);
 
+  const dealId = deal._id?.toString() || deal.id?.toString();
+
+  const handleOpenModal = () => {
+    // Cleanly set query param while stripping lingering hash anchors
+    window.history.replaceState(null, "", `${window.location.pathname}?deal=${dealId}`);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    // Reset to clean pathname with no query params or lingering hashes
+    window.history.replaceState(null, "", window.location.pathname);
+    setModalOpen(false);
+  };
+
   const dealTitle = deal.title || deal.name || "Special Deal";
   const dealPrice = deal.dealPrice || deal.price || 0;
   const originalPrice = deal.originalPrice || 0;
@@ -23,10 +37,9 @@ export function DealCard({ deal }) {
   return (
     <>
       <article
-        onClick={() => setModalOpen(true)}
+        onClick={handleOpenModal}
         className="group relative flex flex-col h-full overflow-hidden rounded-2xl bg-white border border-neutral-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 cursor-pointer"
       >
-        {/* Poster Image Container */}
         <div className="relative aspect-[1/1] w-full overflow-hidden bg-neutral-50 p-2.5">
           {discountPercent > 0 && (
             <span className="absolute top-3 right-3 z-10 rounded-md bg-[#F4C61A] px-2 py-0.5 text-[11px] font-black text-neutral-950 shadow-xs">
@@ -50,7 +63,6 @@ export function DealCard({ deal }) {
           )}
         </div>
 
-        {/* Content Body */}
         <div className="flex flex-1 flex-col p-4 sm:p-5 pt-2.5">
           <h3 className="text-base font-bold text-neutral-900 leading-snug line-clamp-1 group-hover:text-amber-600 transition-colors">
             {dealTitle}
@@ -60,7 +72,6 @@ export function DealCard({ deal }) {
             {deal.description || "Special curated combo with fresh sides & drink."}
           </p>
 
-          {/* Pricing & Button */}
           <div className="mt-auto pt-4 flex flex-col gap-3">
             <div className="flex items-baseline gap-2">
               <span className="text-lg font-black text-neutral-950">
@@ -77,7 +88,7 @@ export function DealCard({ deal }) {
               label="Customize & Add"
               onClick={(e) => {
                 e.stopPropagation();
-                setModalOpen(true);
+                handleOpenModal();
               }}
             />
           </div>
@@ -87,7 +98,7 @@ export function DealCard({ deal }) {
       <DealCustomizerModal
         deal={deal}
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={handleCloseModal}
       />
     </>
   );

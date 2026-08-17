@@ -5,10 +5,10 @@ const fs = require('fs');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // Target the front-end public directory
-    const uploadPath = path.join(__dirname, '../assets/uploads/images/products');
+    // Save section banners in assets/uploads/sections
+    const folder = file.fieldname === 'banner' ? 'sections' : 'products';
+    const uploadPath = path.join(__dirname, `../assets/uploads/${folder}`);
 
-    // Create directory if it doesn't exist
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
@@ -16,15 +16,15 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
-    // Slugify the item name (e.g., "Classic Beef Burger" -> "classic-beef-burger")
-    const itemName = req.body.name || 'product';
-    const slugName = itemName
+    const rawName = req.body.title || req.body.name || 'banner';
+    const slugName = rawName
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-');
 
     const ext = path.extname(file.originalname);
-    cb(null, `${slugName}${ext}`);
+    // Append timestamp to prevent caching & overwriting
+    cb(null, `${slugName}-${Date.now()}${ext}`);
   },
 });
 

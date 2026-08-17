@@ -1,6 +1,29 @@
+// back-end/controllers/sectionController.js
 const Section = require('../models/Section');
 
-// GET all display sections with populated products & deals
+// Helper to safely parse array strings from FormData
+const parseArrayField = (val) => {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [val];
+    }
+  }
+  return [];
+};
+
+// Helper to resolve uploaded image file URL
+const getUploadedFileUrl = (req) => {
+  if (!req.file) return null;
+  const folder = req.file.fieldname === 'banner' ? 'sections' : 'products';
+  return `http://localhost:5000/uploads/${folder}/${req.file.filename}`;
+};
+
+// GET all display sections
 const getSections = async (req, res) => {
   try {
     const sections = await Section.find({})
@@ -30,14 +53,16 @@ const createSection = async (req, res) => {
     }
 
     const sectionCount = await Section.countDocuments();
+    const uploadedBanner = getUploadedFileUrl(req);
 
     const newSection = new Section({
       title: title.trim(),
       slug,
-      subtitle,
+      subtitle: subtitle || '',
+      banner: uploadedBanner || '',
       displayOrder: displayOrder !== undefined ? Number(displayOrder) : sectionCount + 1,
-      products: products || [],
-      deals: deals || [],
+      products: parseArrayField(products),
+      deals: parseArrayField(deals),
       isShown: true,
     });
 
@@ -56,7 +81,7 @@ const createSection = async (req, res) => {
 const updateSection = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, subtitle, products, deals, displayOrder, isShown } = req.body;
+    const { title, subtitle, products, deals, displayOrder, isShown, removeBanner } = req.body;
 
     const section = await Section.findById(id);
     if (!section) {
@@ -68,10 +93,20 @@ const updateSection = async (req, res) => {
       section.slug = title.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
     }
     if (subtitle !== undefined) section.subtitle = subtitle;
-    if (products !== undefined) section.products = products;
-    if (deals !== undefined) section.deals = deals;
+    if (products !== undefined) section.products = parseArrayField(products);
+    if (deals !== undefined) section.deals = parseArrayField(deals);
     if (displayOrder !== undefined) section.displayOrder = Number(displayOrder);
-    if (isShown !== undefined) section.isShown = Boolean(isShown);
+    if (isShown !== undefined) section.isShown = String(isShown) === 'true' || isShown === true;
+
+    // Handle explicit deletion vs new file upload
+    if (String(removeBanner) === 'true') {
+      section.banner = '';
+    } else {
+      const newBannerUrl = getUploadedFileUrl(req);
+      if (newBannerUrl) {
+        section.banner = newBannerUrl;
+      }
+    }
 
     const updatedSection = await section.save();
     const populatedSection = await Section.findById(updatedSection._id)

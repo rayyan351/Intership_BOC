@@ -1,3 +1,4 @@
+// front-end/src/app/admin/products/sections/page.jsx
 'use client';
 
 import React, { useState } from 'react';
@@ -32,13 +33,14 @@ export default function SectionsPage() {
   const [updateSection, { isLoading: isUpdating }] = useUpdateSectionMutation();
   const [deleteSection, { isLoading: isDeleting }] = useDeleteSectionMutation();
 
-  const handleSaveSection = async (data) => {
+  const handleSaveSection = async (formData) => {
     try {
       if (selectedSection) {
-        await updateSection({ id: selectedSection._id, ...data }).unwrap();
+        // Pass formData directly without object spread
+        await updateSection({ id: selectedSection._id, formData }).unwrap();
         showSuccess('Display section updated successfully!');
       } else {
-        await createSection(data).unwrap();
+        await createSection(formData).unwrap();
         showSuccess('Display section created successfully!');
       }
       setIsModalOpen(false);
@@ -52,7 +54,10 @@ export default function SectionsPage() {
     const startTime = Date.now();
     try {
       setUpdatingId(record._id);
-      await updateSection({ id: record._id, isShown: isChecked }).unwrap();
+      
+      const formData = new FormData();
+      formData.append('isShown', isChecked);
+      await updateSection({ id: record._id, formData }).unwrap();
 
       const elapsedTime = Date.now() - startTime;
       if (elapsedTime < 350) {
@@ -100,6 +105,21 @@ export default function SectionsPage() {
           <span className="text-xs text-gray-500">{record.subtitle}</span>
         </div>
       ),
+    },
+    {
+      title: 'Banner Preview',
+      dataIndex: 'banner',
+      key: 'banner',
+      render: (banner) =>
+        banner ? (
+          <img
+            src={banner.startsWith('http') ? banner : `http://localhost:5000${banner}`}
+            alt="Banner"
+            className="w-24 h-9 object-cover rounded border border-gray-200"
+          />
+        ) : (
+          <span className="text-xs text-gray-400 italic">No Banner</span>
+        ),
     },
     {
       title: 'Curated Items',

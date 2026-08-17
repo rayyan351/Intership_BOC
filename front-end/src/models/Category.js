@@ -5,6 +5,7 @@ const CategorySchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, lowercase: true, trim: true },
+    banner: { type: String, default: "" },
     description: { type: String, default: "" },
     banner: { type: String, default: "" },
     sortOrder: { type: Number, default: 0 },
