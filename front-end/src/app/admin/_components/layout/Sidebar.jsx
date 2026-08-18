@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'antd/es/typography/Link';
 import { Layout, Menu } from 'antd';
 import {
   DashboardOutlined,
@@ -9,6 +10,7 @@ import {
   AppstoreOutlined,
   TagsOutlined,
   GiftOutlined,
+  TeamOutlined,
   LayoutOutlined,
   PictureOutlined,
   TrademarkCircleOutlined,
@@ -33,6 +35,11 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
       key: '/admin/orders',
       icon: <ShoppingOutlined />,
       label: 'Orders',
+    },
+    {
+      key: '/admin/staff',
+      icon: <TeamOutlined />,
+      label: <Link href="/admin/staff">Staff & Roles</Link>,
     },
     {
       key: 'products-submenu',
@@ -76,7 +83,7 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
       icon: <UsergroupAddOutlined />,
       label: 'Users',
     },
-     {
+    {
       key: '/admin/locations',
       icon: <TrademarkCircleOutlined />,
       label: 'Locations',

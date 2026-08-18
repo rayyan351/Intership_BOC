@@ -1,3 +1,4 @@
+// back-end/routes/authRoutes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -8,6 +9,7 @@ const {
 const { protect } = require('../middleware/authMiddleware');
 
 router.post('/login', loginUser);
+
 router
   .route('/profile')
   .get(protect, getUserProfile)

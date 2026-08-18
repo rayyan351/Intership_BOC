@@ -1,8 +1,8 @@
 // back-end/models/User.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
-const { ROLES, PERMISSIONS, ROLE_DEFAULT_PERMISSIONS } = require("../config/roleBasedPermissions");
-const { generateEmployeeId } = require("../utils/generateBranchCode");
+const { ROLES, PERMISSIONS, ROLE_DEFAULT_PERMISSIONS } = require("../config/permissions");
+const { generateEmployeeId } = require("../utils/generateCodes");
 
 const userSchema = new mongoose.Schema(
   {
@@ -70,16 +70,22 @@ const userSchema = new mongoose.Schema(
 );
 
 // Auto-generate employeeId and sync branchCode
-// In back-end/models/User.js
-userSchema.pre("save", async function () {
-  if (this.role !== "super_admin" && !this.employeeId) {
-    this.employeeId = await generateEmployeeId();
+userSchema.pre("save", async function (next) {
+  if (this.role !== ROLES.SUPER_ADMIN && !this.employeeId) {
+    try {
+      this.employeeId = await generateEmployeeId();
+    } catch (err) {
+      return next(err);
+    }
   }
 
+  // Password hashing
   if (this.isModified("password")) {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
   }
+
+  next();
 });
 
 // Compare password helper

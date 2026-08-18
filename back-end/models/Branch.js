@@ -1,40 +1,67 @@
-// models/Branch.js
-const mongoose = require('mongoose');
+// back-end/models/Branch.js
+const mongoose = require("mongoose");
+const { generateBranchCode } = require("../utils/generateBranchCode");
 
 const branchSchema = new mongoose.Schema(
   {
+    branchCode: {
+      type: String,
+      unique: true,
+      trim: true,
+      uppercase: true,
+    },
     name: {
       type: String,
-      required: [true, 'Branch / Area name is required'],
+      required: [true, "Branch name is required"],
       trim: true,
-    }, // e.g. "SMCHS", "Clifton", "Gulberg"
+    },
     city: {
       type: String,
-      required: [true, 'City is required'],
-      enum: ['Karachi', 'Lahore', 'Islamabad', 'Rawalpindi'],
-      default: 'Karachi',
+      required: [true, "City is required"],
+      enum: ["Karachi", "Lahore", "Islamabad", "Rawalpindi"],
+      default: "Karachi",
     },
     address: {
       type: String,
-      default: '',
+      default: "",
       trim: true,
     },
     phone: {
       type: String,
-      default: '',
+      default: "",
       trim: true,
+    },
+    latitude: {
+      type: Number,
+      default: null,
+    },
+    longitude: {
+      type: Number,
+      default: null,
+    },
+    googleMapsUrl: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    deliveryRadiusKm: {
+      type: Number,
+      default: 8,
     },
     deliveryFee: {
       type: Number,
       default: 0,
+      min: [0, "Delivery fee cannot be negative"],
     },
     minOrderAmount: {
       type: Number,
       default: 0,
+      min: [0, "Minimum order amount cannot be negative"],
     },
     isShown: {
       type: Boolean,
       default: true,
+      index: true,
     },
     displayOrder: {
       type: Number,
@@ -44,4 +71,11 @@ const branchSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.models?.Branch || mongoose.model('Branch', branchSchema);
+// ✅ Modern Mongoose async hook (No `next` parameter or callback)
+branchSchema.pre("save", async function () {
+  if (!this.branchCode) {
+    this.branchCode = await generateBranchCode(this.city);
+  }
+});
+
+module.exports = mongoose.models.Branch || mongoose.model("Branch", branchSchema);

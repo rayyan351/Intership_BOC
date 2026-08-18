@@ -78,77 +78,101 @@ export default function LocationsPage() {
       b.city?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const columns = [
-    {
-      title: 'Branch / Area',
-      dataIndex: 'name',
-      key: 'name',
-      render: (text, r) => (
-        <div>
-          <span className="font-bold text-gray-900 block">{text}</span>
-          <span className="text-xs text-gray-400">{r.address || 'No specific address'}</span>
-        </div>
-      ),
-    },
-    {
-      title: 'City',
-      dataIndex: 'city',
-      key: 'city',
-      render: (city) => (
-        <Tag color={city === 'Karachi' ? 'gold' : city === 'Lahore' ? 'green' : 'blue'}>
-          {city}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Delivery Fee',
-      dataIndex: 'deliveryFee',
-      key: 'deliveryFee',
-      render: (fee) => <span className="font-semibold text-gray-800">Rs. {fee || 0}</span>,
-    },
-    {
-      title: 'Status',
-      dataIndex: 'isShown',
-      key: 'isShown',
-      render: (isShown, record) => (
-        <Space size="small">
-          <CustomSwitch
-            checked={record.isShown ?? true}
-            loading={updatingId === record._id}
-            onChange={(checked) => handleStatusToggle(record, checked)}
-          />
-          <span className="text-xs font-semibold text-gray-600">
-            {record.isShown ?? true ? 'Active' : 'Disabled'}
+  // Update the columns definition in front-end/src/app/admin/locations/page.jsx
+const columns = [
+  {
+    title: 'Branch / Area',
+    dataIndex: 'name',
+    key: 'name',
+    render: (text, r) => (
+      <div>
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-gray-900">{text}</span>
+          <span className="text-[11px] font-mono font-semibold px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-900 border border-yellow-300">
+            {r.branchCode || 'NO-CODE'}
           </span>
-        </Space>
-      ),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button
-            type="text"
-            icon={<EditOutlined className="text-gray-600" />}
-            onClick={() => {
-              setSelectedBranch(record);
-              setIsModalOpen(true);
-            }}
-          />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => {
-              setBranchToDelete(record);
-              setIsDeleteModalOpen(true);
-            }}
-          />
-        </Space>
-      ),
-    },
-  ];
+        </div>
+        <span className="text-xs text-gray-400 block">{r.address || 'No address specified'}</span>
+      </div>
+    ),
+  },
+  {
+    title: 'City',
+    dataIndex: 'city',
+    key: 'city',
+    render: (city) => (
+      <Tag color={city === 'Karachi' ? 'gold' : city === 'Lahore' ? 'green' : 'blue'}>
+        {city}
+      </Tag>
+    ),
+  },
+  {
+    title: 'Map & Coordinates',
+    key: 'coords',
+    render: (_, r) => (
+      r.latitude && r.longitude ? (
+        <a
+          href={r.googleMapsUrl || `https://www.google.com/maps?q=${r.latitude},${r.longitude}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-blue-600 hover:underline font-mono"
+        >
+          {r.latitude.toFixed(4)}, {r.longitude.toFixed(4)} ({r.deliveryRadiusKm || 8}km)
+        </a>
+      ) : (
+        <span className="text-xs text-gray-400 italic">No GPS set</span>
+      )
+    ),
+  },
+  {
+    title: 'Delivery Fee',
+    dataIndex: 'deliveryFee',
+    key: 'deliveryFee',
+    render: (fee) => <span className="font-semibold text-gray-800">Rs. {fee || 0}</span>,
+  },
+  {
+    title: 'Status',
+    dataIndex: 'isShown',
+    key: 'isShown',
+    render: (isShown, record) => (
+      <Space size="small">
+        <CustomSwitch
+          checked={record.isShown ?? true}
+          loading={updatingId === record._id}
+          onChange={(checked) => handleStatusToggle(record, checked)}
+        />
+        <span className="text-xs font-semibold text-gray-600">
+          {record.isShown ?? true ? 'Active' : 'Disabled'}
+        </span>
+      </Space>
+    ),
+  },
+  {
+    title: 'Actions',
+    key: 'actions',
+    render: (_, record) => (
+      <Space size="middle">
+        <Button
+          type="text"
+          icon={<EditOutlined className="text-gray-600" />}
+          onClick={() => {
+            setSelectedBranch(record);
+            setIsModalOpen(true);
+          }}
+        />
+        <Button
+          type="text"
+          danger
+          icon={<DeleteOutlined />}
+          onClick={() => {
+            setBranchToDelete(record);
+            setIsDeleteModalOpen(true);
+          }}
+        />
+      </Space>
+    ),
+  },
+];
 
   return (
     <>
