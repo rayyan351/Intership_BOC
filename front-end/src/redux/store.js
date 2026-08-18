@@ -9,6 +9,8 @@ import { dealCategoryApi } from '@/services/dealCategoryApi';
 import { menuApi } from '@/services/menuApi';
 import { orderApi } from '@/services/orderApi';
 import { bannerApi } from '@/services/bannerApi';
+import { settingApi } from '@/services/settingApi';
+import { branchApi } from '@/services/branchApi';
 
 export const store = configureStore({
   reducer: {
@@ -23,6 +25,8 @@ export const store = configureStore({
     [menuApi.reducerPath]:menuApi.reducer,
     [orderApi.reducerPath]:orderApi.reducer,
     [bannerApi.reducerPath]:bannerApi.reducer,
+    [settingApi.reducerPath]:settingApi.reducer,
+    [branchApi.reducerPath]:branchApi.reducer,
   },
   // 2. Add the RTK Query middleware for caching, invalidation, and polling support
   middleware: (getDefaultMiddleware) =>
@@ -35,5 +39,7 @@ export const store = configureStore({
      .concat(dealCategoryApi.middleware)
      .concat(menuApi.middleware)
      .concat(orderApi.middleware)
-     .concat(bannerApi.middleware),
+     .concat(bannerApi.middleware)
+     .concat(settingApi.middleware)
+     .concat(branchApi.middleware),
 });

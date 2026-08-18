@@ -3,7 +3,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { DISPLAY_PHONE, FEEDBACK_EMAIL, ORDER_PHONE } from "@/lib/site";
 
-export function SiteFooter() {
+export function SiteFooter({
+  storeLogo,
+  storeName = "Burger O'Clock",
+}) {
+  const resolvedLogo = storeLogo
+    ? storeLogo.startsWith("http")
+      ? storeLogo
+      : `http://localhost:5000${storeLogo.startsWith("/") ? "" : "/"}${storeLogo}`
+    : "/images/brand/BurgerO'clock logo.webp";
+
   return (
     <footer className="relative overflow-hidden bg-black text-white" id="locations">
       {/* Main Grid Container */}
@@ -11,13 +20,16 @@ export function SiteFooter() {
         
         {/* Brand Column */}
         <div className="flex flex-col items-start gap-3">
-          <Image
-            alt="Burger O'Clock"
-            height={90}
-            src="/images/brand/BurgerO'clock logo.webp"
-            width={230}
-            className="w-[200px] sm:w-[250px] h-auto object-contain"
-          />
+          <div className="relative w-[200px] sm:w-[240px] h-[75px] sm:h-[90px]">
+            <Image
+              alt={storeName}
+              fill
+              unoptimized
+              sizes="(max-width: 640px) 200px, 240px"
+              src={resolvedLogo}
+              className="object-contain object-left"
+            />
+          </div>
           <p className="max-w-[360px] text-[#b9b9b9] text-sm sm:text-base leading-[1.6] m-0">
             Premium burgers, bold flavours and direct online ordering across Karachi and Lahore.
           </p>
@@ -67,7 +79,7 @@ export function SiteFooter() {
         {/* Promo App Visual */}
         <div className="hidden min-[621px]:block relative min-h-[250px] lg:min-h-[330px] w-full">
           <Image
-            alt="Burger O'Clock ordering app placeholder"
+            alt={`${storeName} ordering app`}
             fill
             sizes="(max-width: 900px) 200px, 260px"
             src="/images/footer/promo.webp"
@@ -78,7 +90,7 @@ export function SiteFooter() {
 
       {/* Bottom Yellow Strip */}
       <div className="min-h-[58px] flex flex-col min-[621px]:flex-row items-center justify-center gap-[7px] min-[621px]:gap-[50px] px-5 py-2.5 bg-[#F4C61A] text-black text-[0.78rem] font-bold text-center">
-        <span>© 2026 Burger O'Clock. Frontend internship redevelopment.</span>
+        <span>© {new Date().getFullYear()} {storeName}. All rights reserved.</span>
         <div className="flex items-center gap-[18px]">
           <a href="#" className="hover:underline">
             FAQs

@@ -15,7 +15,10 @@ const drawerLinks = [
   { label: "Our Locations", href: "#locations", icon: "location" },
 ];
 
-export function SiteHeader() {
+export function SiteHeader({
+  storeLogo,
+  storeName = "Burger O'Clock",
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -73,27 +76,37 @@ export function SiteHeader() {
     };
   }, [closeMenu, menuOpen]);
 
+  // Safe resolver for local uploads vs external CDNs vs static fallback
+  const resolvedLogo = storeLogo
+    ? storeLogo.startsWith("http")
+      ? storeLogo
+      : `http://localhost:5000${storeLogo.startsWith("/") ? "" : "/"}${storeLogo}`
+    : "/images/brand/BurgerO'clock logo.webp";
+
   return (
     <>
-      {/* Header Container (Notice: no high z-index, allowing the hero carousel to overlap on top) */}
+      {/* Header Container */}
       <header className="relative min-h-[102px] sm:min-h-[136px] -mb-[18px] sm:-mb-[36px] rounded-b-[28px] sm:rounded-b-[46px] bg-black text-white overflow-hidden">
         <div className="flex w-[calc(100%-24px)] md:w-[min(100%-32px,1120px)] lg:w-[min(1120px,calc(100%-48px))] min-h-[84px] sm:min-h-[100px] items-center justify-between gap-2 md:gap-7 mx-auto">
           
           {/* Brand Group */}
           <div className="flex items-center min-w-0 gap-[7px] sm:gap-3">
             <Link
-              aria-label="Burger O'Clock home"
+              aria-label={`${storeName} home`}
               className="inline-flex shrink-0"
               href="/"
             >
-              <Image
-                alt="Burger O'Clock"
-                height={58}
-                priority
-                src="/images/brand/BurgerO'clock logo.webp"
-                width={136}
-                className="w-[92px] min-[430px]:w-[100px] sm:w-[120px] h-auto object-contain"
-              />
+              <div className="relative w-[92px] min-[430px]:w-[100px] sm:w-[120px] h-[42px] sm:h-[52px]">
+                <Image
+                  alt={storeName}
+                  fill
+                  priority
+                  unoptimized
+                  src={resolvedLogo}
+                  sizes="(max-width: 640px) 100px, 120px"
+                  className="object-contain object-left"
+                />
+              </div>
             </Link>
 
             {/* Location Selector */}
@@ -125,7 +138,7 @@ export function SiteHeader() {
 
             {/* Phone Button */}
             <a
-              aria-label={`Call Burger O'Clock at ${DISPLAY_PHONE}`}
+              aria-label={`Call ${storeName} at ${DISPLAY_PHONE}`}
               className="hidden min-[680px]:inline-flex items-center gap-[7px] min-h-[40px] px-3 border border-[#F4C61A] rounded-full bg-transparent text-[#F4C61A] text-[0.7rem] font-extrabold whitespace-nowrap transition-all duration-200 hover:-translate-y-[1px] hover:bg-[#F4C61A] hover:text-black"
               href={`tel:${ORDER_PHONE}`}
             >
@@ -174,7 +187,7 @@ export function SiteHeader() {
         </div>
       </header>
 
-      {/* Drawer Layer (Keeps high z-index for modal overlay) */}
+      {/* Drawer Layer */}
       <div
         aria-hidden={!menuOpen}
         className={`fixed inset-0 z-[500] transition-[visibility,opacity] duration-300 ${
@@ -201,7 +214,7 @@ export function SiteHeader() {
         >
           <div className="flex items-center justify-between min-h-[64px] px-3.5 py-2 border-b border-[#eeeeee]">
             <h2 id="site-navigation-title" className="m-0 text-[0.88rem] font-bold tracking-[-0.015em] text-[#101010]">
-              Burger O&apos;Clock
+              {storeName}
             </h2>
 
             <button

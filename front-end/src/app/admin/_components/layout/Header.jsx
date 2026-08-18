@@ -1,3 +1,4 @@
+// front-end/src/app/admin/_components/layout/AdminHeader.jsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -7,11 +8,13 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import FormInput from '@/app/admin/_components/formElements/inputfield/Forminput';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
+import { useGetSettingsQuery } from '@/services/settingApi';
 
 const { Header: AntHeader } = Layout;
 
 export default function AdminHeader() {
   const router = useRouter();
+  const { data: settings } = useGetSettingsQuery();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [user, setUser] = useState({ name: 'Admin', email: '' });
   const [loading, setLoading] = useState(false);
@@ -117,6 +120,13 @@ export default function AdminHeader() {
     },
   ];
 
+  // Resolve dynamic vs fallback logo path
+  const adminLogoUrl = settings?.adminLogo
+    ? settings.adminLogo.startsWith('http')
+      ? settings.adminLogo
+      : `http://localhost:5000${settings.adminLogo.startsWith('/') ? '' : '/'}${settings.adminLogo}`
+    : "/images/brand/BurgerO'clock logo.webp";
+
   return (
     <>
       {contextHolder}
@@ -128,10 +138,11 @@ export default function AdminHeader() {
         <div className="flex items-center gap-3 shrink-0">
           <div className="relative h-9 w-28 sm:w-32 shrink-0">
             <Image
-              src="/images/brand/BurgerO'clock logo.webp"
+              src={adminLogoUrl}
               alt="Admin Logo"
               fill
               priority
+              unoptimized
               sizes="128px"
               className="object-contain object-left"
             />

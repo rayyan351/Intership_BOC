@@ -11,6 +11,7 @@ import {
   GiftOutlined,
   LayoutOutlined,
   PictureOutlined,
+  TrademarkCircleOutlined,
   UsergroupAddOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
@@ -74,6 +75,11 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
       key: '/admin/users',
       icon: <UsergroupAddOutlined />,
       label: 'Users',
+    },
+     {
+      key: '/admin/locations',
+      icon: <TrademarkCircleOutlined />,
+      label: 'Locations',
     },
     {
       key: '/admin/settings',
