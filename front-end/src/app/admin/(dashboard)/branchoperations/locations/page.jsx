@@ -134,7 +134,7 @@ const columns = [
     title: 'Status',
     dataIndex: 'isShown',
     key: 'isShown',
-    render: (isShown, record) => (
+    render: (record) => (
       <Space size="small">
         <CustomSwitch
           checked={record.isShown ?? true}
@@ -207,6 +207,7 @@ const columns = [
           onSubmit={handleSave}
           loading={isCreating || isUpdating}
           initialValues={selectedBranch}
+          existingBranches={branches}
         />
 
         <ConfirmModal

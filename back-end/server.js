@@ -14,6 +14,7 @@ const dealCategoryRoutes = require('./routes/dealCategoryRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 const branchRoutes = require('./routes/branchRoutes');
 const staffRoutes = require('./routes/staffRoutes');
+const roleRoutes = require('./routes/roleRoutes');
 
 dotenv.config();
 connectDB();
@@ -36,6 +37,7 @@ app.use('/api/deal-categories', require('./routes/dealCategoryRoutes'));
 app.use('/api/settings', require('./routes/settingRoutes'));
 app.use('/api/branches', require('./routes/branchRoutes'));
 app.use('/api/staff', require('./routes/staffRoutes'));
+app.use('/api/roles', require('./routes/roleRoutes'));
 
 app.get('/', (req, res) => {
   res.send('Burger O Clock API is running...');

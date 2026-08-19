@@ -9,10 +9,8 @@ const {
 } = require('../controllers/staffController');
 const { protect } = require('../middleware/authMiddleware');
 const { requireRole } = require('../middleware/rbacMiddleware');
-const { ROLES } = require('../config/roleBasedPermissions');
 
-// All staff management routes are protected for Super Admin only
-router.use(protect, requireRole(ROLES.SUPER_ADMIN));
+router.use(protect, requireRole('super_admin', 'admin'));
 
 router.route('/')
   .get(getStaffMembers)

@@ -1,7 +1,6 @@
 // back-end/models/User.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
-const { ROLES, PERMISSIONS, ROLE_DEFAULT_PERMISSIONS } = require("../config/roleBasedPermissions");
 const { generateEmployeeId } = require("../utils/generateBranchCode");
 
 const userSchema = new mongoose.Schema(
@@ -32,11 +31,21 @@ const userSchema = new mongoose.Schema(
       minlength: [6, "Password must be at least 6 characters"],
       select: false, // Do not expose password by default
     },
+    roleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Role',
+      default: null,
+    },
     role: {
       type: String,
-      enum: Object.values(ROLES),
-      default: ROLES.BRANCH_STAFF,
+      default: 'staff',
+      trim: true,
+      lowercase: true,
       index: true,
+    },
+    customPermissions: {
+      type: [String],
+      default: [], // User-specific capabilities override
     },
     // Null for Super Admin, populated for Branch Staff/Managers
     branch: {
@@ -48,13 +57,6 @@ const userSchema = new mongoose.Schema(
     branchCode: {
       type: String,
       default: null,
-    },
-    permissions: {
-      type: [String],
-      enum: Object.values(PERMISSIONS),
-      default: function () {
-        return ROLE_DEFAULT_PERMISSIONS[this.role] || [];
-      },
     },
     isActive: {
       type: Boolean,
@@ -70,7 +72,6 @@ const userSchema = new mongoose.Schema(
 );
 
 // Auto-generate employeeId and sync branchCode
-// In back-end/models/User.js
 userSchema.pre("save", async function () {
   if (this.role !== "super_admin" && !this.employeeId) {
     this.employeeId = await generateEmployeeId();
@@ -87,10 +88,10 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Check if user has specific permission
-userSchema.methods.hasPermission = function (permission) {
-  if (this.role === ROLES.SUPER_ADMIN) return true;
-  return this.permissions.includes(permission);
+// Check if user has specific permission (Super Admin or has user override / role permission)
+userSchema.methods.hasPermission = function (permissionKey) {
+  if (this.role === 'super_admin' || this.role === 'admin') return true;
+  return this.customPermissions.includes(permissionKey);
 };
 
 module.exports = mongoose.models.User || mongoose.model("User", userSchema);

@@ -12,6 +12,7 @@ import { bannerApi } from '@/services/bannerApi';
 import { settingApi } from '@/services/settingApi';
 import { branchApi } from '@/services/branchApi';
 import { staffApi } from '@/services/staffApi';
+import { roleApi } from '@/services/roleApi';
 
 export const store = configureStore({
   reducer: {
@@ -29,6 +30,7 @@ export const store = configureStore({
     [settingApi.reducerPath]:settingApi.reducer,
     [branchApi.reducerPath]:branchApi.reducer,
     [staffApi.reducerPath]:staffApi.reducer,
+    [roleApi.reducerPath]:roleApi.reducer,
   },
   // 2. Add the RTK Query middleware for caching, invalidation, and polling support
   middleware: (getDefaultMiddleware) =>
@@ -44,5 +46,6 @@ export const store = configureStore({
      .concat(bannerApi.middleware)
      .concat(settingApi.middleware)
      .concat(branchApi.middleware)
-     .concat(staffApi.middleware),
+     .concat(staffApi.middleware)
+     .concat(roleApi.middleware),
 });

@@ -41,30 +41,33 @@ export default function LoginPage() {
   const [login, { isLoading }] = useLoginMutation();
 
   // 3. Form Submit Handler
-  const handleLogin = async (values) => {
-    try {
-      const data = await login(values).unwrap();
+const handleLogin = async (values) => {
+  try {
+    const data = await login(values).unwrap();
 
-      localStorage.setItem('adminToken', data.token);
-      localStorage.setItem(
-        'adminUser',
-        JSON.stringify({
-          _id: data._id,
-          name: data.name,
-          email: data.email,
-          role: data.role,
-        })
-      );
+    localStorage.setItem('adminToken', data.token);
+    localStorage.setItem(
+      'adminUser',
+      JSON.stringify({
+        _id: data._id,
+        employeeId: data.employeeId,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        branch: data.branch,
+        branchCode: data.branchCode,
+        permissions: data.permissions || [], // Stored in localStorage
+      })
+    );
 
-      messageApi.success('Welcome back, Admin!');
-
-      setTimeout(() => {
-        router.push('/admin/dashboard');
-      }, 500);
-    } catch (error) {
-      messageApi.error(error?.data?.message || error?.message || 'Server error. Please try again.');
-    }
-  };
+    messageApi.success('Welcome back!');
+    setTimeout(() => {
+      router.push('/admin/dashboard');
+    }, 400);
+  } catch (error) {
+    messageApi.error(error?.data?.message || 'Invalid login credentials');
+  }
+};
 
   return (
     <div className="min-h-screen w-full bg-zinc-950 flex items-center justify-center p-4">

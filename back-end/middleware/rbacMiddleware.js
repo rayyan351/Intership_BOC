@@ -1,25 +1,21 @@
 // back-end/middleware/rbacMiddleware.js
 const { ROLES } = require("../config/roleBasedPermissions");
 
-/**
- * Enforces role-level access.
- * e.g. requireRole(ROLES.SUPER_ADMIN)
- */
+// back-end/middleware/rbacMiddleware.js
+
 const requireRole = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ success: false, message: "Unauthenticated." });
+      return res.status(401).json({ success: false, message: 'Unauthenticated.' });
     }
 
-    const userRole = (req.user.role || "").toLowerCase().trim();
+    const userRole = (req.user.role || '').toLowerCase().trim();
 
-    // Super Admin / Admin has master access
-    const isSuperAdmin =
-      userRole === "super_admin" ||
-      userRole === "admin" ||
-      userRole === ROLES?.SUPER_ADMIN;
-
-    if (isSuperAdmin || allowedRoles.includes(userRole)) {
+    if (
+      userRole === 'super_admin' ||
+      userRole === 'admin' ||
+      allowedRoles.map((r) => r.toLowerCase()).includes(userRole)
+    ) {
       return next();
     }
 
@@ -30,28 +26,26 @@ const requireRole = (...allowedRoles) => {
   };
 };
 
-/**
- * Enforces granular permission flags.
- * Super Admins automatically pass.
- */
 const requirePermission = (requiredPermissions = [], matchAny = false) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ success: false, message: "Unauthenticated." });
+      return res.status(401).json({ success: false, message: 'Unauthenticated.' });
     }
 
-    const userRole = (req.user.role || "").toLowerCase().trim();
-    const isSuperAdmin =
-      userRole === "super_admin" ||
-      userRole === "admin" ||
-      userRole === ROLES?.SUPER_ADMIN;
+    const userRole = (req.user.role || '').toLowerCase().trim();
 
-    // Master bypass for Super Admin
-    if (isSuperAdmin) {
+    // Master bypass for Super Admin / Admin
+    if (userRole === 'super_admin' || userRole === 'admin') {
       return next();
     }
 
-    const userPermissions = req.user.permissions || [];
+    const userPermissions = req.user.effectivePermissions || req.user.customPermissions || [];
+
+    // Bypass if user has wildcard full access
+    if (userPermissions.includes('*')) {
+      return next();
+    }
+
     const permissionsArray = Array.isArray(requiredPermissions)
       ? requiredPermissions
       : [requiredPermissions];
@@ -63,7 +57,7 @@ const requirePermission = (requiredPermissions = [], matchAny = false) => {
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden. You do not have the required permissions to perform this action.",
+        message: 'Forbidden. You do not have the required permissions.',
         missingPermissions: permissionsArray.filter((p) => !userPermissions.includes(p)),
       });
     }

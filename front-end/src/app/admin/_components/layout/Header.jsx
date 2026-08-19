@@ -35,13 +35,17 @@ export default function AdminHeader() {
   }, []);
 
   const handleLogout = () => {
+    // 1. Wipe all local storage auth keys
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminUser');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     
     messageApi.success('Logged out successfully');
     
+    // 2. Full page redirect clears all Redux Query cache completely
     setTimeout(() => {
-      router.replace('/admin/login');
+      window.location.href = '/admin/login';
     }, 300);
   };
 
@@ -120,7 +124,6 @@ export default function AdminHeader() {
     },
   ];
 
-  // Resolve dynamic vs fallback logo path
   const adminLogoUrl = settings?.adminLogo
     ? settings.adminLogo.startsWith('http')
       ? settings.adminLogo
@@ -152,6 +155,7 @@ export default function AdminHeader() {
           </span>
         </div>
 
+        {/* Removed faulty getPopupContainer that blocked click listener */}
         <Dropdown 
           menu={{ 
             items: userMenuItems,
@@ -159,9 +163,8 @@ export default function AdminHeader() {
           }} 
           placement="bottomRight" 
           trigger={['click']}
-          getPopupContainer={(triggerNode) => triggerNode.parentNode}
         >
-          <div className="flex items-center gap-3 cursor-pointer hover:bg-zinc-900 p-1.5 rounded-lg transition">
+          <div className="flex items-center gap-3 cursor-pointer hover:bg-zinc-900 p-1.5 rounded-lg transition select-none">
             <Avatar size="large" icon={<UserOutlined />} className="bg-[#ffc400] text-black font-bold" />
             <span className="text-sm font-semibold text-white hidden md:inline">{user.name}</span>
           </div>

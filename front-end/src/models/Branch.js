@@ -18,8 +18,8 @@ const branchSchema = new mongoose.Schema(
     city: {
       type: String,
       required: [true, "City is required"],
-      enum: ["Karachi", "Lahore", "Islamabad", "Rawalpindi"],
-      default: "Karachi",
+      trim: true,
+      // Removed rigid hardcoded enum to allow custom cities
     },
     address: {
       type: String,
@@ -31,7 +31,6 @@ const branchSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
-    // Coordinates for Google Maps & Geolocation
     latitude: {
       type: Number,
       default: null,
@@ -47,7 +46,7 @@ const branchSchema = new mongoose.Schema(
     },
     deliveryRadiusKm: {
       type: Number,
-      default: 8, // Standard 8km delivery zone
+      default: 8,
     },
     deliveryFee: {
       type: Number,
@@ -72,15 +71,11 @@ const branchSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-branchSchema.pre("save", async function (next) {
+// Modern async pre-save hook
+branchSchema.pre("save", async function () {
   if (!this.branchCode) {
-    try {
-      this.branchCode = await generateBranchCode(this.city);
-    } catch (err) {
-      return next(err);
-    }
+    this.branchCode = await generateBranchCode(this.city);
   }
-  next();
 });
 
 module.exports = mongoose.models.Branch || mongoose.model("Branch", branchSchema);

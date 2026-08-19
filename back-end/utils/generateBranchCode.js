@@ -1,22 +1,38 @@
 // back-end/utils/generateCodes.js
 const mongoose = require("mongoose");
 
-const CITY_PREFIXES = {
-  Karachi: "KHI",
-  Lahore: "LHE",
-  Islamabad: "ISB",
-  Rawalpindi: "RWP",
-  Default: "BRN",
+const KNOWN_PREFIXES = {
+  karachi: "KHI",
+  lahore: "LHE",
+  islamabad: "ISB",
+  rawalpindi: "RWP",
+  peshawar: "PEW",
+  faisalabad: "FSD",
+  multan: "MUL",
+  quetta: "UET",
+  hyderabad: "HYD",
 };
 
+function getCityPrefix(cityName) {
+  if (!cityName) return "BRN";
+  const clean = cityName.trim().toLowerCase();
+  if (KNOWN_PREFIXES[clean]) return KNOWN_PREFIXES[clean];
+
+  // Fallback: take first 3 alphanumeric characters
+  const lettersOnly = clean.replace(/[^a-z]/g, "");
+  if (lettersOnly.length >= 3) {
+    return lettersOnly.substring(0, 3).toUpperCase();
+  }
+  return "BRN";
+}
+
 /**
- * Generates sequential Branch Code (e.g. KHI-001, LHE-002)
+ * Generates sequential Branch Code (e.g. KHI-001, HYD-001, ISB-003)
  */
 async function generateBranchCode(city) {
-  const prefix = CITY_PREFIXES[city] || CITY_PREFIXES.Default;
+  const prefix = getCityPrefix(city);
   const Branch = mongoose.models.Branch || mongoose.model("Branch");
 
-  // Find the highest sequence number for this city prefix
   const lastBranch = await Branch.findOne({
     branchCode: new RegExp(`^${prefix}-\\d+`, "i"),
   })
@@ -34,9 +50,6 @@ async function generateBranchCode(city) {
   return `${prefix}-${String(nextSequence).padStart(3, "0")}`;
 }
 
-/**
- * Generates sequential Employee ID (e.g. EMP-1001)
- */
 async function generateEmployeeId() {
   const User = mongoose.models.User || mongoose.model("User");
 

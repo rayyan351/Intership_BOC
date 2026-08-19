@@ -1,27 +1,22 @@
 // src/services/staffApi.js
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { siteConfig } from '@/config/site';
 
 export const staffApi = createApi({
   reducerPath: 'staffApi',
   baseQuery: fetchBaseQuery({
-    baseUrl: 'http://localhost:5000/api',
-    prepareHeaders: (headers, { getState }) => {
-      // Check both redux state and common localStorage keys
-      const token =
-        getState()?.auth?.token ||
-        (typeof window !== 'undefined'
-          ? localStorage.getItem('token') || localStorage.getItem('adminToken')
-          : null);
-
-      if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
+    baseUrl: siteConfig?.baseUrl || 'http://localhost:5000/api',
+    prepareHeaders: (headers) => {
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
+        if (token) headers.set('Authorization', `Bearer ${token}`);
       }
       return headers;
     },
   }),
   tagTypes: ['Staff'],
   endpoints: (builder) => ({
-    getStaff: builder.query({
+    getStaffMembers: builder.query({
       query: () => '/staff',
       providesTags: ['Staff'],
     }),
@@ -52,7 +47,7 @@ export const staffApi = createApi({
 });
 
 export const {
-  useGetStaffQuery,
+  useGetStaffMembersQuery,
   useCreateStaffMutation,
   useUpdateStaffMutation,
   useDeleteStaffMutation,

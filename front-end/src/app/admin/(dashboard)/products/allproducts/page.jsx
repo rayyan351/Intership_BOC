@@ -1,6 +1,8 @@
+// src/app/admin/(dashboard)/products/allproducts/page.jsx
 'use client';
 
 import React, { useState } from 'react';
+import { usePermission } from '@/hooks/usePermission';
 import { Table, Button, Tag, Space, Image } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import MenuItemModal from './_components/menuItemModal';
@@ -22,6 +24,13 @@ export default function ProductsPage() {
   const { contextHolder, showSuccess, showError } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+
+  const { hasPermission } = usePermission();
+
+  const canAdd = hasPermission('products:create');
+  const canEdit = hasPermission('products:edit');
+  const canDelete = hasPermission('products:delete');
+  const canToggleStock = hasPermission('products:toggle_stock');
 
   // States for Delete Confirmation Modal
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -65,14 +74,13 @@ export default function ProductsPage() {
   };
 
   const handleVisibilityToggle = async (record, isChecked) => {
+    if (!canToggleStock) return;
     const startTime = Date.now();
     try {
       setUpdatingId(record._id);
 
-      // Fire the mutation
       await toggleAvailability({ id: record._id, isShown: isChecked }).unwrap();
 
-      // Ensure spinner is visible for at least 350ms for smooth feedback
       const elapsedTime = Date.now() - startTime;
       const minDelay = 350;
       if (elapsedTime < minDelay) {
@@ -179,6 +187,7 @@ export default function ProductsPage() {
         <Space size="small">
           <CustomSwitch
             checked={record.isShown ?? true}
+            disabled={!canToggleStock}
             loading={updatingId === record._id}
             onChange={(checked) => handleVisibilityToggle(record, checked)}
           />
@@ -191,21 +200,35 @@ export default function ProductsPage() {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button
-            type="text"
-            icon={<EditOutlined className="text-gray-600" />}
-            onClick={() => handleOpenEditModal(record)}
-          />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleOpenDeleteModal(record)}
-          />
-        </Space>
-      ),
+      render: (_, record) => {
+        if (!canEdit && !canDelete) {
+          return (
+            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+              View Only
+            </Tag>
+          );
+        }
+
+        return (
+          <Space size="middle">
+            {canEdit && (
+              <Button
+                type="text"
+                icon={<EditOutlined className="text-gray-600" />}
+                onClick={() => handleOpenEditModal(record)}
+              />
+            )}
+            {canDelete && (
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleOpenDeleteModal(record)}
+              />
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -215,10 +238,14 @@ export default function ProductsPage() {
       <PageLayout
         title="Products"
         subTitle="Manage restaurant menu items and prices"
-        onAdd={() => {
-          setSelectedProduct(null);
-          setIsModalOpen(true);
-        }}
+        onAdd={
+          canAdd
+            ? () => {
+                setSelectedProduct(null);
+                setIsModalOpen(true);
+              }
+            : null
+        }
         addText="Add new item"
         searchValue={searchTerm}
         onSearch={setSearchTerm}
@@ -243,7 +270,7 @@ export default function ProductsPage() {
           initialValues={selectedProduct}
         />
 
-        {/* Custom Confirm Delete Modal (Option B) */}
+        {/* Custom Confirm Delete Modal */}
         <ConfirmModal
           open={isDeleteModalOpen}
           onCancel={() => {

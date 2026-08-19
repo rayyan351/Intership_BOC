@@ -2,6 +2,16 @@
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
 
+// Helper to compute effective permissions
+const getEffectivePermissions = (user) => {
+  if (user.role === 'super_admin' || user.role === 'admin') {
+    return ['*'];
+  }
+  const rolePerms = user.roleId?.permissions || [];
+  const customPerms = user.customPermissions || [];
+  return Array.from(new Set([...rolePerms, ...customPerms]));
+};
+
 // @desc    Auth user & get token (Login via Email or Employee ID)
 // @route   POST /api/auth/login
 // @access  Public
@@ -14,7 +24,6 @@ const loginUser = async (req, res) => {
   }
 
   try {
-    // Search by Email OR Employee ID
     const user = await User.findOne({
       $or: [
         { email: loginIdentifier.toLowerCase() },
@@ -22,19 +31,20 @@ const loginUser = async (req, res) => {
       ],
     })
       .select('+password')
+      .populate('roleId', 'name slug permissions')
       .populate('branch', 'name city branchCode isShown');
 
     if (user && (await user.matchPassword(password))) {
-      // Check if user is active
       if (user.isActive === false) {
         return res.status(403).json({
           message: 'Your account is deactivated. Please contact Super Admin.',
         });
       }
 
-      // Update last login timestamp
       user.lastLogin = new Date();
       await user.save({ validateBeforeSave: false });
+
+      const permissions = getEffectivePermissions(user);
 
       res.json({
         _id: user._id,
@@ -44,7 +54,7 @@ const loginUser = async (req, res) => {
         role: user.role,
         branch: user.branch,
         branchCode: user.branchCode,
-        permissions: user.permissions || [],
+        permissions,
         token: generateToken(user._id),
       });
     } else {
@@ -61,10 +71,13 @@ const loginUser = async (req, res) => {
 const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
+      .populate('roleId', 'name slug permissions')
       .populate('branch', 'name city branchCode isShown')
       .select('-password');
 
     if (user) {
+      const permissions = getEffectivePermissions(user);
+
       res.json({
         _id: user._id,
         employeeId: user.employeeId,
@@ -73,7 +86,7 @@ const getUserProfile = async (req, res) => {
         role: user.role,
         branch: user.branch,
         branchCode: user.branchCode,
-        permissions: user.permissions || [],
+        permissions,
         isActive: user.isActive,
       });
     } else {
@@ -101,8 +114,11 @@ const updateUserProfile = async (req, res) => {
 
       const updatedUser = await user.save();
       const populatedUser = await User.findById(updatedUser._id)
+        .populate('roleId', 'name slug permissions')
         .populate('branch', 'name city branchCode isShown')
         .select('-password');
+
+      const permissions = getEffectivePermissions(populatedUser);
 
       res.json({
         _id: populatedUser._id,
@@ -112,7 +128,7 @@ const updateUserProfile = async (req, res) => {
         role: populatedUser.role,
         branch: populatedUser.branch,
         branchCode: populatedUser.branchCode,
-        permissions: populatedUser.permissions || [],
+        permissions,
         token: generateToken(populatedUser._id),
       });
     } else {

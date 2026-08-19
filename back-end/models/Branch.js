@@ -18,8 +18,8 @@ const branchSchema = new mongoose.Schema(
     city: {
       type: String,
       required: [true, "City is required"],
-      enum: ["Karachi", "Lahore", "Islamabad", "Rawalpindi"],
-      default: "Karachi",
+      trim: true,
+      // Removed rigid hardcoded enum to allow custom cities
     },
     address: {
       type: String,
@@ -71,7 +71,7 @@ const branchSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ Modern Mongoose async hook (No `next` parameter or callback)
+// Modern async pre-save hook
 branchSchema.pre("save", async function () {
   if (!this.branchCode) {
     this.branchCode = await generateBranchCode(this.city);

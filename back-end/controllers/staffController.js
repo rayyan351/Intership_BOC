@@ -1,14 +1,13 @@
 // back-end/controllers/staffController.js
 const User = require('../models/User');
-const Branch = require('../models/Branch');
-const { ROLES, ROLE_DEFAULT_PERMISSIONS } = require('../config/roleBasedPermissions');
+const Role = require('../models/Role');
 
-// @desc    Get all staff members
-// @route   GET /api/staff
-// @access  Private (Super Admin)
+// GET /api/staff (List all branch staff members)
 const getStaffMembers = async (req, res) => {
   try {
-    const staff = await User.find({ role: { $ne: ROLES.SUPER_ADMIN } })
+    // Exclude root and HQ administrators from branch staff listings
+    const staff = await User.find({ role: { $nin: ['super_admin', 'admin'] } })
+      .populate('roleId', 'name slug permissions')
       .populate('branch', 'name city branchCode')
       .select('-password')
       .sort({ createdAt: -1 });
@@ -19,57 +18,55 @@ const getStaffMembers = async (req, res) => {
   }
 };
 
-// @desc    Create new staff member
-// @route   POST /api/staff
-// @access  Private (Super Admin)
+// POST /api/staff (Create Staff User)
 const createStaffMember = async (req, res) => {
   try {
-    const { name, email, password, role, branch, permissions } = req.body;
+    const { name, email, password, roleId, branchId, customPermissions } = req.body;
 
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({ message: 'Please provide name, email, password, and role' });
+    if (!name || !email || !password || !branchId || !roleId) {
+      return res.status(400).json({ message: 'Please fill all required fields' });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
-    if (existingUser) {
+    const userExists = await User.findOne({ email: email.toLowerCase().trim() });
+    if (userExists) {
       return res.status(400).json({ message: 'A user with this email already exists' });
     }
 
-    let branchCode = null;
-    if (branch) {
-      const branchDoc = await Branch.findById(branch);
-      if (branchDoc) branchCode = branchDoc.branchCode;
+    const roleDoc = await Role.findById(roleId);
+    if (!roleDoc) {
+      return res.status(404).json({ message: 'Selected role not found' });
     }
 
-    const staffMember = await User.create({
+    // Default to role permissions if no explicit custom overrides provided
+    const finalPermissions = Array.isArray(customPermissions) && customPermissions.length > 0
+      ? customPermissions
+      : roleDoc.permissions;
+
+    const user = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
-      role,
-      branch: branch || null,
-      branchCode,
-      permissions: permissions && permissions.length > 0
-        ? permissions
-        : (ROLE_DEFAULT_PERMISSIONS[role] || []),
-      isActive: true,
+      role: roleDoc.slug || 'staff',
+      roleId: roleDoc._id,
+      branch: branchId,
+      customPermissions: finalPermissions,
     });
 
-    const populatedStaff = await User.findById(staffMember._id)
+    const populatedUser = await User.findById(user._id)
+      .populate('roleId', 'name slug permissions')
       .populate('branch', 'name city branchCode')
       .select('-password');
 
-    res.status(201).json(populatedStaff);
+    res.status(201).json(populatedUser);
   } catch (error) {
-    res.status(400).json({ message: 'Error creating staff member', error: error.message });
+    res.status(400).json({ message: error.message || 'Failed to create staff member' });
   }
 };
 
-// @desc    Update staff member
-// @route   PUT /api/staff/:id
-// @access  Private (Super Admin)
+// PUT /api/staff/:id (Update Staff User)
 const updateStaffMember = async (req, res) => {
   try {
-    const { name, email, password, role, branch, permissions, isActive } = req.body;
+    const { name, email, password, roleId, branchId, customPermissions, isActive } = req.body;
     const user = await User.findById(req.params.id);
 
     if (!user) {
@@ -78,48 +75,45 @@ const updateStaffMember = async (req, res) => {
 
     if (name) user.name = name.trim();
     if (email) user.email = email.toLowerCase().trim();
-    if (role) user.role = role;
-    if (typeof isActive === 'boolean') user.isActive = isActive;
-    if (permissions) user.permissions = permissions;
+    if (password) user.password = password; // Triggers bcrypt pre-save
+    if (branchId) user.branch = branchId;
+    if (isActive !== undefined) user.isActive = isActive;
 
-    if (branch !== undefined) {
-      user.branch = branch || null;
-      if (branch) {
-        const branchDoc = await Branch.findById(branch);
-        user.branchCode = branchDoc ? branchDoc.branchCode : null;
-      } else {
-        user.branchCode = null;
+    if (roleId) {
+      const roleDoc = await Role.findById(roleId);
+      if (roleDoc) {
+        user.roleId = roleDoc._id;
+        user.role = roleDoc.slug || 'staff';
       }
     }
 
-    if (password) {
-      user.password = password; // Will be hashed via pre-save hook
+    if (customPermissions !== undefined) {
+      user.customPermissions = customPermissions;
     }
 
     await user.save();
 
-    const updatedUser = await User.findById(user._id)
+    const updated = await User.findById(user._id)
+      .populate('roleId', 'name slug permissions')
       .populate('branch', 'name city branchCode')
       .select('-password');
 
-    res.status(200).json(updatedUser);
+    res.status(200).json(updated);
   } catch (error) {
-    res.status(400).json({ message: 'Error updating staff member', error: error.message });
+    res.status(400).json({ message: error.message || 'Failed to update staff member' });
   }
 };
 
-// @desc    Delete staff member
-// @route   DELETE /api/staff/:id
-// @access  Private (Super Admin)
+// DELETE /api/staff/:id
 const deleteStaffMember = async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
-    if (!user) {
-      return res.status(404).json({ message: 'Staff member not found' });
-    }
-    res.status(200).json({ message: 'Staff member removed successfully' });
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'Staff member not found' });
+
+    await user.deleteOne();
+    res.status(200).json({ message: 'Staff member deleted successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Error deleting staff member', error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
