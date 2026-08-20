@@ -8,16 +8,16 @@ const {
   deleteStaffMember,
 } = require('../controllers/staffController');
 const { protect } = require('../middleware/authMiddleware');
-const { requireRole } = require('../middleware/rbacMiddleware');
+const { requirePermission } = require('../middleware/rbacMiddleware');
 
-router.use(protect, requireRole('super_admin', 'admin'));
+router.use(protect);
 
 router.route('/')
-  .get(getStaffMembers)
-  .post(createStaffMember);
+  .get(requirePermission('staff:view'), getStaffMembers)
+  .post(requirePermission('staff:create'), createStaffMember);
 
 router.route('/:id')
-  .put(updateStaffMember)
-  .delete(deleteStaffMember);
+  .put(requirePermission('staff:edit'), updateStaffMember)
+  .delete(requirePermission('staff:delete'), deleteStaffMember);
 
 module.exports = router;

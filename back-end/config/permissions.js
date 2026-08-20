@@ -4,12 +4,9 @@ const SYSTEM_MODULES = [
   {
     key: 'dashboard',
     title: 'Dashboard & Metrics',
-    description: 'Overview, branch sales analytics, and order reports',
-    icon: 'DashboardOutlined',
     resources: [
       {
         resource: 'Main Overview',
-        description: 'Revenue totals, live orders summary, and sales charts',
         actions: [
           { key: 'dashboard:view', label: 'View Analytics', type: 'view' },
         ],
@@ -19,12 +16,9 @@ const SYSTEM_MODULES = [
   {
     key: 'orders',
     title: 'Order Management',
-    description: 'Live order pipeline, POS creation, kitchen tracking, and cancellations',
-    icon: 'ShoppingOutlined',
     resources: [
       {
         resource: 'Live Orders & POS',
-        description: 'Manage dine-in, takeaway, and delivery orders',
         actions: [
           { key: 'orders:view', label: 'View Queue', type: 'view' },
           { key: 'orders:create', label: 'Create Order (POS)', type: 'create' },
@@ -37,12 +31,10 @@ const SYSTEM_MODULES = [
   {
     key: 'products',
     title: 'Products & Catalog Menu',
-    description: 'Categories, combos, display rows, product pricing, and stock switches',
     icon: 'AppstoreOutlined',
     resources: [
       {
         resource: 'Categories',
-        description: 'Main product categories',
         actions: [
           { key: 'categories:view', label: 'View', type: 'view' },
           { key: 'categories:create', label: 'Add', type: 'create' },
@@ -53,7 +45,6 @@ const SYSTEM_MODULES = [
       },
       {
         resource: 'Deal Categories',
-        description: 'Categories reserved for promotional deals and bundles',
         actions: [
           { key: 'dealcategories:view', label: 'View', type: 'view' },
           { key: 'dealcategories:create', label: 'Add', type: 'create' },
@@ -64,7 +55,6 @@ const SYSTEM_MODULES = [
       },
       {
         resource: 'Display Sections',
-        description: 'Homepage featured rows and meal collections',
         actions: [
           { key: 'sections:view', label: 'View', type: 'view' },
           { key: 'sections:create', label: 'Add', type: 'create' },
@@ -74,7 +64,6 @@ const SYSTEM_MODULES = [
       },
       {
         resource: 'All Products',
-        description: 'Menu food items, price modifications, and variants',
         actions: [
           { key: 'products:view', label: 'View Items', type: 'view' },
           { key: 'products:create', label: 'Add Item', type: 'create' },
@@ -85,7 +74,6 @@ const SYSTEM_MODULES = [
       },
       {
         resource: 'Deals & Bundles',
-        description: 'Combo meals, dynamic deals, and family packages',
         actions: [
           { key: 'deals:view', label: 'View Deals', type: 'view' },
           { key: 'deals:create', label: 'Add Deal', type: 'create' },
@@ -99,12 +87,10 @@ const SYSTEM_MODULES = [
   {
     key: 'banners',
     title: 'Hero Banners',
-    description: 'Promotional slider banners across web and mobile storefronts',
     icon: 'PictureOutlined',
     resources: [
       {
         resource: 'Homepage Sliders',
-        description: 'Top promotional sliders',
         actions: [
           { key: 'banners:view', label: 'View', type: 'view' },
           { key: 'banners:create', label: 'Upload', type: 'create' },
@@ -117,12 +103,10 @@ const SYSTEM_MODULES = [
   {
     key: 'branch_operations',
     title: 'Branch Operations',
-    description: 'Outlets, GPS locations, employee credentials, and role matrices',
     icon: 'BankOutlined',
     resources: [
       {
         resource: 'Store Outlets',
-        description: 'Branch locations, GPS pins, and delivery radii',
         actions: [
           { key: 'locations:view', label: 'View Outlets', type: 'view' },
           { key: 'locations:create', label: 'Add Outlet', type: 'create' },
@@ -132,7 +116,6 @@ const SYSTEM_MODULES = [
       },
       {
         resource: 'Staff Accounts',
-        description: 'Branch employees and access credentials',
         actions: [
           { key: 'staff:view', label: 'View Staff', type: 'view' },
           { key: 'staff:create', label: 'Add Staff', type: 'create' },
@@ -143,7 +126,6 @@ const SYSTEM_MODULES = [
       },
       {
         resource: 'Roles & Matrix',
-        description: 'System roles and permission assignments',
         actions: [
           { key: 'roles:view', label: 'View Roles', type: 'view' },
           { key: 'roles:create', label: 'Add Role', type: 'create' },
@@ -156,12 +138,10 @@ const SYSTEM_MODULES = [
   {
     key: 'settings',
     title: 'Brand & SEO Settings',
-    description: 'Logos, SEO tab title, favicon, and franchise identity',
     icon: 'SettingOutlined',
     resources: [
       {
         resource: 'Brand Identity',
-        description: 'Store metadata and logos',
         actions: [
           { key: 'settings:view', label: 'View Settings', type: 'view' },
           { key: 'settings:edit', label: 'Save Changes', type: 'edit' },

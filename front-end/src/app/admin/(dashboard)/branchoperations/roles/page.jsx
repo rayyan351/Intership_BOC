@@ -1,14 +1,14 @@
-// src/app/admin/(dashboard)/branchoperations/roles/page.jsx
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Button, Popconfirm, Tag, Tooltip } from 'antd';
+import { Table, Button, Popconfirm, Tag } from 'antd';
 import {
   EditOutlined,
   DeleteOutlined,
   ArrowLeftOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons';
+import { usePermission } from '@/hooks/usePermission';
 
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
@@ -25,11 +25,14 @@ export default function RolesPage() {
   const { contextHolder, showSuccess, showError } = useToast();
   const { data, isLoading } = useGetRolesAndModulesQuery();
   const roles = data?.roles || [];
-  const modules = data?.modules || [];
+
+  const { hasPermission } = usePermission();
+  const canAdd = hasPermission('roles:create');
+  const canEdit = hasPermission('roles:edit');
+  const canDelete = hasPermission('roles:delete');
 
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'form'
   const [selectedRoleId, setSelectedRoleId] = useState(null);
-
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -59,30 +62,6 @@ export default function RolesPage() {
   const handleCancelForm = () => {
     setViewMode('list');
     setSelectedRoleId(null);
-  };
-
-  const handleToggleSingle = (key) => {
-    setFormData((prev) => {
-      const exists = prev.permissions.includes(key);
-      return {
-        ...prev,
-        permissions: exists
-          ? prev.permissions.filter((k) => k !== key)
-          : [...prev.permissions, key],
-      };
-    });
-  };
-
-  const handleBatchToggle = (keys, enable) => {
-    setFormData((prev) => {
-      let updated;
-      if (enable) {
-        updated = Array.from(new Set([...prev.permissions, ...keys]));
-      } else {
-        updated = prev.permissions.filter((k) => !keys.includes(k));
-      }
-      return { ...prev, permissions: updated };
-    });
   };
 
   const handleSaveForm = async (e) => {
@@ -116,7 +95,6 @@ export default function RolesPage() {
     }
   };
 
-  // Modern Table Columns for Roles Overview
   const columns = [
     {
       title: 'Role Name',
@@ -164,35 +142,47 @@ export default function RolesPage() {
       key: 'actions',
       align: 'right',
       width: '14%',
-      render: (_, record) => (
-        <div className="flex items-center justify-end gap-1.5">
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleStartEdit(record)}
-            className="!text-xs font-semibold"
-          >
-            Edit
-          </Button>
+      render: (_, record) => {
+        if (!canEdit && (!canDelete || record.isSystem)) {
+          return (
+            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+              View Only
+            </Tag>
+          );
+        }
 
-          {!record.isSystem && (
-            <Popconfirm
-              title="Delete Role"
-              description={`Delete "${record.name}" permanently?`}
-              onConfirm={() => handleDeleteRole(record._id)}
-              okText="Yes"
-              cancelText="No"
-            >
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            {canEdit && (
               <Button
                 size="small"
-                danger
-                icon={<DeleteOutlined />}
-                className="!text-xs"
-              />
-            </Popconfirm>
-          )}
-        </div>
-      ),
+                icon={<EditOutlined />}
+                onClick={() => handleStartEdit(record)}
+                className="!text-xs font-semibold"
+              >
+                Edit
+              </Button>
+            )}
+
+            {canDelete && !record.isSystem && (
+              <Popconfirm
+                title="Delete Role"
+                description={`Delete "${record.name}" permanently?`}
+                onConfirm={() => handleDeleteRole(record._id)}
+                okText="Yes"
+                cancelText="No"
+              >
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  className="!text-xs"
+                />
+              </Popconfirm>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -202,13 +192,12 @@ export default function RolesPage() {
       <PageLayout
         title={viewMode === 'form' ? (selectedRoleId ? 'Edit Role' : 'Create Role') : 'Roles & Permissions'}
         subTitle="Manage team roles and customize operational permissions"
-        onAdd={viewMode === 'list' ? handleStartCreate : null}
+        onAdd={viewMode === 'list' && canAdd ? handleStartCreate : null}
         addText="Create New Role"
       >
         {viewMode === 'form' ? (
-          /* ===================== FLAT STUDIO FORM (NO TRIPLE WRAPPERS) ===================== */
           <form onSubmit={handleSaveForm} className="space-y-5 font-['Plus_Jakarta_Sans',sans-serif]">
-            {/* Top Action Bar */}
+            {/* Action Bar */}
             <div className="flex items-center justify-between pb-3 border-b border-neutral-200">
               <div className="flex items-center gap-3">
                 <button
@@ -238,7 +227,7 @@ export default function RolesPage() {
               </div>
             </div>
 
-            {/* Inputs Row */}
+            {/* Inputs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
@@ -268,17 +257,16 @@ export default function RolesPage() {
               </div>
             </div>
 
-            {/* Flat Collapsible Permission Matrix Table */}
+            {/* Self-contained matrix table */}
             <PermissionMatrixTable
-              modules={modules}
-              selectedPermissions={formData.permissions}
-              onTogglePermission={handleToggleSingle}
-              onBatchToggle={handleBatchToggle}
+              value={formData.permissions}
+              onChange={(updatedPermissions) =>
+                setFormData((prev) => ({ ...prev, permissions: updatedPermissions }))
+              }
             />
           </form>
         ) : (
-          /* ===================== CLEAN ROLES TABLE OVERVIEW ===================== */
-          <div className="bg-white overflow-hidden shadow-sm font-['Plus_Jakarta_Sans',sans-serif]">
+          <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm font-['Plus_Jakarta_Sans',sans-serif]">
             <Table
               columns={columns}
               dataSource={roles}

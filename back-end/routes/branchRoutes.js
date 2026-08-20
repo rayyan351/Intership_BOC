@@ -7,10 +7,18 @@ const {
   updateBranch,
   deleteBranch,
 } = require('../controllers/branchController');
+const { protect } = require('../middleware/authMiddleware');
+const { requirePermission } = require('../middleware/rbacMiddleware');
 
-router.get('/', getBranches);
-router.post('/', createBranch);
-router.put('/:id', updateBranch);
-router.delete('/:id', deleteBranch);
+router.use(protect);
+
+// Allow access to getBranches if user has locations:view OR staff:view (for outlet dropdowns)
+router.route('/')
+  .get(requirePermission(['locations:view', 'staff:view'], true), getBranches)
+  .post(requirePermission('locations:create'), createBranch);
+
+router.route('/:id')
+  .put(requirePermission('locations:edit'), updateBranch)
+  .delete(requirePermission('locations:delete'), deleteBranch);
 
 module.exports = router;

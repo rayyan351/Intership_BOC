@@ -1,9 +1,11 @@
 // src/app/admin/(dashboard)/branchoperations/roles/_components/PermissionMatrixTable.jsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { Spin } from 'antd';
 import { DownOutlined, RightOutlined } from '@ant-design/icons';
 import CustomSwitch from '@/app/admin/_components/formElements/switch/CustomSwitch';
+import { useGetRolesAndModulesQuery } from '@/services/roleApi';
 
 const ACTION_TYPES = [
   { type: 'view', label: 'View', width: 'w-[12%]' },
@@ -14,11 +16,11 @@ const ACTION_TYPES = [
 ];
 
 export default function PermissionMatrixTable({
-  modules = [],
-  selectedPermissions = [],
-  onTogglePermission,
-  onBatchToggle,
+  value = [],
+  onChange,
 }) {
+  const { data, isLoading } = useGetRolesAndModulesQuery();
+  const modules = data?.modules || [];
   const [collapsedSections, setCollapsedSections] = useState({});
 
   const toggleSection = (key) => {
@@ -28,26 +30,105 @@ export default function PermissionMatrixTable({
     }));
   };
 
+  // Map all global action keys across all modules by action type
+  const globalColumnKeys = useMemo(() => {
+    const mapping = {};
+    ACTION_TYPES.forEach((act) => {
+      mapping[act.type] = modules
+        .flatMap((mod) => mod.resources)
+        .flatMap((res) => res.actions)
+        .filter((a) => a.type === act.type)
+        .map((a) => a.key);
+    });
+    return mapping;
+  }, [modules]);
+
+  // Handle Global Column Toggle (Turns ON/OFF the entire column for ALL modules)
+  const handleGlobalColumnToggle = (actionType, enable) => {
+    if (!onChange) return;
+    const targetKeys = globalColumnKeys[actionType] || [];
+    let updated;
+    if (enable) {
+      updated = Array.from(new Set([...value, ...targetKeys]));
+    } else {
+      updated = value.filter((k) => !targetKeys.includes(k));
+    }
+    onChange(updated);
+  };
+
+  // Handle Module Row Toggle (Turns ON/OFF the action for a specific parent module)
+  const handleModuleRowToggle = (columnKeys, enable) => {
+    if (!onChange) return;
+    let updated;
+    if (enable) {
+      updated = Array.from(new Set([...value, ...columnKeys]));
+    } else {
+      updated = value.filter((k) => !columnKeys.includes(k));
+    }
+    onChange(updated);
+  };
+
+  // Handle Single Action Toggle
+  const handleToggleSingle = (key) => {
+    if (!onChange) return;
+    const exists = value.includes(key);
+    const updated = exists ? value.filter((k) => k !== key) : [...value, key];
+    onChange(updated);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="w-full py-12 flex justify-center items-center rounded-xl border border-neutral-200 bg-white">
+        <Spin tip="Loading permission matrix..." />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full overflow-hidden rounded-xl border border-neutral-200 bg-white font-['Plus_Jakarta_Sans',sans-serif]">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
-          {/* Dual-Tier Header */}
+          {/* Dual-Tier Header with Column Master Toggles */}
+          {/* Dual-Tier Balanced Header */}
+          {/* Dual-Tier Balanced Header */}
           <thead>
+            {/* Tier 1: Main Category Titles */}
             <tr className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 text-[11px] font-bold uppercase tracking-wider">
-              <th rowSpan={2} className="py-3 px-6 w-[36%] align-middle border-r border-neutral-200">
-                Names
+              <th className="py-2.5 px-6 w-[36%] text-center align-middle border-r border-neutral-200">
+                Resource Name
               </th>
-              <th colSpan={5} className="py-2 px-3 text-center border-b border-neutral-200 bg-neutral-100/50 text-neutral-800 text-[11px]">
+              <th
+                colSpan={5}
+                className="py-2.5 px-3 text-center bg-neutral-100/60 text-neutral-800 text-[11px] font-bold uppercase tracking-wider"
+              >
                 Permissions
               </th>
             </tr>
-            <tr className="bg-neutral-50/50 border-b border-neutral-200 text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-              {ACTION_TYPES.map((act) => (
-                <th key={act.type} className={`py-2 px-3 text-center ${act.width}`}>
-                  {act.label}
-                </th>
-              ))}
+
+            {/* Tier 2: Column Action Labels & Master Switches */}
+            <tr className="bg-neutral-50/70 border-b border-neutral-200 text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
+              {/* Empty spacer under Resource Name */}
+              <th className="py-2 px-6 border-r border-neutral-200 bg-neutral-50/40"></th>
+
+              {/* Master Switches directly aligned under each action column */}
+              {ACTION_TYPES.map((act) => {
+                const colKeys = globalColumnKeys[act.type] || [];
+                const isGlobalChecked = colKeys.length > 0 && colKeys.every((k) => value.includes(k));
+
+                return (
+                  <th key={act.type} className={`py-2 px-3 text-center ${act.width}`}>
+                    <div className="flex flex-col items-center justify-center gap-1">
+                      <span className="text-[10px] tracking-wider text-neutral-500 font-bold">{act.label}</span>
+                      {colKeys.length > 0 && (
+                        <CustomSwitch
+                          checked={isGlobalChecked}
+                          onChange={(checked) => handleGlobalColumnToggle(act.type, checked)}
+                        />
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
 
@@ -73,7 +154,7 @@ export default function PermissionMatrixTable({
                       </div>
                     </td>
 
-                    {/* Master Category Switches */}
+                    {/* Module-Level Category Switches */}
                     {ACTION_TYPES.map((act) => {
                       const columnKeys = mod.resources
                         .flatMap((r) => r.actions)
@@ -88,7 +169,7 @@ export default function PermissionMatrixTable({
                         );
                       }
 
-                      const isAllChecked = columnKeys.every((k) => selectedPermissions.includes(k));
+                      const isAllChecked = columnKeys.every((k) => value.includes(k));
 
                       return (
                         <td
@@ -98,7 +179,7 @@ export default function PermissionMatrixTable({
                         >
                           <CustomSwitch
                             checked={isAllChecked}
-                            onChange={(checked) => onBatchToggle(columnKeys, checked)}
+                            onChange={(checked) => handleModuleRowToggle(columnKeys, checked)}
                           />
                         </td>
                       );
@@ -127,8 +208,8 @@ export default function PermissionMatrixTable({
                             <td key={act.type} className="py-3 px-3 text-center">
                               {targetAction ? (
                                 <CustomSwitch
-                                  checked={selectedPermissions.includes(targetAction.key)}
-                                  onChange={() => onTogglePermission(targetAction.key)}
+                                  checked={value.includes(targetAction.key)}
+                                  onChange={() => handleToggleSingle(targetAction.key)}
                                 />
                               ) : (
                                 <span className="text-neutral-300 select-none text-xs">—</span>

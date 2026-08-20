@@ -1,9 +1,9 @@
-// front-end/src/app/admin/products/deals/page.jsx
 'use client';
 
 import React, { useState } from 'react';
 import { Table, Button, Tag, Space, Image } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { usePermission } from '@/hooks/usePermission';
 import PageLayout from '../../../_components/layout/PageLayout';
 import ConfirmModal from '../../../_components/modal/ConfirmModal';
 import CustomSwitch from '@/app/admin/_components/formElements/switch/CustomSwitch';
@@ -28,6 +28,12 @@ export default function DealsPage() {
   const [updatingId, setUpdatingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const { hasPermission } = usePermission();
+  const canAdd = hasPermission('deals:create');
+  const canEdit = hasPermission('deals:edit');
+  const canDelete = hasPermission('deals:delete');
+  const canToggleStatus = hasPermission('deals:status') || hasPermission('deals:toggle_stock');
+
   const { data: deals = [], isLoading } = useGetDealsQuery();
   const [createDeal, { isLoading: isCreating }] = useCreateDealMutation();
   const [updateDeal, { isLoading: isUpdating }] = useUpdateDealMutation();
@@ -50,6 +56,7 @@ export default function DealsPage() {
   };
 
   const handleStatusToggle = async (record, isChecked) => {
+    if (!canToggleStatus) return;
     const startTime = Date.now();
     try {
       setUpdatingId(record._id);
@@ -181,6 +188,7 @@ export default function DealsPage() {
         <Space size="small">
           <CustomSwitch
             checked={record.isShown ?? true}
+            disabled={!canToggleStatus}
             loading={updatingId === record._id}
             onChange={(checked) => handleStatusToggle(record, checked)}
           />
@@ -204,29 +212,43 @@ export default function DealsPage() {
     {
       title: 'Actions',
       key: 'actions',
-      fixed: 'right', // Pinned to right
+      fixed: 'right',
       width: 90,
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="text"
-            icon={<EditOutlined className="text-gray-600" />}
-            onClick={() => {
-              setSelectedDeal(record);
-              setIsModalOpen(true);
-            }}
-          />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => {
-              setDealToDelete(record);
-              setIsDeleteModalOpen(true);
-            }}
-          />
-        </Space>
-      ),
+      render: (_, record) => {
+        if (!canEdit && !canDelete) {
+          return (
+            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+              View Only
+            </Tag>
+          );
+        }
+
+        return (
+          <Space size="small">
+            {canEdit && (
+              <Button
+                type="text"
+                icon={<EditOutlined className="text-gray-600" />}
+                onClick={() => {
+                  setSelectedDeal(record);
+                  setIsModalOpen(true);
+                }}
+              />
+            )}
+            {canDelete && (
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => {
+                  setDealToDelete(record);
+                  setIsDeleteModalOpen(true);
+                }}
+              />
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -236,10 +258,14 @@ export default function DealsPage() {
       <PageLayout
         title="Deals & Bundles"
         subTitle="Create discounted product bundles and combo offers"
-        onAdd={() => {
-          setSelectedDeal(null);
-          setIsModalOpen(true);
-        }}
+        onAdd={
+          canAdd
+            ? () => {
+                setSelectedDeal(null);
+                setIsModalOpen(true);
+              }
+            : null
+        }
         addText="Create Deal"
         searchValue={searchTerm}
         onSearch={setSearchTerm}
@@ -252,7 +278,7 @@ export default function DealsPage() {
             rowKey="_id"
             loading={isLoading}
             pagination={{ pageSize: 8 }}
-            scroll={{ x: 1100 }} // Horizontal scroll container
+            scroll={{ x: 1100 }}
             bordered={false}
           />
         </div>

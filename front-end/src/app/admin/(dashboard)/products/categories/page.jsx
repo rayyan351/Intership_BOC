@@ -1,9 +1,9 @@
-// front-end/src/app/admin/products/categories/page.jsx
 'use client';
 
 import React, { useState } from 'react';
 import { Table, Button, Tag, Space } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { usePermission } from '@/hooks/usePermission';
 import PageLayout from '../../../_components/layout/PageLayout';
 import ConfirmModal from '../../../_components/modal/ConfirmModal';
 import CategoryModal from './_components/categoryModal';
@@ -28,6 +28,12 @@ export default function CategoriesPage() {
   const [updatingId, setUpdatingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const { hasPermission } = usePermission();
+  const canAdd = hasPermission('categories:create');
+  const canEdit = hasPermission('categories:edit');
+  const canDelete = hasPermission('categories:delete');
+  const canToggleStatus = hasPermission('categories:status') || hasPermission('categories:toggle_stock');
+
   const { data: categories = [], isLoading } = useGetCategoriesQuery();
   const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
   const [updateCategory, { isLoading: isUpdating }] = useUpdateCategoryMutation();
@@ -50,6 +56,7 @@ export default function CategoriesPage() {
   };
 
   const handleStatusToggle = async (record, isChecked) => {
+    if (!canToggleStatus) return;
     const startTime = Date.now();
     try {
       setUpdatingId(record._id);
@@ -105,6 +112,7 @@ export default function CategoriesPage() {
         <Space size="small">
           <CustomSwitch
             checked={record.isShown ?? true}
+            disabled={!canToggleStatus}
             loading={updatingId === record._id}
             onChange={(checked) => handleStatusToggle(record, checked)}
           />
@@ -137,27 +145,41 @@ export default function CategoriesPage() {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button
-            type="text"
-            icon={<EditOutlined className="text-gray-600" />}
-            onClick={() => {
-              setSelectedCategory(record);
-              setIsModalOpen(true);
-            }}
-          />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => {
-              setCategoryToDelete(record);
-              setIsDeleteModalOpen(true);
-            }}
-          />
-        </Space>
-      ),
+      render: (_, record) => {
+        if (!canEdit && !canDelete) {
+          return (
+            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+              View Only
+            </Tag>
+          );
+        }
+
+        return (
+          <Space size="middle">
+            {canEdit && (
+              <Button
+                type="text"
+                icon={<EditOutlined className="text-gray-600" />}
+                onClick={() => {
+                  setSelectedCategory(record);
+                  setIsModalOpen(true);
+                }}
+              />
+            )}
+            {canDelete && (
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => {
+                  setCategoryToDelete(record);
+                  setIsDeleteModalOpen(true);
+                }}
+              />
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -167,10 +189,14 @@ export default function CategoriesPage() {
       <PageLayout
         title="Categories"
         subTitle="Manage menu sections and category status"
-        onAdd={() => {
-          setSelectedCategory(null);
-          setIsModalOpen(true);
-        }}
+        onAdd={
+          canAdd
+            ? () => {
+                setSelectedCategory(null);
+                setIsModalOpen(true);
+              }
+            : null
+        }
         addText="Add Category"
         searchValue={searchTerm}
         onSearch={setSearchTerm}

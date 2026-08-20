@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { Table, Button, Space, Image, Tag } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { usePermission } from '@/hooks/usePermission';
+
 import BannerModal from './_components/bannerModal';
 import ConfirmModal from '@/app/admin/_components/modal/ConfirmModal';
 import CustomSwitch from '@/app/admin/_components/formElements/switch/CustomSwitch';
@@ -23,14 +25,18 @@ export default function AdminBannersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBanner, setSelectedBanner] = useState(null);
 
-  // States for Delete Confirmation Modal
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [bannerToDelete, setBannerToDelete] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
 
-  // RTK Query Hooks
+  const { hasPermission } = usePermission();
+  const canAdd = hasPermission('banners:create');
+  const canEdit = hasPermission('banners:edit');
+  const canDelete = hasPermission('banners:delete');
+  const canToggleStatus = hasPermission('banners:status') || hasPermission('banners:toggle_stock');
+
   const { data: banners = [], isLoading: loading } = useGetBannersQuery();
   const [createBanner, { isLoading: isCreating }] = useCreateBannerMutation();
   const [updateBanner, { isLoading: isUpdating }] = useUpdateBannerMutation();
@@ -66,10 +72,10 @@ export default function AdminBannersPage() {
   };
 
   const handleStatusToggle = async (record, isChecked) => {
+    if (!canToggleStatus) return;
     const startTime = Date.now();
     try {
       setUpdatingId(record._id);
-
       await toggleStatus({ id: record._id, isActive: isChecked }).unwrap();
 
       const elapsedTime = Date.now() - startTime;
@@ -172,6 +178,7 @@ export default function AdminBannersPage() {
         <Space size="small">
           <CustomSwitch
             checked={record.isActive ?? true}
+            disabled={!canToggleStatus}
             loading={updatingId === record._id}
             onChange={(checked) => handleStatusToggle(record, checked)}
           />
@@ -184,21 +191,35 @@ export default function AdminBannersPage() {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button
-            type="text"
-            icon={<EditOutlined className="text-gray-600" />}
-            onClick={() => handleOpenEditModal(record)}
-          />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleOpenDeleteModal(record)}
-          />
-        </Space>
-      ),
+      render: (_, record) => {
+        if (!canEdit && !canDelete) {
+          return (
+            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+              View Only
+            </Tag>
+          );
+        }
+
+        return (
+          <Space size="middle">
+            {canEdit && (
+              <Button
+                type="text"
+                icon={<EditOutlined className="text-gray-600" />}
+                onClick={() => handleOpenEditModal(record)}
+              />
+            )}
+            {canDelete && (
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleOpenDeleteModal(record)}
+              />
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -208,10 +229,14 @@ export default function AdminBannersPage() {
       <PageLayout
         title="Hero Slider Banners"
         subTitle="Manage dynamic hero carousel banners and promotional links on the storefront"
-        onAdd={() => {
-          setSelectedBanner(null);
-          setIsModalOpen(true);
-        }}
+        onAdd={
+          canAdd
+            ? () => {
+                setSelectedBanner(null);
+                setIsModalOpen(true);
+              }
+            : null
+        }
         addText="Add New Banner"
         searchValue={searchTerm}
         onSearch={setSearchTerm}
@@ -227,7 +252,6 @@ export default function AdminBannersPage() {
           bordered={false}
         />
 
-        {/* Add / Edit Banner Custom Modal */}
         <BannerModal
           open={isModalOpen}
           onClose={handleCloseModal}
@@ -236,7 +260,6 @@ export default function AdminBannersPage() {
           initialValues={selectedBanner}
         />
 
-        {/* Delete Confirmation Modal */}
         <ConfirmModal
           open={isDeleteModalOpen}
           onCancel={() => {

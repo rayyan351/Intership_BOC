@@ -7,6 +7,17 @@ export const sectionApi = createApi({
   reducerPath: 'sectionApi',
   baseQuery: fetchBaseQuery({
     baseUrl: siteConfig?.baseUrl,
+    prepareHeaders: (headers) => {
+      const token =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('adminToken') || localStorage.getItem('token')
+          : null;
+
+      if (token) {
+        headers.set('authorization', `Bearer ${token}`);
+      }
+      return headers;
+    },
   }),
   tagTypes: ['Sections'],
   endpoints: (builder) => ({

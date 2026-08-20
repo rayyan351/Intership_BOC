@@ -10,20 +10,19 @@ const {
   deleteRole,
 } = require('../controllers/roleController');
 const { protect } = require('../middleware/authMiddleware');
-const { requireRole } = require('../middleware/rbacMiddleware');
+const { requirePermission } = require('../middleware/rbacMiddleware');
 
-// Ensure your user's role in MongoDB is 'super_admin' or 'admin'
-router.use(protect, requireRole('super_admin', 'admin'));
+router.use(protect);
 
 router.route('/')
-  .get(getRolesAndModules)
-  .post(createRole);
+  .get(requirePermission('roles:view'), getRolesAndModules)
+  .post(requirePermission('roles:create'), createRole);
 
 router.route('/:id')
-  .put(updateRole)
-  .delete(deleteRole);
+  .put(requirePermission('roles:edit'), updateRole)
+  .delete(requirePermission('roles:delete'), deleteRole);
 
-router.patch('/:id/toggle', toggleRolePermission);
-router.put('/:id/batch-permissions', batchUpdateRolePermissions);
+router.patch('/:id/toggle', requirePermission('roles:edit'), toggleRolePermission);
+router.put('/:id/batch-permissions', requirePermission('roles:edit'), batchUpdateRolePermissions);
 
 module.exports = router;

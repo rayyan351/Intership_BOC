@@ -21,7 +21,7 @@ import {
 
 export default function ProductsPage() {
   const [toggleAvailability] = useToggleAvailabilityMutation();
-  const { contextHolder, showSuccess, showError } = useToast();
+  const {contextHolder, showSuccess, showError } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 

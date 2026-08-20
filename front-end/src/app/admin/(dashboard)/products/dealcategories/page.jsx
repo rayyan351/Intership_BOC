@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Table, Button, Space, Tag } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { usePermission } from '@/hooks/usePermission';
 
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
 import ConfirmModal from '@/app/admin/_components/modal/ConfirmModal';
@@ -28,6 +29,12 @@ export default function DealCategoriesPage() {
   const [updatingId, setUpdatingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const { hasPermission } = usePermission();
+  const canAdd = hasPermission('dealcategories:create');
+  const canEdit = hasPermission('dealcategories:edit');
+  const canDelete = hasPermission('dealcategories:delete');
+  const canToggleStatus = hasPermission('dealcategories:status') || hasPermission('dealcategories:toggle_stock');
+
   const { data: categories = [], isLoading } = useGetDealCategoriesQuery();
   const [createCategory, { isLoading: isCreating }] = useCreateDealCategoryMutation();
   const [updateCategory, { isLoading: isUpdating }] = useUpdateDealCategoryMutation();
@@ -50,6 +57,7 @@ export default function DealCategoriesPage() {
   };
 
   const handleStatusToggle = async (record, isChecked) => {
+    if (!canToggleStatus) return;
     const startTime = Date.now();
     try {
       setUpdatingId(record._id);
@@ -104,6 +112,7 @@ export default function DealCategoriesPage() {
         <Space size="small">
           <CustomSwitch
             checked={record.isShown ?? true}
+            disabled={!canToggleStatus}
             loading={updatingId === record._id}
             onChange={(checked) => handleStatusToggle(record, checked)}
           />
@@ -126,27 +135,41 @@ export default function DealCategoriesPage() {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button
-            type="text"
-            icon={<EditOutlined className="text-gray-600" />}
-            onClick={() => {
-              setSelectedCategory(record);
-              setIsModalOpen(true);
-            }}
-          />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => {
-              setCategoryToDelete(record);
-              setIsDeleteModalOpen(true);
-            }}
-          />
-        </Space>
-      ),
+      render: (_, record) => {
+        if (!canEdit && !canDelete) {
+          return (
+            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+              View Only
+            </Tag>
+          );
+        }
+
+        return (
+          <Space size="middle">
+            {canEdit && (
+              <Button
+                type="text"
+                icon={<EditOutlined className="text-gray-600" />}
+                onClick={() => {
+                  setSelectedCategory(record);
+                  setIsModalOpen(true);
+                }}
+              />
+            )}
+            {canDelete && (
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => {
+                  setCategoryToDelete(record);
+                  setIsDeleteModalOpen(true);
+                }}
+              />
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -156,10 +179,14 @@ export default function DealCategoriesPage() {
       <PageLayout
         title="Deal Categories"
         subTitle="Manage classifications and categories for deals, combos, and bundles"
-        onAdd={() => {
-          setSelectedCategory(null);
-          setIsModalOpen(true);
-        }}
+        onAdd={
+          canAdd
+            ? () => {
+                setSelectedCategory(null);
+                setIsModalOpen(true);
+              }
+            : null
+        }
         addText="Create Deal Category"
         searchValue={searchTerm}
         onSearch={setSearchTerm}

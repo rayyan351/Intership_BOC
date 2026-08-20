@@ -1,12 +1,12 @@
-// front-end/src/app/admin/settings/page.jsx
 'use client';
 
 import React, { useEffect } from 'react';
-import { Space } from 'antd';
+import { Space, Tag } from 'antd';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 
+import { usePermission } from '@/hooks/usePermission';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
 import FormInput from '@/app/admin/_components/formElements/inputfield/Forminput';
 import FormImageUpload from '@/app/admin/_components/formElements/imageUpload/FormImageUpload';
@@ -29,6 +29,9 @@ export default function SettingsPage() {
   const { contextHolder, showSuccess, showError } = useToast();
   const { data: settings, isLoading } = useGetSettingsQuery();
   const [updateSettings, { isLoading: isUpdating }] = useUpdateSettingsMutation();
+
+  const { hasPermission } = usePermission();
+  const canEdit = hasPermission('settings:edit');
 
   const { control, handleSubmit, reset, setValue } = useForm({
     resolver: yupResolver(schema),
@@ -60,6 +63,7 @@ export default function SettingsPage() {
   }, [settings, reset]);
 
   const handleSaveSettings = async (values) => {
+    if (!canEdit) return;
     try {
       const formData = new FormData();
       formData.append('storeName', values.storeName);
@@ -97,6 +101,13 @@ export default function SettingsPage() {
             <div className="py-12 text-center text-sm text-gray-400 font-medium">Loading settings...</div>
           ) : (
             <form onSubmit={handleSubmit(handleSaveSettings)} className="space-y-6">
+              {!canEdit && (
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs font-semibold flex items-center justify-between">
+                  <span>You have view-only access to store branding and settings.</span>
+                  <Tag color="warning" className="m-0 border-none font-bold">READ ONLY</Tag>
+                </div>
+              )}
+
               {/* Brand & SEO Names */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormInput
@@ -104,12 +115,14 @@ export default function SettingsPage() {
                   label="Brand Name"
                   placeholder="e.g. Burger O'Clock"
                   control={control}
+                  disabled={!canEdit}
                 />
                 <FormInput
                   name="siteTitle"
                   label="Browser Tab Title (SEO)"
                   placeholder="e.g. Burger O'Clock - Order Online"
                   control={control}
+                  disabled={!canEdit}
                 />
               </div>
 
@@ -128,22 +141,26 @@ export default function SettingsPage() {
                         className="max-h-6 max-w-6 object-contain"
                       />
                     </div>
-                    <label className="flex items-center gap-2 text-xs font-semibold text-red-600 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        onChange={(e) => setValue('removeFavicon', e.target.checked)}
-                        className="rounded border-neutral-300 text-red-600 focus:ring-red-500 cursor-pointer"
-                      />
-                      Remove Favicon
-                    </label>
+                    {canEdit && (
+                      <label className="flex items-center gap-2 text-xs font-semibold text-red-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          onChange={(e) => setValue('removeFavicon', e.target.checked)}
+                          className="rounded border-neutral-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                        />
+                        Remove Favicon
+                      </label>
+                    )}
                   </div>
                 )}
 
-                <FormImageUpload
-                  name="favicon"
-                  label="Upload New Favicon (.ico, .png, .svg)"
-                  control={control}
-                />
+                {canEdit && (
+                  <FormImageUpload
+                    name="favicon"
+                    label="Upload New Favicon (.ico, .png, .svg)"
+                    control={control}
+                  />
+                )}
               </div>
 
               {/* Storefront Navigation Logo */}
@@ -161,22 +178,26 @@ export default function SettingsPage() {
                         className="max-h-full max-w-full object-contain"
                       />
                     </div>
-                    <label className="flex items-center gap-2 text-xs font-semibold text-red-600 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        onChange={(e) => setValue('removeStoreLogo', e.target.checked)}
-                        className="rounded border-neutral-300 text-red-600 focus:ring-red-500 cursor-pointer"
-                      />
-                      Remove Store Logo
-                    </label>
+                    {canEdit && (
+                      <label className="flex items-center gap-2 text-xs font-semibold text-red-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          onChange={(e) => setValue('removeStoreLogo', e.target.checked)}
+                          className="rounded border-neutral-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                        />
+                        Remove Store Logo
+                      </label>
+                    )}
                   </div>
                 )}
 
-                <FormImageUpload
-                  name="storeLogo"
-                  label="Upload New Storefront Logo"
-                  control={control}
-                />
+                {canEdit && (
+                  <FormImageUpload
+                    name="storeLogo"
+                    label="Upload New Storefront Logo"
+                    control={control}
+                  />
+                )}
               </div>
 
               {/* Admin Panel Header Logo */}
@@ -194,32 +215,38 @@ export default function SettingsPage() {
                         className="max-h-full max-w-full object-contain"
                       />
                     </div>
-                    <label className="flex items-center gap-2 text-xs font-semibold text-red-600 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        onChange={(e) => setValue('removeAdminLogo', e.target.checked)}
-                        className="rounded border-neutral-300 text-red-600 focus:ring-red-500 cursor-pointer"
-                      />
-                      Remove Admin Logo
-                    </label>
+                    {canEdit && (
+                      <label className="flex items-center gap-2 text-xs font-semibold text-red-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          onChange={(e) => setValue('removeAdminLogo', e.target.checked)}
+                          className="rounded border-neutral-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                        />
+                        Remove Admin Logo
+                      </label>
+                    )}
                   </div>
                 )}
 
-                <FormImageUpload
-                  name="adminLogo"
-                  label="Upload New Admin Logo"
-                  control={control}
-                />
+                {canEdit && (
+                  <FormImageUpload
+                    name="adminLogo"
+                    label="Upload New Admin Logo"
+                    control={control}
+                  />
+                )}
               </div>
 
               {/* Submit Button */}
-              <div className="flex justify-end pt-4 border-t border-gray-100">
-                <Space size="middle">
-                  <CustomButton variant="primary" htmlType="submit" loading={isUpdating}>
-                    Save Brand Settings
-                  </CustomButton>
-                </Space>
-              </div>
+              {canEdit && (
+                <div className="flex justify-end pt-4 border-t border-gray-100">
+                  <Space size="middle">
+                    <CustomButton variant="primary" htmlType="submit" loading={isUpdating}>
+                      Save Brand Settings
+                    </CustomButton>
+                  </Space>
+                </div>
+              )}
             </form>
           )}
         </div>

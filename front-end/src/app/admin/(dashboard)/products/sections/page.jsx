@@ -1,9 +1,9 @@
-// front-end/src/app/admin/products/sections/page.jsx
 'use client';
 
 import React, { useState } from 'react';
 import { Table, Button, Tag, Space } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { usePermission } from '@/hooks/usePermission';
 import PageLayout from '../../../_components/layout/PageLayout';
 import ConfirmModal from '@/app/admin/_components/modal/ConfirmModal';
 import CustomSwitch from '@/app/admin/_components/formElements/switch/CustomSwitch';
@@ -28,6 +28,12 @@ export default function SectionsPage() {
   const [updatingId, setUpdatingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const { hasPermission } = usePermission();
+  const canAdd = hasPermission('sections:create');
+  const canEdit = hasPermission('sections:edit');
+  const canDelete = hasPermission('sections:delete');
+  const canToggleStatus = hasPermission('sections:status') || hasPermission('sections:toggle_stock');
+
   const { data: sections = [], isLoading } = useGetSectionsQuery();
   const [createSection, { isLoading: isCreating }] = useCreateSectionMutation();
   const [updateSection, { isLoading: isUpdating }] = useUpdateSectionMutation();
@@ -36,7 +42,6 @@ export default function SectionsPage() {
   const handleSaveSection = async (formData) => {
     try {
       if (selectedSection) {
-        // Pass formData directly without object spread
         await updateSection({ id: selectedSection._id, formData }).unwrap();
         showSuccess('Display section updated successfully!');
       } else {
@@ -51,6 +56,7 @@ export default function SectionsPage() {
   };
 
   const handleStatusToggle = async (record, isChecked) => {
+    if (!canToggleStatus) return;
     const startTime = Date.now();
     try {
       setUpdatingId(record._id);
@@ -139,6 +145,7 @@ export default function SectionsPage() {
         <Space size="small">
           <CustomSwitch
             checked={record.isShown ?? true}
+            disabled={!canToggleStatus}
             loading={updatingId === record._id}
             onChange={(checked) => handleStatusToggle(record, checked)}
           />
@@ -161,27 +168,41 @@ export default function SectionsPage() {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button
-            type="text"
-            icon={<EditOutlined className="text-gray-600" />}
-            onClick={() => {
-              setSelectedSection(record);
-              setIsModalOpen(true);
-            }}
-          />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => {
-              setSectionToDelete(record);
-              setIsDeleteModalOpen(true);
-            }}
-          />
-        </Space>
-      ),
+      render: (_, record) => {
+        if (!canEdit && !canDelete) {
+          return (
+            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+              View Only
+            </Tag>
+          );
+        }
+
+        return (
+          <Space size="middle">
+            {canEdit && (
+              <Button
+                type="text"
+                icon={<EditOutlined className="text-gray-600" />}
+                onClick={() => {
+                  setSelectedSection(record);
+                  setIsModalOpen(true);
+                }}
+              />
+            )}
+            {canDelete && (
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => {
+                  setSectionToDelete(record);
+                  setIsDeleteModalOpen(true);
+                }}
+              />
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -191,10 +212,14 @@ export default function SectionsPage() {
       <PageLayout
         title="Display Sections"
         subTitle="Manage homepage sections and curate assigned items"
-        onAdd={() => {
-          setSelectedSection(null);
-          setIsModalOpen(true);
-        }}
+        onAdd={
+          canAdd
+            ? () => {
+                setSelectedSection(null);
+                setIsModalOpen(true);
+              }
+            : null
+        }
         addText="Create Section"
         searchValue={searchTerm}
         onSearch={setSearchTerm}

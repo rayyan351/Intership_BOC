@@ -8,6 +8,17 @@ export const categoryApi = createApi({
   reducerPath: 'categoryApi',
   baseQuery: fetchBaseQuery({
     baseUrl: siteConfig?.baseUrl,
+    prepareHeaders: (headers) => {
+      const token =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('adminToken') || localStorage.getItem('token')
+          : null;
+
+      if (token) {
+        headers.set('authorization', `Bearer ${token}`);
+      }
+      return headers;
+    },
   }),
   tagTypes: ['Categories'],
   endpoints: (builder) => ({

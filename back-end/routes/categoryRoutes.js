@@ -7,10 +7,32 @@ const {
   updateCategory,
   deleteCategory,
 } = require('../controllers/categoryController');
+const { protect } = require('../middleware/authMiddleware');
+const { requirePermission } = require('../middleware/rbacMiddleware');
 
+// Public read: Storefront & Admin listing
 router.get('/', getCategories);
-router.post('/', createCategory);
-router.put('/:id', updateCategory);
-router.delete('/:id', deleteCategory);
+
+// Protected admin mutations
+router.post(
+  '/',
+  protect,
+  requirePermission('categories:create'),
+  createCategory
+);
+
+router.put(
+  '/:id',
+  protect,
+  requirePermission(['categories:edit', 'categories:status', 'categories:toggle_stock'], true),
+  updateCategory
+);
+
+router.delete(
+  '/:id',
+  protect,
+  requirePermission('categories:delete'),
+  deleteCategory
+);
 
 module.exports = router;

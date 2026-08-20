@@ -37,10 +37,10 @@ const createStaffMember = async (req, res) => {
       return res.status(404).json({ message: 'Selected role not found' });
     }
 
-    // Default to role permissions if no explicit custom overrides provided
-    const finalPermissions = Array.isArray(customPermissions) && customPermissions.length > 0
+    // Allow empty array [] so all switches turned OFF stays 0 permissions
+    const finalPermissions = Array.isArray(customPermissions)
       ? customPermissions
-      : roleDoc.permissions;
+      : (roleDoc.permissions || []);
 
     const user = await User.create({
       name: name.trim(),
@@ -75,7 +75,7 @@ const updateStaffMember = async (req, res) => {
 
     if (name) user.name = name.trim();
     if (email) user.email = email.toLowerCase().trim();
-    if (password) user.password = password; // Triggers bcrypt pre-save
+    if (password && password.trim() !== '') user.password = password; // Triggers bcrypt pre-save
     if (branchId) user.branch = branchId;
     if (isActive !== undefined) user.isActive = isActive;
 
@@ -87,8 +87,10 @@ const updateStaffMember = async (req, res) => {
       }
     }
 
-    if (customPermissions !== undefined) {
+    // Explicitly update customPermissions even if empty array []
+    if (Array.isArray(customPermissions)) {
       user.customPermissions = customPermissions;
+      user.markModified('customPermissions');
     }
 
     await user.save();

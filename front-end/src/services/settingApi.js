@@ -5,6 +5,17 @@ export const settingApi = createApi({
   reducerPath: 'settingApi',
   baseQuery: fetchBaseQuery({
     baseUrl: siteConfig?.baseUrl || 'http://localhost:5000/api',
+    prepareHeaders: (headers) => {
+      const token =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('adminToken') || localStorage.getItem('token')
+          : null;
+
+      if (token) {
+        headers.set('authorization', `Bearer ${token}`);
+      }
+      return headers;
+    },
   }),
   tagTypes: ['Settings'],
   endpoints: (builder) => ({

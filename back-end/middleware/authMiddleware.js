@@ -30,13 +30,18 @@ const protect = async (req, res, next) => {
         return res.status(403).json({ message: 'Account is deactivated' });
       }
 
-      // Compute dynamic permissions
+      // Compute permissions:
+      // Super admin gets full bypass wildcard
       if (user.role === 'super_admin' || user.role === 'admin') {
         user.effectivePermissions = ['*'];
       } else {
-        const rolePerms = user.roleId?.permissions || [];
-        const customPerms = user.customPermissions || [];
-        user.effectivePermissions = Array.from(new Set([...rolePerms, ...customPerms]));
+        // User's customPermissions is the direct override list.
+        // If customPermissions is defined (even empty []), use it directly.
+        // Otherwise, fall back to the role's default permissions.
+        user.effectivePermissions =
+          Array.isArray(user.customPermissions) && user.customPermissions.length >= 0
+            ? user.customPermissions
+            : (user.roleId?.permissions || []);
       }
 
       req.user = user;

@@ -7,9 +7,14 @@ const getEffectivePermissions = (user) => {
   if (user.role === 'super_admin' || user.role === 'admin') {
     return ['*'];
   }
-  const rolePerms = user.roleId?.permissions || [];
-  const customPerms = user.customPermissions || [];
-  return Array.from(new Set([...rolePerms, ...customPerms]));
+  
+  // If customPermissions exists (including empty []), respect it as the user's exact permissions
+  if (Array.isArray(user.customPermissions)) {
+    return user.customPermissions;
+  }
+
+  // Fallback to base role permissions
+  return user.roleId?.permissions || [];
 };
 
 // @desc    Auth user & get token (Login via Email or Employee ID)

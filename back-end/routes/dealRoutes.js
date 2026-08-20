@@ -1,8 +1,11 @@
+// back-end/routes/dealRoutes.js
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const { getDeals, createDeal, updateDeal, deleteDeal } = require('../controllers/dealController');
+const { protect } = require('../middleware/authMiddleware');
+const { requirePermission } = require('../middleware/rbacMiddleware');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -17,9 +20,31 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// Public read: Storefront listing & Admin overview
 router.get('/', getDeals);
-router.post('/', upload.single('image'), createDeal);
-router.put('/:id', upload.single('image'), updateDeal);
-router.delete('/:id', deleteDeal);
+
+// Protected admin mutations
+router.post(
+  '/',
+  protect,
+  requirePermission('deals:create'),
+  upload.single('image'),
+  createDeal
+);
+
+router.put(
+  '/:id',
+  protect,
+  requirePermission(['deals:edit', 'deals:status', 'deals:toggle_stock'], true),
+  upload.single('image'),
+  updateDeal
+);
+
+router.delete(
+  '/:id',
+  protect,
+  requirePermission('deals:delete'),
+  deleteDeal
+);
 
 module.exports = router;

@@ -1,3 +1,4 @@
+// back-end/routes/sectionRoutes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -7,12 +8,35 @@ const {
   deleteSection,
 } = require('../controllers/sectionController');
 
-// Import your existing multer upload middleware (adjust the path to wherever your upload middleware lives)
-const upload = require('../middleware/uploadMiddleware') || require('../utils/multer');
+const upload = require('../middleware/uploadMiddleware');
+const { protect } = require('../middleware/authMiddleware');
+const { requirePermission } = require('../middleware/rbacMiddleware');
 
+// Public read: Homepage storefront display & Admin curation
 router.get('/', getSections);
-router.post('/', upload.single('banner'), createSection);
-router.put('/:id', upload.single('banner'), updateSection);
-router.delete('/:id', deleteSection);
+
+// Protected admin mutations
+router.post(
+  '/',
+  protect,
+  requirePermission('sections:create'),
+  upload.single('banner'),
+  createSection
+);
+
+router.put(
+  '/:id',
+  protect,
+  requirePermission(['sections:edit', 'sections:status', 'sections:toggle_stock'], true),
+  upload.single('banner'),
+  updateSection
+);
+
+router.delete(
+  '/:id',
+  protect,
+  requirePermission('sections:delete'),
+  deleteSection
+);
 
 module.exports = router;
