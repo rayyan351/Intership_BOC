@@ -1,9 +1,9 @@
-// front-end/src/services/orderApi.js
+// src/services/purchaseOrderApi.js
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { siteConfig } from '@/config/site';
 
-export const orderApi = createApi({
-  reducerPath: 'orderApi',
+export const purchaseOrderApi = createApi({
+  reducerPath: 'purchaseOrderApi',
   baseQuery: fetchBaseQuery({
     baseUrl: siteConfig?.baseUrl || 'http://localhost:5000/api',
     prepareHeaders: (headers) => {
@@ -18,36 +18,36 @@ export const orderApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Orders'],
+  tagTypes: ['PurchaseOrders', 'Inventory', 'Ledger'],
   endpoints: (builder) => ({
-    getOrders: builder.query({
+    getPurchaseOrders: builder.query({
       query: (params) => ({
-        url: '/orders',
+        url: '/purchase-orders',
         params,
       }),
-      providesTags: ['Orders'],
+      providesTags: ['PurchaseOrders'],
     }),
-    createOrder: builder.mutation({
+    createPurchaseOrder: builder.mutation({
       query: (body) => ({
-        url: '/orders',
+        url: '/purchase-orders',
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Orders'],
+      invalidatesTags: ['PurchaseOrders'],
     }),
-    updateOrderStatus: builder.mutation({
+    receivePurchaseOrder: builder.mutation({
       query: ({ id, ...body }) => ({
-        url: `/orders/${id}/status`,
-        method: 'PUT',
+        url: `/purchase-orders/${id}/receive`,
+        method: 'POST',
         body,
       }),
-      invalidatesTags: ['Orders'],
+      invalidatesTags: ['PurchaseOrders', 'Inventory', 'Ledger'],
     }),
   }),
 });
 
 export const {
-  useGetOrdersQuery,
-  useCreateOrderMutation,
-  useUpdateOrderStatusMutation,
-} = orderApi;
+  useGetPurchaseOrdersQuery,
+  useCreatePurchaseOrderMutation,
+  useReceivePurchaseOrderMutation,
+} = purchaseOrderApi;

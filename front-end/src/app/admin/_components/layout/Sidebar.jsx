@@ -17,6 +17,9 @@ import {
   BankOutlined,
   SettingOutlined,
   TeamOutlined,
+  InboxOutlined,
+  ReconciliationOutlined,
+  DollarCircleOutlined,
 } from '@ant-design/icons';
 import { useRouter, usePathname } from 'next/navigation';
 import { usePermission } from '@/hooks/usePermission';
@@ -27,7 +30,7 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
   const router = useRouter();
   const pathname = usePathname();
   const { hasPermission } = usePermission();
-  console.log(hasPermission);
+
   const menuItems = useMemo(() => {
     const rawItems = [
       {
@@ -76,6 +79,31 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
             icon: <GiftOutlined />,
             label: 'Deals & Bundles',
             permission: 'deals:view',
+          },
+        ],
+      },
+      {
+        key: 'inventory-submenu',
+        icon: <InboxOutlined />,
+        label: 'Inventory & Stock',
+        children: [
+          {
+            key: '/admin/inventory',
+            icon: <ReconciliationOutlined />,
+            label: 'Raw Materials & Stock',
+            permission: 'inventory:view',
+          },
+          {
+            key: '/admin/inventory/suppliers',
+            icon: <ShopOutlined />,
+            label: 'Vendors & Suppliers',
+            permission: 'suppliers:view',
+          },
+          {
+            key: '/admin/inventory/purchase-orders',
+            icon: <DollarCircleOutlined />,
+            label: 'Purchase Orders',
+            permission: 'purchase_orders:view',
           },
         ],
       },
@@ -145,6 +173,9 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
     if (pathname.startsWith('/admin/products') || pathname.startsWith('/admin/categories')) {
       keys.push('products-submenu');
     }
+    if (pathname.startsWith('/admin/inventory')) {
+      keys.push('inventory-submenu');
+    }
     if (pathname.startsWith('/admin/branchoperations')) {
       keys.push('branch-operations');
     }
@@ -152,7 +183,13 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
   };
 
   const handleMenuClick = ({ key }) => {
-    if (key === 'products-submenu' || key === 'branch-operations') return;
+    if (
+      key === 'products-submenu' ||
+      key === 'inventory-submenu' ||
+      key === 'branch-operations'
+    ) {
+      return;
+    }
     router.push(key);
   };
 

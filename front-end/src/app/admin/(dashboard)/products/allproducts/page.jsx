@@ -3,11 +3,12 @@
 
 import React, { useState } from 'react';
 import { usePermission } from '@/hooks/usePermission';
-import { Table, Button, Tag, Space, Image } from 'antd';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Button, Tag, Space, Image, Tooltip } from 'antd';
+import { EditOutlined, DeleteOutlined, CalculatorOutlined } from '@ant-design/icons';
 import MenuItemModal from './_components/menuItemModal';
 import ConfirmModal from '../../../_components/modal/ConfirmModal';
 import CustomSwitch from '../../../_components/formElements/switch/CustomSwitch';
+import RecipeBuilderModal from './_components/recipeBuilderModal';
 import PageLayout from '../../../_components/layout/PageLayout';
 import { useToast } from '@/utils/toast';
 import { formatRelativeTime } from '@/utils/formatDate';
@@ -21,7 +22,7 @@ import {
 
 export default function ProductsPage() {
   const [toggleAvailability] = useToggleAvailabilityMutation();
-  const {contextHolder, showSuccess, showError } = useToast();
+  const { contextHolder, showSuccess, showError } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -31,6 +32,11 @@ export default function ProductsPage() {
   const canEdit = hasPermission('products:edit');
   const canDelete = hasPermission('products:delete');
   const canToggleStock = hasPermission('products:toggle_stock');
+  const canManageRecipe =
+    hasPermission('recipes:view') ||
+    hasPermission('recipes:edit') ||
+    hasPermission('recipes:create') ||
+    hasPermission('products:edit');
 
   // States for Delete Confirmation Modal
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -38,6 +44,10 @@ export default function ProductsPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
+
+  // States for Recipe Builder Modal
+  const [recipeModalOpen, setRecipeModalOpen] = useState(false);
+  const [activeProductForRecipe, setActiveProductForRecipe] = useState(null);
 
   // RTK Query Hooks
   const { data: products = [], isLoading: loading } = useGetProductsQuery();
@@ -103,6 +113,11 @@ export default function ProductsPage() {
   const handleOpenDeleteModal = (record) => {
     setProductToDelete(record);
     setIsDeleteModalOpen(true);
+  };
+
+  const handleOpenRecipeModal = (record) => {
+    setActiveProductForRecipe(record);
+    setRecipeModalOpen(true);
   };
 
   const handleCloseModal = () => {
@@ -200,8 +215,9 @@ export default function ProductsPage() {
     {
       title: 'Actions',
       key: 'actions',
+      align: 'right',
       render: (_, record) => {
-        if (!canEdit && !canDelete) {
+        if (!canEdit && !canDelete && !canManageRecipe) {
           return (
             <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
               View Only
@@ -210,21 +226,41 @@ export default function ProductsPage() {
         }
 
         return (
-          <Space size="middle">
-            {canEdit && (
-              <Button
-                type="text"
-                icon={<EditOutlined className="text-gray-600" />}
-                onClick={() => handleOpenEditModal(record)}
-              />
+          <Space size="small">
+            {canManageRecipe && (
+              <Tooltip title="Configure Recipe & Bill of Materials (BOM)">
+                <Button
+                  size="small"
+                  icon={<CalculatorOutlined className="text-amber-600" />}
+                  onClick={() => handleOpenRecipeModal(record)}
+                  className="!text-xs font-bold border-amber-300 bg-amber-50/50 hover:!bg-amber-100/60 hover:!border-amber-400 text-amber-900"
+                >
+                  BOM
+                </Button>
+              </Tooltip>
             )}
+
+            {canEdit && (
+              <Tooltip title="Edit Product Details">
+                <Button
+                  size="small"
+                  type="text"
+                  icon={<EditOutlined className="text-gray-600" />}
+                  onClick={() => handleOpenEditModal(record)}
+                />
+              </Tooltip>
+            )}
+
             {canDelete && (
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => handleOpenDeleteModal(record)}
-              />
+              <Tooltip title="Delete Product">
+                <Button
+                  size="small"
+                  type="text"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => handleOpenDeleteModal(record)}
+                />
+              </Tooltip>
             )}
           </Space>
         );
@@ -237,7 +273,7 @@ export default function ProductsPage() {
       {contextHolder}
       <PageLayout
         title="Products"
-        subTitle="Manage restaurant menu items and prices"
+        subTitle="Manage restaurant menu items, pricing, and recipe configurations"
         onAdd={
           canAdd
             ? () => {
@@ -268,6 +304,16 @@ export default function ProductsPage() {
           onSubmit={handleSaveProduct}
           loading={isCreating || isUpdating}
           initialValues={selectedProduct}
+        />
+
+        {/* Recipe & Bill of Materials (BOM) Builder Modal */}
+        <RecipeBuilderModal
+          open={recipeModalOpen}
+          onClose={() => {
+            setRecipeModalOpen(false);
+            setActiveProductForRecipe(null);
+          }}
+          product={activeProductForRecipe}
         />
 
         {/* Custom Confirm Delete Modal */}

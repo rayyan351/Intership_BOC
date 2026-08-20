@@ -7,12 +7,15 @@ import { dealApi } from '@/services/dealApi';
 import { sectionApi } from '@/services/sectionApi';
 import { dealCategoryApi } from '@/services/dealCategoryApi';
 import { menuApi } from '@/services/menuApi';
+import { purchaseOrderApi } from '@/services/purchaseOrderApi';
 import { orderApi } from '@/services/orderApi';
 import { bannerApi } from '@/services/bannerApi';
 import { settingApi } from '@/services/settingApi';
 import { branchApi } from '@/services/branchApi';
 import { staffApi } from '@/services/staffApi';
 import { roleApi } from '@/services/roleApi';
+import { inventoryApi } from '@/services/inventoryApi';
+import { recipeApi } from '@/services/recipeApi';
 
 export const store = configureStore({
   reducer: {
@@ -31,6 +34,10 @@ export const store = configureStore({
     [branchApi.reducerPath]:branchApi.reducer,
     [staffApi.reducerPath]:staffApi.reducer,
     [roleApi.reducerPath]:roleApi.reducer,
+    [inventoryApi.reducerPath]:inventoryApi.reducer,
+    [recipeApi.reducerPath]:recipeApi.reducer,
+    [purchaseOrderApi.reducerPath]:purchaseOrderApi.reducer,
+    [orderApi.reducerPath]:orderApi.reducer,
   },
   // 2. Add the RTK Query middleware for caching, invalidation, and polling support
   middleware: (getDefaultMiddleware) =>
@@ -42,10 +49,13 @@ export const store = configureStore({
      .concat(sectionApi.middleware)
      .concat(dealCategoryApi.middleware)
      .concat(menuApi.middleware)
-     .concat(orderApi.middleware)
      .concat(bannerApi.middleware)
      .concat(settingApi.middleware)
      .concat(branchApi.middleware)
      .concat(staffApi.middleware)
-     .concat(roleApi.middleware),
+     .concat(roleApi.middleware)
+     .concat(inventoryApi.middleware)
+     .concat(recipeApi.middleware)
+     .concat(purchaseOrderApi.middleware)
+     .concat(orderApi.middleware),
 });

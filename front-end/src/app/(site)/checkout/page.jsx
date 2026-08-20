@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearCart } from '@/redux/cart/cartSlice';
-import { usePlaceOrderMutation } from '@/services/orderApi';
+import { usePlaceOrderMutation } from '@/services/purchaseOrderApi';
 import { useLocation } from '@/context/LocationContext';
 import { formatPrice } from '@/lib/currency';
 

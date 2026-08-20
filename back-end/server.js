@@ -8,13 +8,6 @@ const path = require('path');
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
-const dealRoutes = require('./routes/dealRoutes');
-const sectionRoutes = require('./routes/sectionRoutes');
-const dealCategoryRoutes = require('./routes/dealCategoryRoutes');
-const settingRoutes = require('./routes/settingRoutes');
-const branchRoutes = require('./routes/branchRoutes');
-const staffRoutes = require('./routes/staffRoutes');
-const roleRoutes = require('./routes/roleRoutes');
 
 dotenv.config();
 connectDB();
@@ -38,6 +31,11 @@ app.use('/api/settings', require('./routes/settingRoutes'));
 app.use('/api/branches', require('./routes/branchRoutes'));
 app.use('/api/staff', require('./routes/staffRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
+app.use('/api/inventory', require('./routes/inventoryRoutes'));
+app.use('/api/suppliers', require('./routes/supplierRoutes'));
+app.use('/api/recipes', require('./routes/recipeRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/purchase-orders', require('./routes/purchaseOrderRoutes'));
 
 app.get('/', (req, res) => {
   res.send('Burger O Clock API is running...');
