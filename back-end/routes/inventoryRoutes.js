@@ -13,6 +13,7 @@ const {
 const { protect } = require('../middleware/authMiddleware');
 const { requirePermission } = require('../middleware/rbacMiddleware');
 const { getRecipeMarginAnalytics } = require('../controllers/recipeAnalyticsController');
+const { getStockValuationReport } = require('../controllers/stockValuationController');
 
 router.use(protect);
 
@@ -39,6 +40,12 @@ router.get(
   '/analytics/recipe-margins',
   requirePermission(['inventory:view', 'recipes:view'], true),
   getRecipeMarginAnalytics
-);  
+); 
+
+router.get(
+  '/analytics/valuation',
+  requirePermission(['inventory:view', 'reports:view'], true),
+  getStockValuationReport
+);
 
 module.exports = router;

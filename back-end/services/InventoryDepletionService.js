@@ -2,6 +2,7 @@
 const Recipe = require('../models/Recipe');
 const InventoryItem = require('../models/InventoryItem');
 const StockTransaction = require('../models/StockTransaction');
+const StockBatch = require('../models/StockBatch');
 
 /**
  * Pre-validates if branch has sufficient raw ingredients before committing the order.
@@ -77,6 +78,7 @@ const validateStockAvailability = async ({ orderItems, branchId, session }) => {
 
 /**
  * Validates and deducts raw gross inventory ingredients for items in an order.
+ * Prioritizes oldest/nearest-expiry stock using First-Expired, First-Out (FEFO).
  */
 const depleteInventoryForOrder = async ({
   orderItems,
@@ -124,7 +126,7 @@ const depleteInventoryForOrder = async ({
     }
   }
 
-  // 2. Execute branch deductions & build ledger records
+  // 2. Execute branch deductions, FEFO batch consumption, & build ledger records
   for (const [, plan] of stockDeductionPlan) {
     const { itemDoc, totalQtyToDeduct } = plan;
     const roundedDeduction = Number(totalQtyToDeduct.toFixed(2));
@@ -152,6 +154,33 @@ const depleteInventoryForOrder = async ({
     branchStock.currentStock = newStock;
     await freshItem.save({ session });
 
+    // 3. FEFO Batch Depletion: Deduct from active batches nearest to expiration
+    let qtyRemainingToDeduct = roundedDeduction;
+
+    const activeBatches = await StockBatch.find({
+      item: freshItem._id,
+      branch: branchId,
+      status: 'ACTIVE',
+      remainingQuantity: { $gt: 0 },
+    })
+      .sort({ expiryDate: 1 }) // FEFO ordering
+      .session(session);
+
+    for (const batch of activeBatches) {
+      if (qtyRemainingToDeduct <= 0) break;
+
+      if (batch.remainingQuantity <= qtyRemainingToDeduct) {
+        qtyRemainingToDeduct = Number((qtyRemainingToDeduct - batch.remainingQuantity).toFixed(2));
+        batch.remainingQuantity = 0;
+        batch.status = 'DEPLETED';
+      } else {
+        batch.remainingQuantity = Number((batch.remainingQuantity - qtyRemainingToDeduct).toFixed(2));
+        qtyRemainingToDeduct = 0;
+      }
+      await batch.save({ session });
+    }
+
+    // 4. Log double-entry ledger entry
     ledgerEntries.push({
       item: freshItem._id,
       branch: branchId,

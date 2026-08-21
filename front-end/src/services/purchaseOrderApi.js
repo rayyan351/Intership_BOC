@@ -18,7 +18,7 @@ export const purchaseOrderApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['PurchaseOrders', 'Inventory', 'Ledger'],
+  tagTypes: ['PurchaseOrders', 'Inventory', 'Ledger', 'StockTransactions', 'Batches'],
   endpoints: (builder) => ({
     getPurchaseOrders: builder.query({
       query: (params) => ({
@@ -49,7 +49,7 @@ export const purchaseOrderApi = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['PurchaseOrders', 'Inventory', 'Ledger', 'StockTransactions'],
+      invalidatesTags: ['PurchaseOrders', 'Inventory', 'Ledger', 'StockTransactions', 'Batches'],
     }),
   }),
 });

@@ -37,6 +37,8 @@ app.use('/api/recipes', require('./routes/recipeRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/purchase-orders', require('./routes/purchaseOrderRoutes'));
 app.use('/api/inventory/stocktakes', require('./routes/stocktakeRoutes'));
+app.use('/api/inventory/auto-reorder', require('./routes/autoReorderRoutes'));
+app.use('/api/inventory/batches', require('./routes/batchRoutes'));
 
 app.get('/', (req, res) => {
   res.send('Burger O Clock API is running...');

@@ -18,7 +18,7 @@ export const inventoryApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Inventory', 'Ledger', 'Suppliers', 'StockTransactions', 'PurchaseOrders', 'Recipes', 'Stocktakes'],
+  tagTypes: ['Inventory', 'Ledger', 'Suppliers', 'StockTransactions', 'PurchaseOrders', 'Recipes', 'Stocktakes', 'Batches'],
   endpoints: (builder) => ({
     getInventoryItems: builder.query({
       query: (params) => ({
@@ -120,6 +120,47 @@ export const inventoryApi = createApi({
       }),
       invalidatesTags: ['Stocktakes', 'Inventory', 'Ledger', 'StockTransactions'],
     }),
+    getAutoReorderSuggestions: builder.query({
+      query: (params) => ({
+        url: '/inventory/auto-reorder/suggestions',
+        params,
+      }),
+      providesTags: ['Inventory', 'PurchaseOrders', 'StockTransactions'],
+    }),
+    generateAutoReorderPO: builder.mutation({
+      query: (body) => ({
+        url: '/inventory/auto-reorder/generate-po',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['PurchaseOrders', 'Inventory'],
+    }),
+    getStockValuationReport: builder.query({
+      query: (params) => ({
+        url: '/inventory/analytics/valuation',
+        params,
+      }),
+      providesTags: ['Inventory', 'StockTransactions', 'PurchaseOrders', 'Ledger'],
+    }),
+    getSupplierPerformanceAnalytics: builder.query({
+      query: () => '/suppliers/analytics/performance',
+      providesTags: ['Suppliers', 'PurchaseOrders', 'StockTransactions'],
+    }),
+    getStockBatches: builder.query({
+      query: (params) => ({
+        url: '/inventory/batches',
+        params,
+      }),
+      providesTags: ['Batches', 'Inventory', 'StockTransactions'],
+    }),
+    discardBatch: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: `/inventory/batches/${id}/discard`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Batches', 'Inventory', 'Ledger', 'StockTransactions'],
+    }),
   }),
 });
 
@@ -138,4 +179,10 @@ export const {
   useGetRecipeMarginsQuery,
   useGetStocktakesQuery,
   useSubmitStocktakeMutation,
+  useGetAutoReorderSuggestionsQuery,
+  useGenerateAutoReorderPOMutation,
+  useGetStockValuationReportQuery,
+  useGetSupplierPerformanceAnalyticsQuery,
+  useGetStockBatchesQuery,
+  useDiscardBatchMutation,
 } = inventoryApi;

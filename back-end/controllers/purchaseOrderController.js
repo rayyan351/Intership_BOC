@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const PurchaseOrder = require('../models/PurchaseOrder');
 const InventoryItem = require('../models/InventoryItem');
 const StockTransaction = require('../models/StockTransaction');
+const StockBatch = require('../models/StockBatch');
 
 // @desc    Get all Purchase Orders
 // @route   GET /api/purchase-orders
@@ -116,7 +117,7 @@ const updatePOStatus = async (req, res) => {
   }
 };
 
-// @desc    Receive Stock Delivery (Executes ACID Transaction, Inward Ledger, & Updates WAC)
+// @desc    Receive Stock Delivery (Executes ACID Transaction, Inward Ledger, WAC, and FEFO Batch Creation)
 // @route   POST /api/purchase-orders/:id/receive
 // @access  Private (purchase_orders:receive, inventory:adjust)
 const receivePurchaseOrder = async (req, res) => {
@@ -147,6 +148,7 @@ const receivePurchaseOrder = async (req, res) => {
     }
 
     const ledgerEntries = [];
+    const batchEntries = [];
 
     for (const recItem of receivedItems) {
       const poItemIndex = po.items.findIndex(
@@ -208,6 +210,7 @@ const receivePurchaseOrder = async (req, res) => {
 
       await invItem.save({ session });
 
+      // Create Double-Entry Inward Transaction
       ledgerEntries.push({
         item: invItem._id,
         branch: po.branch,
@@ -220,10 +223,36 @@ const receivePurchaseOrder = async (req, res) => {
         performedBy: req.user?._id || po.createdBy,
         notes: `PO Received (${po.poNumber}): Invoice #${supplierInvoiceNo || 'N/A'}${notes ? ` - ${notes}` : ''}`,
       });
+
+      // Generate FEFO StockBatch for this delivery lot
+      const dateCode = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const batchSuffix = Math.floor(100 + Math.random() * 900);
+      const generatedBatchNo = `LOT-${invItem.sku || 'RAW'}-${dateCode}-${batchSuffix}`;
+
+      const batchExpiryDate = recItem.expiryDate
+        ? new Date(recItem.expiryDate)
+        : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // 14 days default shelf-life
+
+      batchEntries.push({
+        batchNumber: recItem.batchNumber || generatedBatchNo,
+        item: invItem._id,
+        branch: po.branch,
+        purchaseOrder: po._id,
+        initialQuantity: incomingRecipeUnits,
+        remainingQuantity: incomingRecipeUnits,
+        unitCost: newRecipeCost,
+        expiryDate: batchExpiryDate,
+        receivedDate: new Date(),
+        status: 'ACTIVE',
+      });
     }
 
     if (ledgerEntries.length > 0) {
       await StockTransaction.insertMany(ledgerEntries, { session });
+    }
+
+    if (batchEntries.length > 0) {
+      await StockBatch.insertMany(batchEntries, { session });
     }
 
     // Check completion status across all ordered lines
@@ -245,7 +274,7 @@ const receivePurchaseOrder = async (req, res) => {
     session.endSession();
 
     res.status(200).json({
-      message: 'Stock received, WAC calculated, and audit ledger updated successfully.',
+      message: 'Stock received, WAC calculated, audit ledger updated, and FEFO batches created successfully.',
       po,
     });
   } catch (error) {
