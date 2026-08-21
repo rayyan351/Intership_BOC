@@ -2,12 +2,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Button, Tag, Space, Tabs } from 'antd';
+import { Table, Button, Tag, Space, Tabs, Alert } from 'antd';
 import {
   EditOutlined,
   SwapOutlined,
   WarningOutlined,
   CheckCircleOutlined,
+  WarningFilled,
+  RetweetOutlined,
 } from '@ant-design/icons';
 import { usePermission } from '@/hooks/usePermission';
 
@@ -15,6 +17,7 @@ import PageLayout from '@/app/admin/_components/layout/PageLayout';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
 import InventoryItemModal from './_components/InventoryItemModal';
 import StockAdjustModal from './_components/StockAdjustModal';
+import StockTransferModal from './_components/StockTransferModal';
 import { useToast } from '@/utils/toast';
 
 import {
@@ -23,6 +26,8 @@ import {
   useUpdateInventoryItemMutation,
   useAdjustStockMutation,
   useGetSuppliersQuery,
+  useGetLowStockAlertsQuery,
+  useTransferStockMutation,
 } from '@/services/inventoryApi';
 import { useGetBranchesQuery } from '@/services/branchApi';
 
@@ -44,7 +49,10 @@ export default function InventoryPage() {
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [adjustingItem, setAdjustingItem] = useState(null);
 
-  // RTK Query endpoints
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferringItem, setTransferringItem] = useState(null);
+
+  // RTK Query hooks
   const { data: items = [], isLoading } = useGetInventoryItemsQuery();
   const { data: branches = [] } = useGetBranchesQuery();
   const { data: suppliers = [] } = useGetSuppliersQuery();
@@ -52,6 +60,7 @@ export default function InventoryPage() {
   const [createItem, { isLoading: isCreating }] = useCreateInventoryItemMutation();
   const [updateItem, { isLoading: isUpdating }] = useUpdateInventoryItemMutation();
   const [adjustStock, { isLoading: isAdjusting }] = useAdjustStockMutation();
+  const [transferStock, { isLoading: isTransferring }] = useTransferStockMutation();
 
   const handleSaveItem = async (formData) => {
     try {
@@ -86,6 +95,17 @@ export default function InventoryPage() {
     }
   };
 
+  const handleStockTransfer = async (transferData) => {
+    try {
+      await transferStock(transferData).unwrap();
+      showSuccess('Stock successfully transferred between outlets');
+      setIsTransferModalOpen(false);
+      setTransferringItem(null);
+    } catch (err) {
+      showError(err?.data?.message || 'Stock transfer failed');
+    }
+  };
+
   // Helper for computing stock count according to active branch filter tab
   const getBranchStockInfo = (record) => {
     if (activeBranchTab === 'ALL') {
@@ -111,11 +131,15 @@ export default function InventoryPage() {
     );
   });
 
+  const { data: lowStockAlerts = [] } = useGetLowStockAlertsQuery(
+    activeBranchTab !== 'ALL' ? { branchId: activeBranchTab } : {}
+  );
+
   const columns = [
     {
       title: 'Item / SKU',
       key: 'item',
-      width: '28%',
+      width: '26%',
       render: (_, record) => (
         <div>
           <div className="flex items-center gap-2">
@@ -133,7 +157,7 @@ export default function InventoryPage() {
     {
       title: 'Packaging & Units',
       key: 'units',
-      width: '22%',
+      width: '20%',
       render: (_, record) => (
         <div className="text-xs">
           <span className="text-neutral-800 font-semibold block">
@@ -189,21 +213,34 @@ export default function InventoryPage() {
       title: 'Actions',
       key: 'actions',
       align: 'right',
-      width: '14%',
+      width: '18%',
       render: (_, record) => (
         <Space size="small">
           {canAdjust && (
-            <Button
-              size="small"
-              icon={<SwapOutlined />}
-              onClick={() => {
-                setAdjustingItem(record);
-                setIsAdjustModalOpen(true);
-              }}
-              className="!text-xs font-semibold"
-            >
-              Adjust
-            </Button>
+            <>
+              <Button
+                size="small"
+                icon={<SwapOutlined />}
+                onClick={() => {
+                  setAdjustingItem(record);
+                  setIsAdjustModalOpen(true);
+                }}
+                className="!text-xs font-semibold"
+              >
+                Adjust
+              </Button>
+              <Button
+                size="small"
+                icon={<RetweetOutlined />}
+                onClick={() => {
+                  setTransferringItem(record);
+                  setIsTransferModalOpen(true);
+                }}
+                className="!text-xs font-semibold text-amber-700 border-amber-300 hover:!border-amber-500 hover:!text-amber-600"
+              >
+                Transfer
+              </Button>
+            </>
           )}
           {canEdit && (
             <Button
@@ -246,6 +283,28 @@ export default function InventoryPage() {
         searchPlaceholder="Search material by name, SKU, or category..."
       >
         <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm font-['Plus_Jakarta_Sans',sans-serif]">
+          {lowStockAlerts.length > 0 && (
+            <div className="mb-4">
+              <Alert
+                message={
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <WarningFilled className="text-amber-500 text-base" />
+                      <span className="font-bold text-neutral-900 text-xs">
+                        {lowStockAlerts.length} raw material{lowStockAlerts.length > 1 ? 's are' : ' is'} below critical reorder level!
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-neutral-500 font-semibold">
+                      Review stock levels or create a purchase order to prevent kitchen stockouts.
+                    </span>
+                  </div>
+                }
+                type="warning"
+                showIcon={false}
+                className="rounded-xl border border-amber-200 bg-amber-50/70 py-2.5 px-4"
+              />
+            </div>
+          )}
           <Tabs
             activeKey={activeBranchTab}
             onChange={setActiveBranchTab}
@@ -263,6 +322,7 @@ export default function InventoryPage() {
           />
         </div>
 
+        {/* Create / Edit Inventory Item */}
         <InventoryItemModal
           open={isItemModalOpen}
           onClose={() => {
@@ -275,6 +335,7 @@ export default function InventoryPage() {
           loading={isCreating || isUpdating}
         />
 
+        {/* Manual Stock Adjust Modal */}
         <StockAdjustModal
           open={isAdjustModalOpen}
           onClose={() => {
@@ -285,6 +346,19 @@ export default function InventoryPage() {
           branches={branches}
           onSubmit={handleStockAdjustment}
           loading={isAdjusting}
+        />
+
+        {/* Inter-Branch Transfer Modal */}
+        <StockTransferModal
+          open={isTransferModalOpen}
+          onClose={() => {
+            setIsTransferModalOpen(false);
+            setTransferringItem(null);
+          }}
+          item={transferringItem}
+          branches={branches}
+          onTransfer={handleStockTransfer}
+          loading={isTransferring}
         />
       </PageLayout>
     </>

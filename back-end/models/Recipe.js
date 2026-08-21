@@ -13,6 +13,12 @@ const recipeIngredientSchema = new mongoose.Schema(
       required: [true, 'Quantity is required'],
       min: [0.001, 'Quantity must be greater than 0'],
     },
+    yieldPercentage: {
+      type: Number,
+      default: 100, // 100% = no shrinkage (e.g. buns). 80% = 20% cooking loss (e.g. raw beef)
+      min: [1, 'Yield percentage must be at least 1%'],
+      max: [100, 'Yield percentage cannot exceed 100%'],
+    },
     unit: {
       type: String,
       required: true, // Auto-synced with inventoryItem.recipeUnit (g, ml, piece)

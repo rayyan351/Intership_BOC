@@ -1,11 +1,15 @@
-// front-end/src/app/admin/(dashboard)/inventory/purchase-orders/page.jsx
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Button, Tag, Space } from 'antd';
-import { CheckCircleOutlined, InboxOutlined } from '@ant-design/icons';
+import { Table, Button, Tag, Space, Select } from 'antd';
+import {
+  CheckCircleOutlined,
+  InboxOutlined,
+  SendOutlined,
+  PrinterOutlined,
+} from '@ant-design/icons';
 import { usePermission } from '@/hooks/usePermission';
-
+import { exportPurchaseOrderPDF } from '@/utils/exportPurchaseOrderPdf';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
 import ReceivePOModal from './_components/ReceivePOModal';
 import CreatePOModal from './_components/CreatePOModal';
@@ -14,6 +18,7 @@ import { useToast } from '@/utils/toast';
 import {
   useGetPurchaseOrdersQuery,
   useCreatePurchaseOrderMutation,
+  useUpdatePOStatusMutation,
   useReceivePurchaseOrderMutation,
 } from '@/services/purchaseOrderApi';
 import { useGetSuppliersQuery, useGetInventoryItemsQuery } from '@/services/inventoryApi';
@@ -26,19 +31,23 @@ export default function PurchaseOrdersPage() {
   const canAdd = hasPermission('purchase_orders:create');
   const canReceive = hasPermission('purchase_orders:receive') || hasPermission('inventory:adjust');
 
-  // Modals state
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [branchFilter, setBranchFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
-  // RTK Query endpoints
-  const { data: purchaseOrders = [], isLoading } = useGetPurchaseOrdersQuery();
+  const { data: purchaseOrders = [], isLoading } = useGetPurchaseOrdersQuery({
+    branchId: branchFilter || undefined,
+    status: statusFilter || undefined,
+  });
   const { data: suppliers = [] } = useGetSuppliersQuery();
   const { data: branches = [] } = useGetBranchesQuery();
   const { data: inventoryItems = [] } = useGetInventoryItemsQuery();
 
   const [createPO, { isLoading: isCreating }] = useCreatePurchaseOrderMutation();
+  const [updateStatus] = useUpdatePOStatusMutation();
   const [receivePO, { isLoading: isReceiving }] = useReceivePurchaseOrderMutation();
 
   const handleCreatePOSubmit = async (formData) => {
@@ -48,6 +57,15 @@ export default function PurchaseOrdersPage() {
       setCreateModalOpen(false);
     } catch (err) {
       showError(err?.data?.message || 'Failed to create purchase order');
+    }
+  };
+
+  const handleStatusChange = async (id, status) => {
+    try {
+      await updateStatus({ id, status }).unwrap();
+      showSuccess(`Status changed to ${status}`);
+    } catch (err) {
+      showError(err?.data?.message || 'Failed to update status');
     }
   };
 
@@ -119,7 +137,7 @@ export default function PurchaseOrdersPage() {
       title: 'Items & Total',
       dataIndex: 'totalAmount',
       key: 'totalAmount',
-      width: '18%',
+      width: '16%',
       render: (totalAmount, record) => (
         <div>
           <span className="font-mono font-bold text-sm text-neutral-900 block">
@@ -135,26 +153,19 @@ export default function PurchaseOrdersPage() {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      width: '14%',
+      width: '12%',
       render: (status) => {
-        const currentStatus = typeof status === 'string' ? status : 'ORDERED';
-        if (currentStatus === 'RECEIVED') {
-          return (
-            <Tag color="success" className="font-bold text-[10px] border-none">
-              RECEIVED
-            </Tag>
-          );
-        }
-        if (currentStatus === 'ORDERED') {
-          return (
-            <Tag color="processing" className="font-bold text-[10px] border-none">
-              IN TRANSIT
-            </Tag>
-          );
-        }
+        const badges = {
+          DRAFT: { color: 'default', label: 'DRAFT' },
+          ORDERED: { color: 'processing', label: 'ORDERED' },
+          PARTIALLY_RECEIVED: { color: 'warning', label: 'PARTIAL' },
+          RECEIVED: { color: 'success', label: 'RECEIVED' },
+          CANCELLED: { color: 'error', label: 'CANCELLED' },
+        };
+        const badge = badges[status] || { color: 'default', label: status };
         return (
-          <Tag color="default" className="font-bold text-[10px] border-none">
-            {currentStatus}
+          <Tag color={badge.color} className="font-bold text-[10px] border-none">
+            {badge.label}
           </Tag>
         );
       },
@@ -163,31 +174,54 @@ export default function PurchaseOrdersPage() {
       title: 'Actions',
       key: 'actions',
       align: 'right',
-      width: '12%',
+      width: '16%',
       render: (_, record) => {
-        if (record?.status === 'RECEIVED') {
-          return (
-            <span className="text-[11px] font-bold text-emerald-600 flex items-center justify-end gap-1">
-              <CheckCircleOutlined /> Inward Logged
-            </span>
-          );
-        }
-
         return (
-          canReceive && (
+          <Space size="small">
+            {/* Always-accessible Print/PDF button */}
             <Button
               size="small"
-              type="primary"
-              icon={<InboxOutlined />}
-              onClick={() => {
-                setSelectedPO(record);
-                setReceiveModalOpen(true);
-              }}
-              className="!text-xs font-bold !bg-neutral-900 hover:!bg-neutral-800"
+              icon={<PrinterOutlined />}
+              onClick={() => exportPurchaseOrderPDF(record)}
+              className="!text-xs font-semibold"
+              title="Print Supplier Purchase Order PDF"
             >
-              Receive Stock
+              PDF
             </Button>
-          )
+
+            {record?.status === 'DRAFT' && (
+              <Button
+                size="small"
+                icon={<SendOutlined />}
+                onClick={() => handleStatusChange(record._id, 'ORDERED')}
+                className="!text-xs font-semibold"
+              >
+                Mark Ordered
+              </Button>
+            )}
+
+            {canReceive &&
+              (record?.status === 'ORDERED' || record?.status === 'PARTIALLY_RECEIVED') && (
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<InboxOutlined />}
+                  onClick={() => {
+                    setSelectedPO(record);
+                    setReceiveModalOpen(true);
+                  }}
+                  className="!text-xs font-bold !bg-neutral-900 hover:!bg-neutral-800"
+                >
+                  Receive Stock
+                </Button>
+              )}
+
+            {record?.status === 'RECEIVED' && (
+              <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                <CheckCircleOutlined /> Inward Logged
+              </span>
+            )}
+          </Space>
         );
       },
     },
@@ -206,6 +240,31 @@ export default function PurchaseOrdersPage() {
         searchPlaceholder="Search by PO number, supplier, or branch..."
       >
         <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm font-['Plus_Jakarta_Sans',sans-serif]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <Select
+              className="w-full"
+              placeholder="Filter by Destination Branch"
+              allowClear
+              value={branchFilter || undefined}
+              onChange={(val) => setBranchFilter(val || '')}
+              options={branches.map((b) => ({ value: b._id, label: `${b.name} (${b.city})` }))}
+            />
+            <Select
+              className="w-full"
+              placeholder="Filter by PO Status"
+              allowClear
+              value={statusFilter || undefined}
+              onChange={(val) => setStatusFilter(val || '')}
+              options={[
+                { value: 'DRAFT', label: 'Draft' },
+                { value: 'ORDERED', label: 'Ordered / In Transit' },
+                { value: 'PARTIALLY_RECEIVED', label: 'Partially Received' },
+                { value: 'RECEIVED', label: 'Fully Received' },
+                { value: 'CANCELLED', label: 'Cancelled' },
+              ]}
+            />
+          </div>
+
           <Table
             columns={columns}
             dataSource={filteredOrders}

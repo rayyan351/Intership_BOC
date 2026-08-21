@@ -17,20 +17,14 @@ const getPurchaseOrders = async (req, res) => {
     if (supplierId) filter.supplier = supplierId;
 
     const orders = await PurchaseOrder.find(filter)
-      .populate('supplier', 'name phone email paymentTerms')
-      .populate('branch', 'name city branchCode')
+      .populate('supplier', 'name phone email paymentTerms address')
+      .populate('branch', 'name city branchCode address phone')
       .populate({
         path: 'items.item',
-        select: 'name sku purchaseUnit recipeUnit conversionFactor costPerPurchaseUnit',
+        select: 'name sku purchaseUnit recipeUnit conversionFactor costPerPurchaseUnit costPerRecipeUnit',
       })
-      .populate({
-        path: 'createdBy',
-        select: 'name email',
-      })
-      .populate({
-        path: 'receivedBy',
-        select: 'name email',
-      })
+      .populate('createdBy', 'name email')
+      .populate('receivedBy', 'name email')
       .sort({ createdAt: -1 });
 
     res.status(200).json(orders || []);
@@ -46,6 +40,10 @@ const getPurchaseOrders = async (req, res) => {
 const createPurchaseOrder = async (req, res) => {
   try {
     const { supplier, branch, items, expectedDeliveryDate, notes, status } = req.body;
+
+    if (!supplier || !branch) {
+      return res.status(400).json({ message: 'Supplier and branch are required.' });
+    }
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Purchase order must contain at least one item.' });
@@ -79,7 +77,7 @@ const createPurchaseOrder = async (req, res) => {
       totalAmount: Number(totalAmount.toFixed(2)),
       expectedDeliveryDate: expectedDeliveryDate || null,
       notes: notes || '',
-      status: status || 'ORDERED',
+      status: status || 'DRAFT',
       createdBy: req.user?._id || null,
     });
 
@@ -88,6 +86,33 @@ const createPurchaseOrder = async (req, res) => {
   } catch (error) {
     console.error('Error in createPurchaseOrder:', error);
     res.status(500).json({ message: 'Error creating purchase order', error: error.message });
+  }
+};
+
+// @desc    Update Purchase Order Status (e.g. DRAFT -> ORDERED or CANCELLED)
+// @route   PUT /api/purchase-orders/:id/status
+// @access  Private (purchase_orders:edit)
+const updatePOStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const po = await PurchaseOrder.findById(id);
+    if (!po) {
+      return res.status(404).json({ message: 'Purchase order not found.' });
+    }
+
+    if (po.status === 'RECEIVED') {
+      return res.status(400).json({ message: 'Received purchase orders cannot change status.' });
+    }
+
+    po.status = status;
+    await po.save();
+
+    res.status(200).json(po);
+  } catch (error) {
+    console.error('Error in updatePOStatus:', error);
+    res.status(500).json({ message: 'Error updating PO status', error: error.message });
   }
 };
 
@@ -102,6 +127,12 @@ const receivePurchaseOrder = async (req, res) => {
     const { id } = req.params;
     const { receivedItems, supplierInvoiceNo, notes } = req.body;
 
+    if (!Array.isArray(receivedItems) || receivedItems.length === 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ message: 'No received delivery items provided.' });
+    }
+
     const po = await PurchaseOrder.findById(id).session(session);
     if (!po) {
       await session.abortTransaction();
@@ -109,10 +140,10 @@ const receivePurchaseOrder = async (req, res) => {
       return res.status(404).json({ message: 'Purchase order not found.' });
     }
 
-    if (po.status === 'RECEIVED') {
+    if (po.status === 'RECEIVED' || po.status === 'CANCELLED') {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ message: 'This purchase order has already been received.' });
+      return res.status(400).json({ message: `Cannot receive stock on a ${po.status} purchase order.` });
     }
 
     const ledgerEntries = [];
@@ -124,12 +155,18 @@ const receivePurchaseOrder = async (req, res) => {
 
       if (poItemIndex === -1) continue;
 
-      const receivedQty = Number(recItem.receivedQuantity) || 0;
+      const incomingQty = Number(recItem.receivedQuantity) || 0;
+      if (incomingQty <= 0) continue;
+
       const actualUnitCost = Number(recItem.actualUnitPurchasePrice || po.items[poItemIndex].unitPurchasePrice);
 
-      po.items[poItemIndex].receivedQuantity = receivedQty;
+      // Accumulate existing received quantity with new delivery batch
+      const currentReceivedQty = po.items[poItemIndex].receivedQuantity || 0;
+      const newTotalReceivedQty = currentReceivedQty + incomingQty;
+
+      po.items[poItemIndex].receivedQuantity = newTotalReceivedQty;
       po.items[poItemIndex].unitPurchasePrice = actualUnitCost;
-      po.items[poItemIndex].subtotal = Number((receivedQty * actualUnitCost).toFixed(2));
+      po.items[poItemIndex].subtotal = Number((newTotalReceivedQty * actualUnitCost).toFixed(2));
 
       const invItem = await InventoryItem.findById(recItem.itemId).session(session);
       if (!invItem) continue;
@@ -149,10 +186,10 @@ const receivePurchaseOrder = async (req, res) => {
       }
 
       const factor = invItem.conversionFactor || 1;
-      const incomingRecipeUnits = receivedQty * factor;
+      const incomingRecipeUnits = incomingQty * factor;
       const incomingRecipeUnitCost = Number((actualUnitCost / factor).toFixed(4));
 
-      // Weighted Average Cost (WAC)
+      // Weighted Average Cost (WAC) Formulation
       const currentRecipeUnits = branchStock.currentStock || 0;
       const currentRecipeUnitCost = invItem.costPerRecipeUnit || 0;
 
@@ -181,7 +218,7 @@ const receivePurchaseOrder = async (req, res) => {
         unitCostAtTime: newRecipeCost,
         totalMonetaryValue: incomingTotalVal,
         performedBy: req.user?._id || po.createdBy,
-        notes: `PO Received: ${po.poNumber} (Invoice: ${supplierInvoiceNo || 'N/A'})`,
+        notes: `PO Received (${po.poNumber}): Invoice #${supplierInvoiceNo || 'N/A'}${notes ? ` - ${notes}` : ''}`,
       });
     }
 
@@ -189,19 +226,28 @@ const receivePurchaseOrder = async (req, res) => {
       await StockTransaction.insertMany(ledgerEntries, { session });
     }
 
-    po.status = 'RECEIVED';
+    // Check completion status across all ordered lines
+    const isAllFullyReceived = po.items.every(
+      (itm) => (itm.receivedQuantity || 0) >= itm.orderedQuantity
+    );
+
+    po.status = isAllFullyReceived ? 'RECEIVED' : 'PARTIALLY_RECEIVED';
     po.receivedAt = new Date();
     po.receivedBy = req.user?._id || null;
-    po.supplierInvoiceNo = supplierInvoiceNo || '';
+    po.supplierInvoiceNo = supplierInvoiceNo || po.supplierInvoiceNo || '';
     if (notes) po.notes = notes;
     po.totalAmount = po.items.reduce((sum, itm) => sum + itm.subtotal, 0);
 
+    po.markModified('items');
     await po.save({ session });
 
     await session.commitTransaction();
     session.endSession();
 
-    res.status(200).json({ message: 'Stock received and WAC calculated successfully.' });
+    res.status(200).json({
+      message: 'Stock received, WAC calculated, and audit ledger updated successfully.',
+      po,
+    });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -213,5 +259,6 @@ const receivePurchaseOrder = async (req, res) => {
 module.exports = {
   getPurchaseOrders,
   createPurchaseOrder,
+  updatePOStatus,
   receivePurchaseOrder,
 };

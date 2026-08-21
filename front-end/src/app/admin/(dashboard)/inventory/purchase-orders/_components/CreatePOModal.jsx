@@ -1,8 +1,7 @@
-// src/app/admin/(dashboard)/inventory/purchase-orders/_components/CreatePOModal.jsx
 'use client';
 
 import React, { useState } from 'react';
-import { Modal, Select, Button } from 'antd';
+import { Modal, Select, Button, DatePicker } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
 import { useToast } from '@/utils/toast';
@@ -19,21 +18,21 @@ export default function CreatePOModal({
   const { showError } = useToast();
   const [supplierId, setSupplierId] = useState('');
   const [branchId, setBranchId] = useState('');
-  const [expectedDate, setExpectedDate] = useState('');
+  const [expectedDate, setExpectedDate] = useState(null);
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([]);
 
   const handleAddItem = () => {
-    if (inventoryItems.length === 0) return;
-    const defaultItem = inventoryItems[0];
+    if (!inventoryItems.length) return;
+    const firstItem = inventoryItems[0];
     setItems((prev) => [
       ...prev,
       {
-        item: defaultItem._id,
-        name: defaultItem.name,
-        purchaseUnit: defaultItem.purchaseUnit,
+        item: firstItem._id,
+        name: firstItem.name,
+        purchaseUnit: firstItem.purchaseUnit,
         orderedQuantity: 10,
-        unitPurchasePrice: defaultItem.costPerPurchaseUnit || 0,
+        unitPurchasePrice: firstItem.costPerPurchaseUnit || 0,
       },
     ]);
   };
@@ -78,17 +77,17 @@ export default function CreatePOModal({
     e.preventDefault();
     if (!supplierId) return showError('Please select a supplier.');
     if (!branchId) return showError('Please select a destination branch.');
-    if (items.length === 0) return showError('Please add at least one line item.');
+    if (!items.length) return showError('Please add at least one line item.');
 
     const subtotalCalc = items.reduce(
-      (sum, i) => sum + Number(i.orderedQuantity) * Number(i.unitPurchasePrice),
+      (sum, i) => sum + (Number(i.orderedQuantity) || 0) * (Number(i.unitPurchasePrice) || 0),
       0
     );
 
     onSubmit({
       supplier: supplierId,
       branch: branchId,
-      expectedDeliveryDate: expectedDate || null,
+      expectedDeliveryDate: expectedDate ? expectedDate.toISOString() : null,
       notes,
       items: items.map((i) => ({
         item: i.item,
@@ -111,7 +110,7 @@ export default function CreatePOModal({
       footer={null}
       title={null}
       centered
-      width={680}
+      width={720}
       className="font-['Plus_Jakarta_Sans',sans-serif]"
     >
       <div className="pt-2 pb-1">
@@ -126,38 +125,34 @@ export default function CreatePOModal({
               <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
                 Supplier / Vendor <span className="text-red-500">*</span>
               </label>
-              <select
-                value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm font-semibold text-neutral-900 focus:outline-none focus:border-[#ffc400]"
-                required
-              >
-                <option value="">Select Vendor</option>
-                {suppliers.map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {s.name} ({s.paymentTerms})
-                  </option>
-                ))}
-              </select>
+              <Select
+                className="w-full h-10"
+                placeholder="Select Vendor"
+                showSearch
+                filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                value={supplierId || undefined}
+                onChange={setSupplierId}
+                options={suppliers.map((s) => ({
+                  value: s._id,
+                  label: `${s.name} (${s.paymentTerms || 'Standard'})`,
+                }))}
+              />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Destination Branch <span className="text-red-500">*</span>
+                Destination Outlet <span className="text-red-500">*</span>
               </label>
-              <select
-                value={branchId}
-                onChange={(e) => setBranchId(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm font-semibold text-neutral-900 focus:outline-none focus:border-[#ffc400]"
-                required
-              >
-                <option value="">Select Outlet</option>
-                {branches.map((b) => (
-                  <option key={b._id} value={b._id}>
-                    {b.name} ({b.city})
-                  </option>
-                ))}
-              </select>
+              <Select
+                className="w-full h-10"
+                placeholder="Select Outlet"
+                value={branchId || undefined}
+                onChange={setBranchId}
+                options={branches.map((b) => ({
+                  value: b._id,
+                  label: `${b.name} (${b.city})`,
+                }))}
+              />
             </div>
           </div>
 
@@ -166,11 +161,9 @@ export default function CreatePOModal({
               <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
                 Expected Delivery Date
               </label>
-              <input
-                type="date"
-                value={expectedDate}
-                onChange={(e) => setExpectedDate(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm font-medium text-neutral-900 focus:outline-none focus:border-[#ffc400]"
+              <DatePicker
+                className="w-full h-10"
+                onChange={(date) => setExpectedDate(date)}
               />
             </div>
 
@@ -215,6 +208,8 @@ export default function CreatePOModal({
                       value={itm.item}
                       onChange={(val) => handleItemSelect(idx, val)}
                       className="w-full"
+                      showSearch
+                      filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                       options={inventoryItems.map((inv) => ({
                         value: inv._id,
                         label: `${inv.name} (${inv.purchaseUnit})`,
@@ -232,7 +227,7 @@ export default function CreatePOModal({
                       className="w-full h-8 px-2 border border-neutral-300 rounded bg-white font-mono font-bold text-xs"
                       required
                     />
-                    <span className="ml-1 text-[11px] font-bold text-neutral-500 w-6">
+                    <span className="ml-1 text-[11px] font-bold text-neutral-500 w-8 truncate">
                       {itm.purchaseUnit}
                     </span>
                   </div>

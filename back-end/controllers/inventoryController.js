@@ -47,7 +47,6 @@ const getInventoryItems = async (req, res) => {
 // @desc    Create new inventory item (initializes stock across all active branches)
 // @route   POST /api/inventory
 // @access  Private (inventory:create)
-// Replace createInventoryItem in back-end/controllers/inventoryController.js
 const createInventoryItem = async (req, res) => {
   try {
     const {
@@ -330,8 +329,6 @@ const getStockLedger = async (req, res) => {
   }
 };
 
-// Add to back-end/controllers/inventoryController.js
-
 // @desc    Log Kitchen Wastage or Spoilage
 // @route   POST /api/inventory/:id/spoilage
 // @access  Private (inventory:adjust)
@@ -405,7 +402,170 @@ const logKitchenWastage = async (req, res) => {
   }
 };
 
-// Export ALL 5 methods cleanly
+// @desc    Get low stock alerts across all or selected branch
+// @route   GET /api/inventory/alerts/low-stock
+// @access  Private (inventory:view)
+const getLowStockAlerts = async (req, res) => {
+  try {
+    const { branchId } = req.query;
+
+    const filter = { isActive: true };
+    const items = await InventoryItem.find(filter)
+      .populate('branchStocks.branch', 'name city branchCode')
+      .populate('primarySupplier', 'name phone email paymentTerms')
+      .lean();
+
+    const lowStockAlerts = [];
+
+    items.forEach((item) => {
+      (item.branchStocks || []).forEach((bs) => {
+        if (branchId && bs.branch?._id?.toString() !== branchId) return;
+
+        if (bs.currentStock <= bs.reorderLevel) {
+          const deficit = Math.max(0, bs.reorderLevel - bs.currentStock);
+          const requiredToIdeal = Math.max(0, bs.idealStock - bs.currentStock);
+          const conversion = item.conversionFactor || 1;
+
+          lowStockAlerts.push({
+            itemId: item._id,
+            name: item.name,
+            sku: item.sku,
+            category: item.category,
+            recipeUnit: item.recipeUnit,
+            purchaseUnit: item.purchaseUnit,
+            conversionFactor: conversion,
+            costPerPurchaseUnit: item.costPerPurchaseUnit,
+            branch: bs.branch,
+            currentStock: bs.currentStock,
+            reorderLevel: bs.reorderLevel,
+            idealStock: bs.idealStock,
+            deficit,
+            recommendedOrderPurchaseUnits: Math.ceil(requiredToIdeal / conversion),
+            estimatedReorderCost: Number(
+              (Math.ceil(requiredToIdeal / conversion) * (item.costPerPurchaseUnit || 0)).toFixed(2)
+            ),
+            supplier: item.primarySupplier,
+          });
+        }
+      });
+    });
+
+    res.status(200).json(lowStockAlerts);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch low stock alerts', error: error.message });
+  }
+};
+
+// @desc    Transfer raw material between branch outlets
+// @route   POST /api/inventory/transfer
+// @access  Private (inventory:adjust)
+const transferStockBetweenBranches = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { itemId, sourceBranchId, targetBranchId, quantity, notes } = req.body;
+
+    if (!itemId || !sourceBranchId || !targetBranchId || !quantity || Number(quantity) <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ message: 'Item, source, target branch, and valid quantity are required.' });
+    }
+
+    if (sourceBranchId.toString() === targetBranchId.toString()) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ message: 'Source and target branch cannot be the same.' });
+    }
+
+    const item = await InventoryItem.findById(itemId).session(session);
+    if (!item) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: 'Inventory item not found.' });
+    }
+
+    // 1. Validate Source Branch Stock
+    let sourceStock = item.branchStocks.find((bs) => bs.branch.toString() === sourceBranchId.toString());
+    const availableQty = sourceStock?.currentStock || 0;
+    const transferQty = Number(quantity);
+
+    if (availableQty < transferQty) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        message: `Insufficient stock at source branch. Available: ${availableQty} ${item.recipeUnit}`,
+      });
+    }
+
+    // 2. Locate or initialize Target Branch Stock
+    let targetStock = item.branchStocks.find((bs) => bs.branch.toString() === targetBranchId.toString());
+    if (!targetStock) {
+      item.branchStocks.push({
+        branch: targetBranchId,
+        currentStock: 0,
+        reorderLevel: 500,
+        idealStock: 5000,
+      });
+      targetStock = item.branchStocks[item.branchStocks.length - 1];
+    }
+
+    // 3. Update Balances
+    const srcPrev = sourceStock.currentStock;
+    const srcNew = srcPrev - transferQty;
+    sourceStock.currentStock = srcNew;
+
+    const tgtPrev = targetStock.currentStock;
+    const tgtNew = tgtPrev + transferQty;
+    targetStock.currentStock = tgtNew;
+
+    await item.save({ session });
+
+    // 4. Create Immutable Ledger Entries for both sides of transfer
+    const monetaryVal = Number((transferQty * (item.costPerRecipeUnit || 0)).toFixed(2));
+
+    const sourceLedger = new StockTransaction({
+      item: item._id,
+      branch: sourceBranchId,
+      type: 'TRANSFER_OUT',
+      quantityChanged: -transferQty,
+      previousStock: srcPrev,
+      newStock: srcNew,
+      unitCostAtTime: item.costPerRecipeUnit || 0,
+      totalMonetaryValue: monetaryVal,
+      performedBy: req.user._id,
+      notes: `Transfer OUT to target outlet. Notes: ${notes || 'Standard STO'}`,
+    });
+
+    const targetLedger = new StockTransaction({
+      item: item._id,
+      branch: targetBranchId,
+      type: 'TRANSFER_IN',
+      quantityChanged: transferQty,
+      previousStock: tgtPrev,
+      newStock: tgtNew,
+      unitCostAtTime: item.costPerRecipeUnit || 0,
+      totalMonetaryValue: monetaryVal,
+      performedBy: req.user._id,
+      notes: `Transfer IN from source outlet. Notes: ${notes || 'Standard STO'}`,
+    });
+
+    await StockTransaction.insertMany([sourceLedger, targetLedger], { session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({
+      message: `Successfully transferred ${transferQty} ${item.recipeUnit} between branches.`,
+      transferredQuantity: transferQty,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(500).json({ message: 'Branch transfer failed', error: error.message });
+  }
+};
+
 module.exports = {
   getInventoryItems,
   createInventoryItem,
@@ -413,4 +573,6 @@ module.exports = {
   adjustStock,
   getStockLedger,
   logKitchenWastage,
+  getLowStockAlerts,
+  transferStockBetweenBranches,
 };

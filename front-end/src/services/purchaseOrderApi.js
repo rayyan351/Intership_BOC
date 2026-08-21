@@ -1,4 +1,4 @@
-// src/services/purchaseOrderApi.js
+// front-end/src/services/purchaseOrderApi.js
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { siteConfig } from '@/config/site';
 
@@ -35,13 +35,21 @@ export const purchaseOrderApi = createApi({
       }),
       invalidatesTags: ['PurchaseOrders'],
     }),
+    updatePOStatus: builder.mutation({
+      query: ({ id, status }) => ({
+        url: `/purchase-orders/${id}/status`,
+        method: 'PUT',
+        body: { status },
+      }),
+      invalidatesTags: ['PurchaseOrders'],
+    }),
     receivePurchaseOrder: builder.mutation({
       query: ({ id, ...body }) => ({
         url: `/purchase-orders/${id}/receive`,
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['PurchaseOrders', 'Inventory', 'Ledger'],
+      invalidatesTags: ['PurchaseOrders', 'Inventory', 'Ledger', 'StockTransactions'],
     }),
   }),
 });
@@ -49,5 +57,6 @@ export const purchaseOrderApi = createApi({
 export const {
   useGetPurchaseOrdersQuery,
   useCreatePurchaseOrderMutation,
+  useUpdatePOStatusMutation,
   useReceivePurchaseOrderMutation,
 } = purchaseOrderApi;

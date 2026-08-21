@@ -18,7 +18,7 @@ export const inventoryApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Inventory', 'Ledger', 'Suppliers'],
+  tagTypes: ['Inventory', 'Ledger', 'Suppliers', 'StockTransactions', 'PurchaseOrders', 'Recipes', 'Stocktakes'],
   endpoints: (builder) => ({
     getInventoryItems: builder.query({
       query: (params) => ({
@@ -86,6 +86,40 @@ export const inventoryApi = createApi({
       }),
       invalidatesTags: ['Suppliers'],
     }),
+    getLowStockAlerts: builder.query({
+      query: (params) => ({
+        url: '/inventory/alerts/low-stock',
+        params,
+      }),
+      providesTags: ['Inventory', 'StockTransactions', 'PurchaseOrders'],
+    }),
+    transferStock: builder.mutation({
+      query: (body) => ({
+        url: '/inventory/transfer',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Inventory', 'Ledger', 'StockTransactions'],
+    }),
+    getRecipeMargins: builder.query({
+      query: () => '/inventory/analytics/recipe-margins',
+      providesTags: ['Recipes', 'Inventory', 'PurchaseOrders'],
+    }),
+    getStocktakes: builder.query({
+      query: (params) => ({
+        url: '/inventory/stocktakes',
+        params,
+      }),
+      providesTags: ['Stocktakes'],
+    }),
+    submitStocktake: builder.mutation({
+      query: (body) => ({
+        url: '/inventory/stocktakes',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Stocktakes', 'Inventory', 'Ledger', 'StockTransactions'],
+    }),
   }),
 });
 
@@ -99,4 +133,9 @@ export const {
   useCreateSupplierMutation,
   useUpdateSupplierMutation,
   useDeleteSupplierMutation,
+  useGetLowStockAlertsQuery,
+  useTransferStockMutation,
+  useGetRecipeMarginsQuery,
+  useGetStocktakesQuery,
+  useSubmitStocktakeMutation,
 } = inventoryApi;

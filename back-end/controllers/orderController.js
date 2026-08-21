@@ -98,7 +98,15 @@ const createOrder = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    console.error('Error during checkout & inventory auto-depletion:', error);
+
+    if (error.message === 'INSUFFICIENT_STOCK') {
+      return res.status(409).json({
+        message: 'Order cannot be fulfilled due to insufficient ingredient stock at this outlet.',
+        shortages: error.details,
+      });
+    }
+
+    console.error('Order checkout error:', error);
     res.status(500).json({ message: 'Order checkout failed', error: error.message });
   }
 };

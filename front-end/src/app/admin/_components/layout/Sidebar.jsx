@@ -2,14 +2,17 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Layout, Menu } from 'antd';
+import { useGetLowStockAlertsQuery } from '@/services/inventoryApi';
+import { Layout, Menu, Badge } from 'antd';
 import {
   DashboardOutlined,
   ShoppingOutlined,
   UnorderedListOutlined,
   AppstoreOutlined,
   TagsOutlined,
+  RiseOutlined,
   GiftOutlined,
+  AuditOutlined,
   SafetyCertificateOutlined,
   LayoutOutlined,
   PictureOutlined,
@@ -18,6 +21,7 @@ import {
   SettingOutlined,
   TeamOutlined,
   InboxOutlined,
+  HistoryOutlined,
   ReconciliationOutlined,
   DollarCircleOutlined,
 } from '@ant-design/icons';
@@ -30,6 +34,8 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
   const router = useRouter();
   const pathname = usePathname();
   const { hasPermission } = usePermission();
+  const { data: lowStockAlerts = [] } = useGetLowStockAlertsQuery();
+  const alertCount = lowStockAlerts.length;
 
   const menuItems = useMemo(() => {
     const rawItems = [
@@ -85,12 +91,36 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
       {
         key: 'inventory-submenu',
         icon: <InboxOutlined />,
-        label: 'Inventory & Stock',
+        label: (
+          <div className="flex items-center justify-between w-full pr-2">
+            <span>Inventory & Stock</span>
+            {alertCount > 0 && (
+              <Badge
+                count={alertCount}
+                overflowCount={99}
+                className="ml-2"
+                style={{ backgroundColor: '#ef4444', fontSize: '10px', fontWeight: 800 }}
+              />
+            )}
+          </div>
+        ),
         children: [
           {
             key: '/admin/inventory',
             icon: <ReconciliationOutlined />,
             label: 'Raw Materials & Stock',
+            permission: 'inventory:view',
+          },
+          {
+            key: '/admin/inventory/ledger',
+            icon: <HistoryOutlined />,
+            label: 'Stock Audit Ledger',
+            permission: 'inventory:view',
+          },
+          {
+            key: '/admin/inventory/margins',
+            icon: <RiseOutlined />,
+            label: 'Profitability & COGS',
             permission: 'inventory:view',
           },
           {
@@ -104,6 +134,12 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
             icon: <DollarCircleOutlined />,
             label: 'Purchase Orders',
             permission: 'purchase_orders:view',
+          },
+            {
+            key: '/admin/inventory/stocktake',
+            icon: <AuditOutlined />,
+            label: 'Stocktake & Audit',
+            permission: 'inventory:view',
           },
         ],
       },

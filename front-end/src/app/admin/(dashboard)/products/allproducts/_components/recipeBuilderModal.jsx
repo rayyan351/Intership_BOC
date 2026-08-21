@@ -2,8 +2,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Modal, Select, Tag, Button } from 'antd'; // <-- Add Button here
-import { PlusOutlined, DeleteOutlined, CalculatorOutlined } from '@ant-design/icons';
+import { Modal, Select, Tag, Button, InputNumber, Tooltip } from 'antd';
+import { PlusOutlined, DeleteOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
 import { useToast } from '@/utils/toast';
 
@@ -29,11 +29,12 @@ export default function RecipeBuilderModal({ open, onClose, product }) {
       if (recipeData.hasRecipe && Array.isArray(recipeData.ingredients)) {
         setIngredients(
           recipeData.ingredients.map((ing) => ({
-            inventoryItem: ing._id,
-            quantityRequired: ing.quantityRequired,
-            recipeUnit: ing.recipeUnit,
-            unitCost: ing.unitCost,
-            name: ing.name,
+            inventoryItem: ing._id || ing.inventoryItem?._id || ing.inventoryItem,
+            quantityRequired: Number(ing.quantityRequired) || 1,
+            yieldPercentage: Number(ing.yieldPercentage) || 100,
+            recipeUnit: ing.unit || ing.recipeUnit || ing.inventoryItem?.recipeUnit || 'unit',
+            unitCost: ing.unitCost || ing.inventoryItem?.costPerRecipeUnit || 0,
+            name: ing.name || ing.inventoryItem?.name || 'Raw Material',
             notes: ing.notes || '',
           }))
         );
@@ -42,12 +43,20 @@ export default function RecipeBuilderModal({ open, onClose, product }) {
       }
       setPrepNotes(recipeData.preparationNotes || '');
       setAssemblyTime(recipeData.assemblyTimeMinutes || 5);
+    } else if (open) {
+      setIngredients([]);
+      setPrepNotes('');
+      setAssemblyTime(5);
     }
   }, [recipeData, open]);
 
-  // Dynamic Financial Calculations
+  // Dynamic Financial Calculations with Shrinkage Yield Multiplier
   const totalCost = ingredients.reduce((sum, item) => {
-    return sum + (Number(item.quantityRequired) || 0) * (Number(item.unitCost) || 0);
+    const netQty = Number(item.quantityRequired) || 0;
+    const unitPrice = Number(item.unitCost) || 0;
+    const yieldPct = Number(item.yieldPercentage) || 100;
+    const grossQty = netQty / (yieldPct / 100);
+    return sum + grossQty * unitPrice;
   }, 0);
 
   const productPrice = Number(product?.price) || 0;
@@ -65,6 +74,7 @@ export default function RecipeBuilderModal({ open, onClose, product }) {
       {
         inventoryItem: defaultItem._id,
         quantityRequired: 1,
+        yieldPercentage: 100,
         recipeUnit: defaultItem.recipeUnit,
         unitCost: defaultItem.costPerRecipeUnit || 0,
         name: defaultItem.name,
@@ -90,10 +100,10 @@ export default function RecipeBuilderModal({ open, onClose, product }) {
     });
   };
 
-  const handleQuantityChange = (index, qty) => {
+  const handleFieldChange = (index, field, val) => {
     setIngredients((prev) => {
       const copy = [...prev];
-      copy[index].quantityRequired = Number(qty);
+      copy[index][field] = val;
       return copy;
     });
   };
@@ -114,14 +124,16 @@ export default function RecipeBuilderModal({ open, onClose, product }) {
         productId,
         ingredients: ingredients.map((i) => ({
           inventoryItem: i.inventoryItem,
-          quantityRequired: i.quantityRequired,
+          quantityRequired: Number(i.quantityRequired),
+          yieldPercentage: Number(i.yieldPercentage) || 100,
+          unit: i.recipeUnit,
           notes: i.notes || '',
         })),
         preparationNotes: prepNotes,
-        assemblyTimeMinutes: assemblyTime,
+        assemblyTimeMinutes: Number(assemblyTime) || 5,
       }).unwrap();
 
-      showSuccess('Bill of Materials (BOM) saved successfully');
+      showSuccess('Bill of Materials (BOM) & Yield specs saved successfully');
       onClose();
     } catch (err) {
       showError(err?.data?.message || 'Failed to save recipe specification');
@@ -135,7 +147,7 @@ export default function RecipeBuilderModal({ open, onClose, product }) {
       footer={null}
       title={null}
       centered
-      width={720}
+      width={780}
       className="font-['Plus_Jakarta_Sans',sans-serif]"
     >
       <div className="pt-2 pb-1">
@@ -143,7 +155,7 @@ export default function RecipeBuilderModal({ open, onClose, product }) {
           <div>
             <h3 className="text-lg font-bold text-neutral-900 m-0">Recipe & BOM Builder</h3>
             <p className="text-xs text-neutral-500 m-0 mt-0.5">
-              Menu Item: <strong className="text-neutral-900">{product?.name}</strong> (Selling Price: Rs. {productPrice})
+              Menu Item: <strong className="text-neutral-900">{product?.name}</strong> (Selling Price: Rs. {productPrice.toLocaleString()})
             </p>
           </div>
           <Tag color="blue" className="font-bold text-xs uppercase px-2.5 py-0.5 border-none">
@@ -155,7 +167,7 @@ export default function RecipeBuilderModal({ open, onClose, product }) {
         <div className="grid grid-cols-3 gap-3 my-4 p-3.5 bg-neutral-900 text-white rounded-xl">
           <div>
             <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">
-              Total Cost (COGS)
+              True Food Cost (COGS)
             </span>
             <span className="text-base font-bold font-mono text-amber-400">
               Rs. {totalCost.toFixed(2)}
@@ -164,7 +176,7 @@ export default function RecipeBuilderModal({ open, onClose, product }) {
 
           <div>
             <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">
-              Gross Profit / Item
+              Gross Profit / Unit
             </span>
             <span className={`text-base font-bold font-mono ${grossProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               Rs. {grossProfit.toFixed(2)}
@@ -182,10 +194,40 @@ export default function RecipeBuilderModal({ open, onClose, product }) {
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
+          {/* Prep & Assembly Time Controls */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-neutral-700 uppercase tracking-wider mb-1">
+                Assembly / Cook Time (Minutes)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={assemblyTime}
+                onChange={(e) => setAssemblyTime(Number(e.target.value))}
+                className="w-full h-9 px-3 rounded-lg border border-neutral-300 bg-white text-xs font-mono font-bold text-neutral-900 focus:outline-none focus:border-[#ffc400]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-neutral-700 uppercase tracking-wider mb-1">
+                Kitchen Prep & Assembly Notes
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Toast buns with butter, melt double cheese on grill"
+                value={prepNotes}
+                onChange={(e) => setPrepNotes(e.target.value)}
+                className="w-full h-9 px-3 rounded-lg border border-neutral-300 bg-white text-xs font-medium text-neutral-900 focus:outline-none focus:border-[#ffc400]"
+              />
+            </div>
+          </div>
+
+          {/* Raw Materials & Yield Inputs */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
-                Required Raw Materials
+                Raw Ingredients & Cooking Yield Factors
               </span>
               <Button
                 size="small"
@@ -200,18 +242,24 @@ export default function RecipeBuilderModal({ open, onClose, product }) {
 
             <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
               {ingredients.map((item, index) => {
-                const rowCost = (Number(item.quantityRequired) || 0) * (Number(item.unitCost) || 0);
+                const netQty = Number(item.quantityRequired) || 0;
+                const yieldPct = Number(item.yieldPercentage) || 100;
+                const grossQty = netQty / (yieldPct / 100);
+                const rowCost = grossQty * (Number(item.unitCost) || 0);
 
                 return (
                   <div
                     key={index}
-                    className="flex items-center gap-2 p-2.5 bg-neutral-50 rounded-lg border border-neutral-200 text-xs"
+                    className="p-2.5 bg-neutral-50 rounded-xl border border-neutral-200 grid grid-cols-12 gap-2 items-center text-xs"
                   >
-                    <div className="flex-1">
+                    {/* Material Select */}
+                    <div className="col-span-4">
                       <Select
                         value={item.inventoryItem}
                         onChange={(val) => handleItemChange(index, val)}
                         className="w-full"
+                        showSearch
+                        filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                         options={inventoryItems.map((inv) => ({
                           value: inv._id,
                           label: `${inv.name} (Rs. ${inv.costPerRecipeUnit}/${inv.recipeUnit})`,
@@ -219,32 +267,54 @@ export default function RecipeBuilderModal({ open, onClose, product }) {
                       />
                     </div>
 
-                    <div className="w-28 flex items-center">
-                      <input
-                        type="number"
-                        step="any"
-                        min="0.01"
+                    {/* Net Spec Qty */}
+                    <div className="col-span-3">
+                      <label className="text-[9px] text-neutral-500 font-bold block mb-0.5">
+                        Net Spec ({item.recipeUnit})
+                      </label>
+                      <InputNumber
+                        min={0.001}
+                        step={1}
                         value={item.quantityRequired}
-                        onChange={(e) => handleQuantityChange(index, e.target.value)}
-                        className="w-full h-8 px-2 border border-neutral-300 rounded bg-white text-xs font-bold font-mono text-neutral-900 focus:outline-none focus:border-[#ffc400]"
-                        required
+                        onChange={(val) => handleFieldChange(index, 'quantityRequired', val)}
+                        className="w-full font-mono font-bold text-xs"
                       />
-                      <span className="ml-1 text-[11px] font-bold text-neutral-500 w-8">
-                        {item.recipeUnit}
+                    </div>
+
+                    {/* Yield % (Cooking Shrinkage) */}
+                    <div className="col-span-2">
+                      <Tooltip title="100% = No shrink (e.g. buns). 80% = 20% cooking shrinkage (e.g. beef).">
+                        <label className="text-[9px] text-neutral-500 font-bold block mb-0.5 cursor-help">
+                          Yield % <InfoCircleOutlined className="text-neutral-400" />
+                        </label>
+                      </Tooltip>
+                      <InputNumber
+                        min={1}
+                        max={100}
+                        value={item.yieldPercentage}
+                        onChange={(val) => handleFieldChange(index, 'yieldPercentage', val)}
+                        className="w-full font-mono font-bold text-xs"
+                      />
+                    </div>
+
+                    {/* Row Cost */}
+                    <div className="col-span-2 text-right">
+                      <span className="text-[9px] text-neutral-400 font-bold block">Gross Cost</span>
+                      <span className="font-mono font-bold text-neutral-900 text-xs">
+                        Rs. {rowCost.toFixed(2)}
                       </span>
                     </div>
 
-                    <div className="w-24 text-right font-mono font-bold text-neutral-800">
-                      Rs. {rowCost.toFixed(2)}
+                    {/* Delete */}
+                    <div className="col-span-1 text-right">
+                      <Button
+                        size="small"
+                        danger
+                        type="text"
+                        icon={<DeleteOutlined />}
+                        onClick={() => handleRemoveIngredient(index)}
+                      />
                     </div>
-
-                    <Button
-                      size="small"
-                      danger
-                      type="text"
-                      icon={<DeleteOutlined />}
-                      onClick={() => handleRemoveIngredient(index)}
-                    />
                   </div>
                 );
               })}

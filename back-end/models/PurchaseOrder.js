@@ -10,21 +10,22 @@ const poItemSchema = new mongoose.Schema(
     },
     orderedQuantity: {
       type: Number,
-      required: true, // Quantity in item.purchaseUnit (e.g., 20 kg or 50 cartons)
+      required: true,
       min: [0.01, 'Quantity must be greater than 0'],
     },
     receivedQuantity: {
-      type: Number, // Filled upon physical receiving (handles partial deliveries)
+      type: Number,
       default: 0,
+      min: 0,
     },
     unitPurchasePrice: {
       type: Number,
-      required: true, // Cost per purchaseUnit (e.g. Rs. 2,500 / kg)
+      required: true,
       min: 0,
     },
     subtotal: {
       type: Number,
-      required: true, // orderedQuantity * unitPurchasePrice
+      required: true,
     },
   },
   { _id: false }
@@ -36,7 +37,8 @@ const purchaseOrderSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      uppercase: true, // e.g. PO-202608-001
+      uppercase: true,
+      trim: true,
     },
     supplier: {
       type: mongoose.Schema.Types.ObjectId,
@@ -50,8 +52,9 @@ const purchaseOrderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['DRAFT', 'ORDERED', 'RECEIVED', 'CANCELLED'],
+      enum: ['DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED'],
       default: 'DRAFT',
+      index: true,
     },
     items: [poItemSchema],
     totalAmount: {
@@ -81,6 +84,7 @@ const purchaseOrderSchema = new mongoose.Schema(
     receivedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      default: null,
     },
   },
   { timestamps: true }

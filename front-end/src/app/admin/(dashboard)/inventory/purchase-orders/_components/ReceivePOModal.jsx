@@ -17,14 +17,22 @@ export default function ReceivePOModal({ open, onClose, po, onReceive, loading }
       setInvoiceNo('');
       setNotes('');
       setItems(
-        po.items.map((i) => ({
-          itemId: i.item?._id || i.item,
-          name: i.item?.name,
-          purchaseUnit: i.item?.purchaseUnit,
-          orderedQuantity: i.orderedQuantity,
-          receivedQuantity: i.orderedQuantity, // default to full delivery
-          actualUnitPurchasePrice: i.unitPurchasePrice,
-        }))
+        (po.items || []).map((i) => {
+          const ordered = Number(i.orderedQuantity) || 0;
+          const previouslyReceived = Number(i.receivedQuantity) || 0;
+          const remainingQty = Math.max(0, ordered - previouslyReceived);
+
+          return {
+            itemId: i.item?._id || i.item,
+            name: i.item?.name || 'Raw Material',
+            sku: i.item?.sku || '',
+            purchaseUnit: i.item?.purchaseUnit || 'units',
+            orderedQuantity: ordered,
+            previouslyReceived,
+            receivedQuantity: remainingQty > 0 ? remainingQty : ordered,
+            actualUnitPurchasePrice: Number(i.unitPurchasePrice) || 0,
+          };
+        })
       );
     }
   }, [po, open]);
@@ -32,7 +40,7 @@ export default function ReceivePOModal({ open, onClose, po, onReceive, loading }
   const handleQtyChange = (index, val) => {
     setItems((prev) => {
       const copy = [...prev];
-      copy[index].receivedQuantity = Number(val);
+      copy[index].receivedQuantity = Number(val) >= 0 ? Number(val) : 0;
       return copy;
     });
   };
@@ -40,7 +48,7 @@ export default function ReceivePOModal({ open, onClose, po, onReceive, loading }
   const handlePriceChange = (index, val) => {
     setItems((prev) => {
       const copy = [...prev];
-      copy[index].actualUnitPurchasePrice = Number(val);
+      copy[index].actualUnitPurchasePrice = Number(val) >= 0 ? Number(val) : 0;
       return copy;
     });
   };
@@ -49,15 +57,25 @@ export default function ReceivePOModal({ open, onClose, po, onReceive, loading }
     e.preventDefault();
     const hasInvalid = items.some((i) => i.receivedQuantity < 0 || i.actualUnitPurchasePrice <= 0);
     if (hasInvalid) {
-      showError('Please enter valid received quantities and unit prices.');
+      showError('Please enter valid received quantities and positive unit prices.');
+      return;
+    }
+
+    const totalReceivingNow = items.reduce((sum, i) => sum + (i.receivedQuantity || 0), 0);
+    if (totalReceivingNow <= 0) {
+      showError('Total received quantity must be greater than zero.');
       return;
     }
 
     onReceive({
       id: po._id,
-      supplierInvoiceNo: invoiceNo,
-      notes,
-      receivedItems: items,
+      supplierInvoiceNo: invoiceNo.trim(),
+      notes: notes.trim(),
+      receivedItems: items.map((i) => ({
+        itemId: i.itemId,
+        receivedQuantity: i.receivedQuantity,
+        actualUnitPurchasePrice: i.actualUnitPurchasePrice,
+      })),
     });
   };
 
@@ -68,22 +86,22 @@ export default function ReceivePOModal({ open, onClose, po, onReceive, loading }
       footer={null}
       title={null}
       centered
-      width={680}
+      width={720}
       className="font-['Plus_Jakarta_Sans',sans-serif]"
     >
       <div className="pt-2 pb-1">
         <h3 className="text-lg font-bold text-neutral-900 m-0">Receive Stock Delivery</h3>
         <p className="text-xs text-neutral-500 mt-1 mb-4">
-          Receiving PO: <strong className="text-neutral-900 font-mono">{po?.poNumber}</strong> | Supplier:{' '}
-          <strong className="text-neutral-800">{po?.supplier?.name}</strong> | Destination:{' '}
-          <strong className="text-neutral-800">{po?.branch?.name}</strong>
+          PO: <strong className="text-neutral-900 font-mono">{po?.poNumber}</strong> • Supplier:{' '}
+          <strong className="text-neutral-800">{po?.supplier?.name || 'Vendor'}</strong> • Outlet:{' '}
+          <strong className="text-neutral-800">{po?.branch?.name || 'General Branch'}</strong>
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Supplier Invoice / Bill No.
+                Supplier Invoice / Bill No. <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -100,7 +118,7 @@ export default function ReceivePOModal({ open, onClose, po, onReceive, loading }
               </label>
               <input
                 type="text"
-                placeholder="e.g. Inspected quality; temperature verified"
+                placeholder="e.g. Inspected batch quality & verified weight"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm font-medium text-neutral-900 focus:outline-none focus:border-[#ffc400]"
@@ -123,12 +141,13 @@ export default function ReceivePOModal({ open, onClose, po, onReceive, loading }
                     <span className="font-bold text-neutral-900 block">{itm.name}</span>
                     <span className="text-[11px] text-neutral-400">
                       Ordered: {itm.orderedQuantity} {itm.purchaseUnit}
+                      {itm.previouslyReceived > 0 && ` (Received: ${itm.previouslyReceived})`}
                     </span>
                   </div>
 
                   <div className="col-span-3">
                     <label className="text-[10px] text-neutral-500 font-bold block mb-0.5">
-                      Received ({itm.purchaseUnit})
+                      Receiving ({itm.purchaseUnit})
                     </label>
                     <input
                       type="number"
