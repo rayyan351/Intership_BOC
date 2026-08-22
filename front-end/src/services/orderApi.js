@@ -18,7 +18,7 @@ export const orderApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Orders'],
+  tagTypes: ['Orders', 'Inventory', 'Ledger', 'StockTransactions', 'Batches'],
   endpoints: (builder) => ({
     getOrders: builder.query({
       query: (params) => ({
@@ -27,13 +27,24 @@ export const orderApi = createApi({
       }),
       providesTags: ['Orders'],
     }),
+    getOrderById: builder.query({
+      query: (id) => `/orders/${id}`,
+      providesTags: (result, error, id) => [{ type: 'Orders', id }],
+    }),
     createOrder: builder.mutation({
       query: (body) => ({
         url: '/orders',
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Orders'],
+      invalidatesTags: ['Orders', 'Inventory', 'Ledger', 'StockTransactions', 'Batches'],
+    }),
+    createPaymentIntent: builder.mutation({
+      query: (body) => ({
+        url: '/orders/create-payment-intent',
+        method: 'POST',
+        body,
+      }),
     }),
     updateOrderStatus: builder.mutation({
       query: ({ id, ...body }) => ({
@@ -41,13 +52,15 @@ export const orderApi = createApi({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: ['Orders'],
+      invalidatesTags: ['Orders', 'Inventory', 'Ledger', 'StockTransactions', 'Batches'],
     }),
   }),
 });
 
 export const {
   useGetOrdersQuery,
+  useGetOrderByIdQuery,
   useCreateOrderMutation,
+  useCreatePaymentIntentMutation,
   useUpdateOrderStatusMutation,
 } = orderApi;

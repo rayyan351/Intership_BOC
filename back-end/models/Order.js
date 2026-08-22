@@ -6,6 +6,7 @@ const orderItemSchema = new mongoose.Schema(
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product',
+      required: true,
     },
     name: {
       type: String,
@@ -23,12 +24,15 @@ const orderItemSchema = new mongoose.Schema(
     customizations: [
       {
         name: String,
-        additionalPrice: Number,
+        additionalPrice: { type: Number, default: 0 },
       },
     ],
     itemTotal: {
       type: Number,
       required: true,
+    },
+    image: {
+      type: String,
     },
   },
   { _id: false }
@@ -41,17 +45,20 @@ const orderSchema = new mongoose.Schema(
       required: true,
       unique: true,
       uppercase: true,
+      trim: true,
     },
     customer: {
       name: { type: String, required: true },
       phone: { type: String, required: true },
-      email: { type: String },
-      address: { type: String },
+      email: { type: String, trim: true },
+      address: { type: String, required: true },
+      landmark: { type: String },
     },
     branch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch',
-      required: true,
+      required: [true, 'Branch outlet reference is required'],
+      index: true,
     },
     orderType: {
       type: String,
@@ -71,6 +78,10 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    discountAmount: {
+      type: Number,
+      default: 0,
+    },
     totalAmount: {
       type: Number,
       required: true,
@@ -82,13 +93,26 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['PENDING', 'PAID', 'FAILED'],
+      enum: ['PENDING', 'PAID', 'FAILED', 'REFUNDED'],
       default: 'PENDING',
+    },
+    stripePaymentIntentId: {
+      type: String,
+      default: null,
     },
     orderStatus: {
       type: String,
       enum: ['PENDING', 'PREPARING', 'READY', 'ON_THE_WAY', 'DELIVERED', 'CANCELLED'],
       default: 'PENDING',
+      index: true,
+    },
+    orderNotes: {
+      type: String,
+      trim: true,
+    },
+    inventoryDepleted: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

@@ -5,6 +5,22 @@ const InventoryItem = require('../models/InventoryItem');
 const StockTransaction = require('../models/StockTransaction');
 const StockBatch = require('../models/StockBatch');
 
+/**
+ * Category-aware perishable shelf-life estimation helper (in days).
+ * Used when no explicit expiry date is provided on the supplier invoice.
+ */
+const getCategoryDefaultShelfDays = (category) => {
+  const cat = (category || '').toLowerCase();
+  if (cat.includes('bun') || cat.includes('bakery') || cat.includes('bread')) return 3;
+  if (cat.includes('meat') || cat.includes('beef') || cat.includes('chicken') || cat.includes('patty')) return 4;
+  if (cat.includes('dairy') || cat.includes('cheese') || cat.includes('milk')) return 10;
+  if (cat.includes('sauce') || cat.includes('produce') || cat.includes('veg') || cat.includes('vegetable')) return 7;
+  if (cat.includes('oil') || cat.includes('fryer')) return 30;
+  if (cat.includes('frozen')) return 90;
+  if (cat.includes('packaging') || cat.includes('box') || cat.includes('wrap')) return 365;
+  return 30; // Standard fallback
+};
+
 // @desc    Get all Purchase Orders
 // @route   GET /api/purchase-orders
 // @access  Private (purchase_orders:view, inventory:view)
@@ -22,7 +38,7 @@ const getPurchaseOrders = async (req, res) => {
       .populate('branch', 'name city branchCode address phone')
       .populate({
         path: 'items.item',
-        select: 'name sku purchaseUnit recipeUnit conversionFactor costPerPurchaseUnit costPerRecipeUnit',
+        select: 'name sku purchaseUnit recipeUnit conversionFactor costPerPurchaseUnit costPerRecipeUnit category',
       })
       .populate('createdBy', 'name email')
       .populate('receivedBy', 'name email')
@@ -117,7 +133,7 @@ const updatePOStatus = async (req, res) => {
   }
 };
 
-// @desc    Receive Stock Delivery (Executes ACID Transaction, Inward Ledger, WAC, and FEFO Batch Creation)
+// @desc    Receive Stock Delivery (Executes ACID Transaction, Inward Ledger, WAC, and Category-Aware FEFO Batch Creation)
 // @route   POST /api/purchase-orders/:id/receive
 // @access  Private (purchase_orders:receive, inventory:adjust)
 const receivePurchaseOrder = async (req, res) => {
@@ -160,7 +176,11 @@ const receivePurchaseOrder = async (req, res) => {
       const incomingQty = Number(recItem.receivedQuantity) || 0;
       if (incomingQty <= 0) continue;
 
-      const actualUnitCost = Number(recItem.actualUnitPurchasePrice || po.items[poItemIndex].unitPurchasePrice);
+      const actualUnitCost = Number(
+        recItem.actualUnitPurchasePrice !== undefined && recItem.actualUnitPurchasePrice !== null
+          ? recItem.actualUnitPurchasePrice
+          : po.items[poItemIndex].unitPurchasePrice
+      );
 
       // Accumulate existing received quantity with new delivery batch
       const currentReceivedQty = po.items[poItemIndex].receivedQuantity || 0;
@@ -224,14 +244,18 @@ const receivePurchaseOrder = async (req, res) => {
         notes: `PO Received (${po.poNumber}): Invoice #${supplierInvoiceNo || 'N/A'}${notes ? ` - ${notes}` : ''}`,
       });
 
-      // Generate FEFO StockBatch for this delivery lot
+      // Generate Category-Aware FEFO StockBatch for this delivery lot
       const dateCode = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const batchSuffix = Math.floor(100 + Math.random() * 900);
-      const generatedBatchNo = `LOT-${invItem.sku || 'RAW'}-${dateCode}-${batchSuffix}`;
+      const uniqueSuffix = Math.floor(1000 + Math.random() * 9000);
+      const generatedBatchNo = `LOT-${invItem.sku || 'RAW'}-${dateCode}-${uniqueSuffix}`;
+
+      // Dynamic Category-Based Expiry Calculation
+      const defaultShelfDays = getCategoryDefaultShelfDays(invItem.category);
+      const computedDefaultExpiry = new Date(Date.now() + defaultShelfDays * 24 * 60 * 60 * 1000);
 
       const batchExpiryDate = recItem.expiryDate
         ? new Date(recItem.expiryDate)
-        : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // 14 days default shelf-life
+        : computedDefaultExpiry;
 
       batchEntries.push({
         batchNumber: recItem.batchNumber || generatedBatchNo,
@@ -274,7 +298,7 @@ const receivePurchaseOrder = async (req, res) => {
     session.endSession();
 
     res.status(200).json({
-      message: 'Stock received, WAC calculated, audit ledger updated, and FEFO batches created successfully.',
+      message: 'Stock received, WAC calculated, audit ledger updated, and category-aware FEFO batches created successfully.',
       po,
     });
   } catch (error) {
