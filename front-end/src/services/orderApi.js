@@ -54,6 +54,26 @@ export const orderApi = createApi({
       }),
       invalidatesTags: ['Orders', 'Inventory', 'Ledger', 'StockTransactions', 'Batches'],
     }),
+    trackOrder: builder.query({
+      query: (orderNumber) => `/orders/${orderNumber}`,
+      providesTags: (result, error, orderNumber) => [{ type: 'Orders', id: orderNumber }],
+    }),
+    // front-end/src/services/orderApi.js
+    cancelCustomerOrder: builder.mutation({
+      query: ({ id, reason }) => ({
+        url: `/orders/${id}/cancel-customer`,
+        method: 'POST',
+        body: { reason },
+      }),
+      invalidatesTags: ['Orders', 'Inventory', 'Ledger'],
+    }),
+    deleteOrder: builder.mutation({
+      query: (id) => ({
+        url: `/orders/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Orders', 'Inventory', 'Ledger', 'StockTransactions'],
+    }),
   }),
 });
 
@@ -63,4 +83,7 @@ export const {
   useCreateOrderMutation,
   useCreatePaymentIntentMutation,
   useUpdateOrderStatusMutation,
+  useTrackOrderQuery,
+  useCancelCustomerOrderMutation,
+  useDeleteOrderMutation,
 } = orderApi;

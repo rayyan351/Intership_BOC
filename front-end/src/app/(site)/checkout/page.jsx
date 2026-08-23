@@ -1,88 +1,84 @@
 // src/app/(site)/checkout/page.jsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearCart } from '@/redux/cart/cartSlice';
 
-// ✅ CORRECT: Import from orderApi
 import { useCreateOrderMutation, useCreatePaymentIntentMutation } from '@/services/orderApi';
-import { useGetBranchesQuery } from '@/services/branchApi';
-import { useLocation } from '@/context/LocationContext';
+import { useGetDeliveryAreasQuery, useGetSystemSettingsQuery } from '@/services/deliveryAreaApi';
 import { formatPrice } from '@/lib/currency';
 
 export default function CheckoutPage() {
   const router = useRouter();
   const dispatch = useDispatch();
-  const { selectedBranch } = useLocation();
   const { items, totalPrice } = useSelector((state) => state.cart);
-  
-  const { data: branches = [] } = useGetBranchesQuery();
+
+  // Queries for dynamic areas & government tax
+  const { data: deliveryAreas = [] } = useGetDeliveryAreasQuery({ activeOnly: 'true' });
+  const { data: settings } = useGetSystemSettingsQuery();
+
   const [createOrder, { isLoading: isPlacingOrder }] = useCreateOrderMutation();
   const [createPaymentIntent] = useCreatePaymentIntentMutation();
-
-  const [activeBranchId, setActiveBranchId] = useState(
-    selectedBranch?._id || selectedBranch || ''
-  );
 
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
     email: '',
     city: 'Karachi',
+    selectedAreaId: '',
     address: '',
     notes: '',
-    paymentMethod: 'COD',
+    paymentMethod: 'COD', // 'COD' or 'CARD'
   });
 
   const [errorMessage, setErrorMessage] = useState('');
   const [placedOrder, setPlacedOrder] = useState(null);
 
-  const deliveryFee = 0;
+  // Filter areas by city
+  const cityAreas = useMemo(() => {
+    return deliveryAreas.filter((a) => a.city?.toLowerCase() === formData.city?.toLowerCase());
+  }, [deliveryAreas, formData.city]);
+
+  // Selected Area details (Auto-resolves fulfilling branch & delivery fee)
+  const selectedAreaObj = useMemo(() => {
+    return deliveryAreas.find((a) => a._id === formData.selectedAreaId);
+  }, [deliveryAreas, formData.selectedAreaId]);
+
+  const assignedKitchenBranch = selectedAreaObj?.assignedBranch;
+  const deliveryFee = selectedAreaObj?.deliveryFee || 0;
   const subtotal = Number(totalPrice) || 0;
-  const finalTotal = subtotal + deliveryFee;
+
+  // Real-time Dynamic Tax Calculation (e.g. 15% on COD, 13% on Card)
+  const taxConfig = settings?.taxSettings || { codTaxPercentage: 15, cardTaxPercentage: 13, isTaxEnabled: true };
+  const activeTaxRate = taxConfig.isTaxEnabled
+    ? formData.paymentMethod === 'CARD'
+      ? taxConfig.cardTaxPercentage
+      : taxConfig.codTaxPercentage
+    : 0;
+
+  const taxAmount = Number(((subtotal * activeTaxRate) / 100).toFixed(2));
+  const finalTotal = subtotal + deliveryFee + taxAmount;
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setErrorMessage('');
   };
 
-const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
 
-    // ✅ Resolve target database branch ID cleanly
-    let targetBranchId = activeBranchId;
-
-    if (!targetBranchId && selectedBranch) {
-      if (typeof selectedBranch === 'string' && selectedBranch.length === 24) {
-        targetBranchId = selectedBranch;
-      } else if (selectedBranch._id) {
-        targetBranchId = selectedBranch._id;
-      } else if (selectedBranch.name || selectedBranch.id) {
-        const found = branches.find(
-          (b) =>
-            b.name?.toLowerCase() === (selectedBranch.name || '').toLowerCase() ||
-            b.branchCode?.toLowerCase() === (selectedBranch.id || '').toLowerCase()
-        );
-        if (found) targetBranchId = found._id;
-      }
-    }
-
-    if (!targetBranchId && branches.length > 0) {
-      targetBranchId = branches[0]._id;
-    }
-
-    if (!targetBranchId) {
-      setErrorMessage('Please select a Burger O’Clock branch outlet for order preparation.');
+    if (!selectedAreaObj || !assignedKitchenBranch?._id) {
+      setErrorMessage('Please select your delivery area to determine the nearest kitchen outlet.');
       return;
     }
 
     if (!formData.fullName || !formData.phone || !formData.address) {
-      setErrorMessage('Please fill in all required delivery details.');
+      setErrorMessage('Please fill in your full name, phone number, and complete street address.');
       return;
     }
 
@@ -112,12 +108,13 @@ const handleSubmit = async (e) => {
           name: formData.fullName,
           phone: formData.phone,
           email: formData.email,
-          address: `${formData.address}, ${formData.city}`,
+          address: `${formData.address}, ${selectedAreaObj.name}, ${formData.city}`,
         },
-        branch: targetBranchId, // ✅ Pure 24-character ObjectId string
+        branch: assignedKitchenBranch._id, // ✅ Auto-mapped nearest branch
         orderType: 'DELIVERY',
         items: formattedItems,
         subtotal,
+        tax: taxAmount,
         deliveryFee,
         totalAmount: finalTotal,
         paymentMethod: formData.paymentMethod,
@@ -161,6 +158,7 @@ const handleSubmit = async (e) => {
     );
   }
 
+  // Order Success Screen
   if (placedOrder) {
     return (
       <div className="bg-[#fcfcfb] min-h-[75vh] flex items-center justify-center py-12 px-4 font-['Plus_Jakarta_Sans',sans-serif]">
@@ -187,7 +185,7 @@ const handleSubmit = async (e) => {
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-neutral-500 font-sans">Total Bill:</span>
+              <span className="text-neutral-500 font-sans">Total Bill (Inc. Tax):</span>
               <strong className="text-black font-display text-base">
                 {formatPrice(placedOrder.totalAmount)}
               </strong>
@@ -200,12 +198,20 @@ const handleSubmit = async (e) => {
             </div>
           </div>
 
-          <button
-            onClick={() => router.push('/')}
-            className="w-full bg-[#F4C61A] hover:bg-[#E0B210] text-black font-black py-4 rounded-xl shadow-sm transition uppercase tracking-wider text-xs sm:text-sm"
-          >
-            ORDER MORE BURGERS
-          </button>
+          <div className="space-y-2.5">
+            <button
+              onClick={() => router.push(`/track-order?id=${placedOrder.orderNumber}`)}
+              className="w-full bg-[#F4C61A] hover:bg-[#E0B210] text-black font-black py-4 rounded-xl shadow-sm transition uppercase tracking-wider text-xs sm:text-sm"
+            >
+              TRACK MY ORDER LIVE
+            </button>
+            <button
+              onClick={() => router.push('/')}
+              className="w-full bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold py-3 rounded-xl transition uppercase tracking-wider text-xs"
+            >
+              Back to Menu
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -227,94 +233,24 @@ const handleSubmit = async (e) => {
 
         <form onSubmit={handleSubmit} className="flex flex-col lg:flex-row gap-8 items-start">
           <div className="flex-1 w-full space-y-6">
-            
-            {/* 1. Branch Selection */}
+            {/* 1. Customer Delivery Location & Area Selection */}
             <div className="p-6 sm:p-8 rounded-3xl bg-white border border-neutral-200 shadow-sm">
               <h2 className="font-display text-xl sm:text-2xl font-black text-black mb-6 pb-3 border-b border-neutral-100 uppercase tracking-wide">
-                1. Kitchen Outlet
-              </h2>
-              <div>
-                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                  Fulfilling Branch *
-                </label>
-                <select
-                  value={activeBranchId}
-                  onChange={(e) => setActiveBranchId(e.target.value)}
-                  className="w-full min-h-[46px] px-4 rounded-xl border border-neutral-200 bg-neutral-50/50 text-sm text-neutral-900 focus:bg-white focus:border-[#F4C61A] focus:ring-1 focus:ring-[#F4C61A] outline-none transition cursor-pointer"
-                  required
-                >
-                  <option value="" disabled>Select nearest branch</option>
-                  {branches.map((b) => (
-                    <option key={b._id} value={b._id}>
-                      {b.name} ({b.city})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* 2. Delivery Details */}
-            <div className="p-6 sm:p-8 rounded-3xl bg-white border border-neutral-200 shadow-sm">
-              <h2 className="font-display text-xl sm:text-2xl font-black text-black mb-6 pb-3 border-b border-neutral-100 uppercase tracking-wide">
-                2. Delivery Details
+                1. Delivery Location
               </h2>
 
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      name="fullName"
-                      required
-                      value={formData.fullName}
-                      onChange={handleChange}
-                      placeholder="John Doe"
-                      className="w-full min-h-[46px] px-4 rounded-xl border border-neutral-200 bg-neutral-50/50 text-sm text-neutral-900 focus:bg-white focus:border-[#F4C61A] focus:ring-1 focus:ring-[#F4C61A] outline-none transition"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                      Phone Number *
-                    </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      required
-                      value={formData.phone}
-                      onChange={handleChange}
-                      placeholder="0300 1234567"
-                      className="w-full min-h-[46px] px-4 rounded-xl border border-neutral-200 bg-neutral-50/50 text-sm text-neutral-900 focus:bg-white focus:border-[#F4C61A] focus:ring-1 focus:ring-[#F4C61A] outline-none transition"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                      Email Address (Optional)
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder="john@example.com"
-                      className="w-full min-h-[46px] px-4 rounded-xl border border-neutral-200 bg-neutral-50/50 text-sm text-neutral-900 focus:bg-white focus:border-[#F4C61A] focus:ring-1 focus:ring-[#F4C61A] outline-none transition"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                      City
+                      City *
                     </label>
                     <select
                       name="city"
                       value={formData.city}
-                      onChange={handleChange}
+                      onChange={(e) => {
+                        setFormData({ ...formData, city: e.target.value, selectedAreaId: '' });
+                      }}
                       className="w-full min-h-[46px] px-4 rounded-xl border border-neutral-200 bg-neutral-50/50 text-sm text-neutral-900 focus:bg-white focus:border-[#F4C61A] focus:ring-1 focus:ring-[#F4C61A] outline-none transition cursor-pointer"
                     >
                       <option value="Karachi">Karachi</option>
@@ -322,46 +258,108 @@ const handleSubmit = async (e) => {
                       <option value="Islamabad">Islamabad</option>
                     </select>
                   </div>
+
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
+                      Select Your Area / Sector *
+                    </label>
+                    <select
+                      name="selectedAreaId"
+                      value={formData.selectedAreaId}
+                      onChange={handleChange}
+                      className="w-full min-h-[46px] px-4 rounded-xl border border-neutral-200 bg-neutral-50/50 text-sm text-neutral-900 focus:bg-white focus:border-[#F4C61A] focus:ring-1 focus:ring-[#F4C61A] outline-none transition cursor-pointer"
+                      required
+                    >
+                      <option value="" disabled>
+                        Choose your neighborhood
+                      </option>
+                      {cityAreas.map((a) => (
+                        <option key={a._id} value={a._id}>
+                          {a.name} {a.deliveryFee > 0 ? `(+Rs. ${a.deliveryFee} delivery)` : '(Free Delivery)'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
+
+                {/* Auto-Dispatched Kitchen Info Banner */}
+                {selectedAreaObj && assignedKitchenBranch && (
+                  <div className="p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200 text-xs flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-emerald-900 block">
+                        ✓ Nearest Kitchen Outlet Assigned
+                      </span>
+                      <span className="text-emerald-700 text-[11px]">
+                        Order will be freshly prepared at <strong>{assignedKitchenBranch.name}</strong> (~{selectedAreaObj.estimatedDeliveryMinutes || 35} mins)
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                    Complete Street Address *
+                    Complete Street Address (House/Flat #, Street, Building) *
                   </label>
                   <textarea
                     name="address"
-                    rows="3"
+                    rows="2"
                     required
                     value={formData.address}
                     onChange={handleChange}
-                    placeholder="House/Apartment #, Street, Block, Area..."
+                    placeholder="e.g. Apartment # 4B, Street 12, Block 4"
                     className="w-full p-4 rounded-xl border border-neutral-200 bg-neutral-50/50 text-sm text-neutral-900 focus:bg-white focus:border-[#F4C61A] focus:ring-1 focus:ring-[#F4C61A] outline-none transition resize-none"
                   ></textarea>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Customer Contact */}
+            <div className="p-6 sm:p-8 rounded-3xl bg-white border border-neutral-200 shadow-sm">
+              <h2 className="font-display text-xl sm:text-2xl font-black text-black mb-6 pb-3 border-b border-neutral-100 uppercase tracking-wide">
+                2. Contact Information
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="fullName"
+                    required
+                    value={formData.fullName}
+                    onChange={handleChange}
+                    placeholder="John Doe"
+                    className="w-full min-h-[46px] px-4 rounded-xl border border-neutral-200 bg-neutral-50/50 text-sm text-neutral-900 focus:bg-white focus:border-[#F4C61A] focus:ring-1 focus:ring-[#F4C61A] outline-none transition"
+                  />
                 </div>
 
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                    Order Notes (Optional)
+                    Phone Number (Rider Contact) *
                   </label>
                   <input
-                    type="text"
-                    name="notes"
-                    value={formData.notes}
+                    type="tel"
+                    name="phone"
+                    required
+                    value={formData.phone}
                     onChange={handleChange}
-                    placeholder="E.g. extra napkins, please call upon arrival"
+                    placeholder="0300 1234567"
                     className="w-full min-h-[46px] px-4 rounded-xl border border-neutral-200 bg-neutral-50/50 text-sm text-neutral-900 focus:bg-white focus:border-[#F4C61A] focus:ring-1 focus:ring-[#F4C61A] outline-none transition"
                   />
                 </div>
               </div>
             </div>
 
-            {/* 3. Payment Method */}
+            {/* 3. Payment Method & Live Tax Rates */}
             <div className="p-6 sm:p-8 rounded-3xl bg-white border border-neutral-200 shadow-sm">
               <h2 className="font-display text-xl sm:text-2xl font-black text-black mb-5 pb-3 border-b border-neutral-100 uppercase tracking-wide">
                 3. Payment Method
               </h2>
 
               <div className="space-y-3">
+                {/* Cash on Delivery */}
                 <div
                   onClick={() => setFormData({ ...formData, paymentMethod: 'COD' })}
                   className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition ${
@@ -384,12 +382,15 @@ const handleSubmit = async (e) => {
                       <label htmlFor="cod" className="text-sm font-black text-black cursor-pointer uppercase tracking-wider block">
                         Cash on Delivery (COD)
                       </label>
-                      <span className="text-[11px] text-neutral-500 font-medium">Pay cash to rider upon delivery</span>
+                      <span className="text-[11px] text-neutral-500 font-medium">
+                        Standard Govt SST: {taxConfig.codTaxPercentage}%
+                      </span>
                     </div>
                   </div>
                   <span className="text-lg">💵</span>
                 </div>
 
+                {/* Digital Card (Reduced SST Tax) */}
                 <div
                   onClick={() => setFormData({ ...formData, paymentMethod: 'CARD' })}
                   className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition ${
@@ -409,43 +410,50 @@ const handleSubmit = async (e) => {
                       className="w-4 h-4 text-[#F4C61A] accent-[#F4C61A] cursor-pointer"
                     />
                     <div>
-                      <label htmlFor="card" className="text-sm font-black text-black cursor-pointer uppercase tracking-wider block">
-                        Credit / Debit Card (Stripe Test)
-                      </label>
-                      <span className="text-[11px] text-neutral-500 font-medium">Instant sandbox mock authorization (Free)</span>
+                      <div className="flex items-center gap-2">
+                        <label htmlFor="card" className="text-sm font-black text-black cursor-pointer uppercase tracking-wider block">
+                          Credit / Debit Card (Online)
+                        </label>
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                          Save {taxConfig.codTaxPercentage - taxConfig.cardTaxPercentage}% Tax
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-neutral-500 font-medium">
+                        Reduced Govt SST: {taxConfig.cardTaxPercentage}%
+                      </span>
                     </div>
                   </div>
                   <span className="text-lg">💳</span>
                 </div>
               </div>
             </div>
-
           </div>
 
-          {/* RIGHT COLUMN: Order Summary Sidebar */}
+          {/* RIGHT COLUMN: Order Summary & Dynamic Tax Ledger Breakdown */}
           <div className="w-full lg:w-[380px] shrink-0 sticky top-24">
             <div className="p-6 sm:p-7 rounded-3xl bg-white border border-neutral-200 shadow-sm">
               <h2 className="font-display text-xl sm:text-2xl font-black text-black mb-4 pb-3 border-b border-neutral-100 uppercase tracking-wide">
                 Order Summary
               </h2>
 
-              <div className="max-h-64 overflow-y-auto divide-y divide-neutral-100 mb-4 pr-1">
+              {/* Item List */}
+              <div className="max-h-56 overflow-y-auto divide-y divide-neutral-100 mb-4 pr-1">
                 {items.map((item) => {
                   const itemKey = item.cartItemId || item._id || item.id;
                   return (
-                    <div key={itemKey} className="py-3 flex items-start gap-3">
-                      <div className="relative w-12 h-12 min-w-[48px] rounded-xl overflow-hidden bg-neutral-50 border border-neutral-200 shrink-0">
+                    <div key={itemKey} className="py-2.5 flex items-start gap-3">
+                      <div className="relative w-10 h-10 min-w-[40px] rounded-xl overflow-hidden bg-neutral-50 border border-neutral-200 shrink-0">
                         <Image
                           src={item.image || "/images/brand/BurgerO'clock logo.webp"}
                           alt={item.name}
                           fill
-                          sizes="48px"
+                          sizes="40px"
                           className="object-contain p-1"
                         />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold text-black truncate">{item.name}</h4>
-                        <p className="text-[11px] font-semibold text-neutral-500">Qty: {item.quantity}</p>
+                        <p className="text-[10px] font-semibold text-neutral-500">Qty: {item.quantity}</p>
                       </div>
                       <span className="text-xs font-extrabold text-black whitespace-nowrap">
                         {formatPrice(item.price * item.quantity)}
@@ -455,15 +463,33 @@ const handleSubmit = async (e) => {
                 })}
               </div>
 
-              <div className="border-t border-neutral-100 pt-4 space-y-2.5 text-xs font-semibold">
+              {/* Dynamic Bill Calculation */}
+              <div className="border-t border-neutral-100 pt-4 space-y-2 text-xs font-semibold">
                 <div className="flex justify-between text-neutral-600">
                   <span>Subtotal</span>
                   <span className="font-bold text-black">{formatPrice(subtotal)}</span>
                 </div>
+
                 <div className="flex justify-between text-neutral-600">
                   <span>Delivery Fee</span>
-                  <span className="font-black text-emerald-600 uppercase text-[10px] tracking-wider">Free</span>
+                  <span className="font-bold text-neutral-900">
+                    {deliveryFee === 0 ? (
+                      <span className="font-black text-emerald-600 uppercase text-[10px]">Free</span>
+                    ) : (
+                      formatPrice(deliveryFee)
+                    )}
+                  </span>
                 </div>
+
+                {taxConfig.isTaxEnabled && (
+                  <div className="flex justify-between text-neutral-600">
+                    <span>
+                      {taxConfig.taxLabel || 'Sindh Sales Tax'} ({activeTaxRate}%)
+                    </span>
+                    <span className="font-bold text-neutral-900">{formatPrice(taxAmount)}</span>
+                  </div>
+                )}
+
                 <div className="border-t border-neutral-200 pt-3 flex justify-between items-baseline text-sm font-black text-black">
                   <span className="uppercase tracking-wider">Total</span>
                   <span className="font-display text-2xl text-black">{formatPrice(finalTotal)}</span>
@@ -471,15 +497,14 @@ const handleSubmit = async (e) => {
               </div>
 
               <button
-                disabled={isPlacingOrder}
+                disabled={isPlacingOrder || !formData.selectedAreaId}
                 type="submit"
-                className="w-full mt-6 bg-[#F4C61A] hover:bg-[#E0B210] text-black font-black py-4 rounded-xl shadow-md transition transform active:scale-98 uppercase tracking-wider text-xs sm:text-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none"
+                className="w-full mt-6 bg-[#F4C61A] hover:bg-[#E0B210] text-black font-black py-4 rounded-xl shadow-md transition transform active:scale-98 uppercase tracking-wider text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 {isPlacingOrder ? 'Processing Order...' : `Place Order • ${formatPrice(finalTotal)}`}
               </button>
             </div>
           </div>
-
         </form>
       </div>
     </div>

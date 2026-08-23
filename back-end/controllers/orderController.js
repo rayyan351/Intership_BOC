@@ -2,11 +2,12 @@
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Branch = require('../models/Branch');
+const StockTransaction = require('../models/StockTransaction');
 const {
   validateStockAvailability,
   depleteInventoryForOrder,
   restoreInventoryForOrder,
-} = require('../services/inventoryDepletionService'); // Fixed exact file casing
+} = require('../services/inventoryDepletionService');
 
 // Safe Stripe initialization for free test mode
 const stripe = process.env.STRIPE_SECRET_KEY
@@ -21,7 +22,7 @@ const createStripePaymentIntent = async (req, res) => {
     const { amount, currency = 'pkr' } = req.body;
 
     if (!stripe) {
-      // Mock client secret fallback if no secret key is set
+      // Mock client secret fallback if running locally without keys
       return res.status(200).json({
         clientSecret: `mock_pi_secret_${Date.now()}`,
         paymentIntentId: `pi_mock_${Date.now()}`,
@@ -29,7 +30,7 @@ const createStripePaymentIntent = async (req, res) => {
       });
     }
 
-    // Stripe processes smallest currency subunit (cents / paisa)
+    // Stripe processes smallest currency subunit (paisa / cents)
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(Number(amount) * 100),
       currency: currency.toLowerCase(),
@@ -149,7 +150,6 @@ const createOrder = async (req, res) => {
     } else if (branch?._id && mongoose.Types.ObjectId.isValid(branch._id)) {
       resolvedBranchId = branch._id;
     } else {
-      // Find branch by name or custom id slug in database
       const lookupTerm = branch?.name || branch?.id || (typeof branch === 'string' ? branch : '');
       let matchedBranch = null;
 
@@ -165,7 +165,6 @@ const createOrder = async (req, res) => {
       if (matchedBranch) {
         resolvedBranchId = matchedBranch._id;
       } else {
-        // Fallback to the first active branch in DB
         let fallbackBranch = await Branch.findOne({ isActive: { $ne: false } }).session(session);
         if (!fallbackBranch) {
           fallbackBranch = new Branch({
@@ -191,7 +190,7 @@ const createOrder = async (req, res) => {
     // 1. Guard Check: Pre-validate kitchen raw materials availability
     await validateStockAvailability({
       orderItems: items,
-      branchId: resolvedBranchId, // ✅ Use resolvedBranchId
+      branchId: resolvedBranchId,
       session,
     });
 
@@ -221,7 +220,7 @@ const createOrder = async (req, res) => {
     const newOrder = new Order({
       orderNumber,
       customer,
-      branch: resolvedBranchId, // ✅ Use resolvedBranchId
+      branch: resolvedBranchId,
       orderType: orderType || 'DELIVERY',
       items: formattedItems,
       subtotal: Number(subtotal),
@@ -241,7 +240,7 @@ const createOrder = async (req, res) => {
     // 3. Atomically deplete raw materials via FEFO batch engine & yield formulas
     await depleteInventoryForOrder({
       orderItems: items,
-      branchId: resolvedBranchId, // ✅ Use resolvedBranchId
+      branchId: resolvedBranchId,
       orderNumber: savedOrder.orderNumber,
       userId: req.user?._id || null,
       session,
@@ -267,7 +266,7 @@ const createOrder = async (req, res) => {
   }
 };
 
-// @desc    Update order status (handles kitchen cancellation inventory rollback)
+// @desc    Update order status (with auto payment settlement, cancellation reason & stock rollback)
 // @route   PUT /api/orders/:id/status
 // @access  Private (orders:edit)
 const updateOrderStatus = async (req, res) => {
@@ -276,7 +275,7 @@ const updateOrderStatus = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { orderStatus, paymentStatus } = req.body;
+    const { orderStatus, paymentStatus, cancellationReason } = req.body;
 
     const order = await Order.findById(id).session(session);
     if (!order) {
@@ -287,19 +286,39 @@ const updateOrderStatus = async (req, res) => {
 
     const previousStatus = order.orderStatus;
 
-    if (orderStatus) order.orderStatus = orderStatus;
-    if (paymentStatus) order.paymentStatus = paymentStatus;
-
-    // If order is cancelled and inventory was previously depleted, restore stock
-    if (orderStatus === 'CANCELLED' && previousStatus !== 'CANCELLED' && order.inventoryDepleted) {
-      await restoreInventoryForOrder({
-        orderItems: order.items,
-        branchId: order.branch,
-        orderNumber: order.orderNumber,
-        userId: req.user?._id || null,
-        session,
+    // Terminal Status Lock: already completed or cancelled orders cannot be modified
+    if (previousStatus === 'DELIVERED' || previousStatus === 'CANCELLED') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        message: `Order is in terminal state '${previousStatus}' and cannot be modified further.`,
       });
-      order.inventoryDepleted = false;
+    }
+
+    if (orderStatus) order.orderStatus = orderStatus;
+
+    // Auto-resolve payment status based on new order state
+    if (orderStatus === 'DELIVERED') {
+      order.paymentStatus = 'PAID';
+    } else if (orderStatus === 'CANCELLED') {
+      order.cancellationReason = cancellationReason || 'Order cancelled by restaurant manager.';
+      order.cancelledBy = 'ADMIN';
+      // If card was paid, mark REFUNDED; if unpaid/COD, mark VOID
+      order.paymentStatus = order.paymentStatus === 'PAID' ? 'REFUNDED' : 'VOID';
+
+      // Restore raw ingredients back to inventory
+      if (order.inventoryDepleted) {
+        await restoreInventoryForOrder({
+          orderItems: order.items,
+          branchId: order.branch,
+          orderNumber: order.orderNumber,
+          userId: req.user?._id || null,
+          session,
+        });
+        order.inventoryDepleted = false;
+      }
+    } else if (paymentStatus) {
+      order.paymentStatus = paymentStatus;
     }
 
     const updatedOrder = await order.save({ session });
@@ -315,10 +334,135 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
+// @desc    Customer self-service order cancellation (5-min window & PENDING only)
+// @route   POST /api/orders/:id/cancel-customer
+// @access  Public
+const cancelCustomerOrder = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const query = mongoose.Types.ObjectId.isValid(id) ? { _id: id } : { orderNumber: id.toUpperCase() };
+    const order = await Order.findOne(query).session(session);
+
+    if (!order) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: 'Order not found.' });
+    }
+
+    if (order.orderStatus !== 'PENDING') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        message: `Order cannot be cancelled because the kitchen has already started processing (${order.orderStatus}).`,
+      });
+    }
+
+    const orderAgeMs = Date.now() - new Date(order.createdAt).getTime();
+    const MAX_CANCEL_WINDOW_MS = 5 * 60 * 1000;
+
+    if (orderAgeMs > MAX_CANCEL_WINDOW_MS) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        message: 'The 5-minute cancellation window has expired. Please contact kitchen support directly.',
+      });
+    }
+
+    if (order.inventoryDepleted) {
+      await restoreInventoryForOrder({
+        orderItems: order.items,
+        branchId: order.branch,
+        orderNumber: order.orderNumber,
+        userId: null,
+        session,
+      });
+      order.inventoryDepleted = false;
+    }
+
+    order.orderStatus = 'CANCELLED';
+    order.cancelledBy = 'CUSTOMER';
+    order.cancellationReason = reason || 'Cancelled by customer within grace window.';
+    order.paymentStatus = order.paymentStatus === 'PAID' ? 'REFUNDED' : 'VOID';
+
+    await order.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({
+      success: true,
+      message: 'Order cancelled successfully.',
+      order,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Customer Cancel Error:', error);
+    res.status(500).json({ message: 'Failed to cancel order', error: error.message });
+  }
+};
+
+// @desc    Delete/Purge order (Safely restores inventory if active, deletes order document)
+// @route   DELETE /api/orders/:id
+// @access  Private (orders:delete / Super Admin)
+const deleteOrder = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+
+    const order = await Order.findById(id).session(session);
+    if (!order) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: 'Order not found.' });
+    }
+
+    // If order was active and had depleted inventory, restore stock before deleting
+    if (order.inventoryDepleted && order.orderStatus !== 'DELIVERED' && order.orderStatus !== 'CANCELLED') {
+      await restoreInventoryForOrder({
+        orderItems: order.items,
+        branchId: order.branch,
+        orderNumber: order.orderNumber,
+        userId: req.user?._id || null,
+        session,
+      });
+    }
+
+    // Clean up or adjust linked stock transactions
+    await StockTransaction.deleteMany({
+      notes: { $regex: order.orderNumber, $options: 'i' },
+    }).session(session);
+
+    await Order.findByIdAndDelete(id).session(session);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({
+      success: true,
+      message: `Order ${order.orderNumber} permanently purged and associated inventory/transactions balanced.`,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Delete Order Error:', error);
+    res.status(500).json({ message: 'Failed to delete order', error: error.message });
+  }
+};
+
 module.exports = {
   createStripePaymentIntent,
   getOrders,
   getOrderById,
   createOrder,
   updateOrderStatus,
+  cancelCustomerOrder,
+  deleteOrder,
 };

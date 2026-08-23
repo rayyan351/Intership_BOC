@@ -2,18 +2,19 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Tag, Select, Button, Modal, Space, Popconfirm } from 'antd';
+import { Table, Tag, Select, Button, Modal, Tooltip, Input, Popconfirm, Space } from 'antd';
 import {
-  EyeOutlined,
-  CheckCircleOutlined,
-  CarOutlined,
-  FireOutlined,
-  CloseCircleOutlined,
-  CheckOutlined,
+  LockOutlined,
+  StopOutlined,
+  DeleteOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
-import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
-import { useGetOrdersQuery, useUpdateOrderStatusMutation } from '@/services/orderApi';
+import {
+  useGetOrdersQuery,
+  useUpdateOrderStatusMutation,
+  useDeleteOrderMutation,
+} from '@/services/orderApi';
 import { useGetBranchesQuery } from '@/services/branchApi';
 import { useToast } from '@/utils/toast';
 import { formatPrice } from '@/lib/currency';
@@ -24,7 +25,15 @@ const STATUS_OPTIONS = [
   { value: 'READY', label: 'Ready for Pickup', color: 'cyan' },
   { value: 'ON_THE_WAY', label: 'On The Way', color: 'orange' },
   { value: 'DELIVERED', label: 'Delivered (Completed)', color: 'green' },
-  { value: 'CANCELLED', label: 'Cancelled', color: 'red' },
+  { value: 'CANCELLED', label: 'Cancel Order...', color: 'red' },
+];
+
+const PRESET_CANCEL_REASONS = [
+  'Item out of physical stock at outlet',
+  'Delivery area blocked / Rain / Route issue',
+  'Outlet closed / Kitchen maintenance',
+  'Customer unreachable via phone',
+  'Duplicate order placed',
 ];
 
 export default function AdminOrdersPage() {
@@ -32,7 +41,11 @@ export default function AdminOrdersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState(null);
+
+  // Cancellation Modal State
+  const [cancelModalOrder, setCancelModalOrder] = useState(null);
+  const [selectedReason, setSelectedReason] = useState(PRESET_CANCEL_REASONS[0]);
+  const [customReasonText, setCustomReasonText] = useState('');
 
   const { data: orders = [], isLoading } = useGetOrdersQuery({
     branchId: branchFilter || undefined,
@@ -42,30 +55,51 @@ export default function AdminOrdersPage() {
 
   const { data: branches = [] } = useGetBranchesQuery();
   const [updateStatus, { isLoading: isUpdating }] = useUpdateOrderStatusMutation();
+  const [deleteOrder, { isLoading: isDeleting }] = useDeleteOrderMutation();
 
-  const handleStatusUpdate = async (id, newStatus) => {
+  const handleStatusChange = async (orderId, newStatus) => {
+    if (newStatus === 'CANCELLED') {
+      const target = orders.find((o) => o._id === orderId);
+      setCancelModalOrder(target);
+      return;
+    }
+
     try {
-      // If marking delivered, also mark payment as PAID if it was COD
-      const payload = {
-        id,
+      await updateStatus({
+        id: orderId,
         orderStatus: newStatus,
-      };
-      if (newStatus === 'DELIVERED') {
-        payload.paymentStatus = 'PAID';
-      }
-
-      await updateStatus(payload).unwrap();
-      showSuccess(`Order status updated to ${newStatus}`);
-
-      if (selectedOrder?._id === id) {
-        setSelectedOrder((prev) => ({
-          ...prev,
-          orderStatus: newStatus,
-          paymentStatus: newStatus === 'DELIVERED' ? 'PAID' : prev.paymentStatus,
-        }));
-      }
+      }).unwrap();
+      showSuccess(`Order updated to ${newStatus}`);
     } catch (err) {
       showError(err?.data?.message || 'Failed to update order status');
+    }
+  };
+
+  const handleConfirmCancellation = async () => {
+    if (!cancelModalOrder) return;
+    const finalReason = customReasonText.trim() || selectedReason;
+
+    try {
+      await updateStatus({
+        id: cancelModalOrder._id,
+        orderStatus: 'CANCELLED',
+        cancellationReason: finalReason,
+      }).unwrap();
+
+      showSuccess(`Order ${cancelModalOrder.orderNumber} cancelled.`);
+      setCancelModalOrder(null);
+      setCustomReasonText('');
+    } catch (err) {
+      showError(err?.data?.message || 'Failed to cancel order.');
+    }
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    try {
+      await deleteOrder(orderId).unwrap();
+      showSuccess('Order permanently deleted and inventory reconciled.');
+    } catch (err) {
+      showError(err?.data?.message || 'Failed to delete order.');
     }
   };
 
@@ -86,16 +120,21 @@ export default function AdminOrdersPage() {
       ),
     },
     {
-      title: 'Customer & Address',
+      title: 'Customer & Items',
       key: 'customer',
-      width: '24%',
+      width: '26%',
       render: (_, r) => (
         <div>
-          <span className="font-bold text-neutral-900 text-xs block">{r.customer?.name}</span>
-          <span className="text-[11px] text-neutral-500 font-mono block">{r.customer?.phone}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-neutral-900 text-xs">{r.customer?.name}</span>
+            <span className="text-[11px] text-neutral-500 font-mono">({r.customer?.phone})</span>
+          </div>
           <span className="text-[10px] text-neutral-400 truncate block max-w-xs" title={r.customer?.address}>
             {r.customer?.address}
           </span>
+          <div className="text-[11px] text-neutral-700 font-medium mt-1">
+            {r.items?.map((i) => `${i.quantity}x ${i.name}`).join(', ')}
+          </div>
         </div>
       ),
     },
@@ -111,60 +150,106 @@ export default function AdminOrdersPage() {
       ),
     },
     {
-      title: 'Total & Payment',
+      title: 'Bill & Payment',
       key: 'total',
       width: '16%',
-      render: (_, r) => (
-        <div>
-          <span className="font-mono font-bold text-xs text-neutral-900 block">
-            {formatPrice(r.totalAmount)}
-          </span>
-          <div className="flex gap-1 mt-0.5">
-            <Tag
-              color={r.paymentMethod === 'CARD' || r.paymentMethod === 'ONLINE' ? 'purple' : 'default'}
-              className="font-bold text-[9px] border-none"
-            >
-              {r.paymentMethod === 'CARD' || r.paymentMethod === 'ONLINE' ? 'CARD' : 'COD'}
-            </Tag>
-            <Tag
-              color={r.paymentStatus === 'PAID' ? 'green' : 'gold'}
-              className="font-bold text-[9px] border-none"
-            >
-              {r.paymentStatus}
-            </Tag>
+      render: (_, r) => {
+        const paymentColors = {
+          PAID: 'green',
+          PENDING: 'gold',
+          REFUNDED: 'purple',
+          VOID: 'default',
+        };
+
+        return (
+          <div>
+            <span className="font-mono font-bold text-xs text-neutral-900 block">
+              {formatPrice(r.totalAmount)}
+            </span>
+            <div className="flex gap-1 mt-0.5">
+              <Tag
+                color={r.paymentMethod === 'CARD' || r.paymentMethod === 'ONLINE' ? 'purple' : 'default'}
+                className="font-bold text-[9px] border-none"
+              >
+                {r.paymentMethod === 'CARD' || r.paymentMethod === 'ONLINE' ? 'CARD' : 'COD'}
+              </Tag>
+              <Tag
+                color={paymentColors[r.paymentStatus] || 'default'}
+                className="font-bold text-[9px] border-none"
+              >
+                {r.paymentStatus}
+              </Tag>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
-      title: 'Live Kitchen Status',
+      title: 'Kitchen Status',
       key: 'orderStatus',
-      width: '18%',
-      render: (_, r) => (
-        <Select
-          value={r.orderStatus}
-          onChange={(val) => handleStatusUpdate(r._id, val)}
-          className="w-full text-xs font-bold"
-          size="small"
-          options={STATUS_OPTIONS.map((st) => ({
-            value: st.value,
-            label: <Tag color={st.color} className="border-none font-bold text-[10px] m-0">{st.label}</Tag>,
-          }))}
-        />
-      ),
+      width: '20%',
+      render: (_, r) => {
+        const isLocked = r.orderStatus === 'DELIVERED' || r.orderStatus === 'CANCELLED';
+
+        if (isLocked) {
+          return (
+            <div className="space-y-0.5">
+              <Tooltip title="This order has reached its final state and cannot be modified.">
+                <Tag
+                  color={r.orderStatus === 'DELIVERED' ? 'green' : 'red'}
+                  className="font-bold text-[10px] border-none flex items-center gap-1 w-fit cursor-not-allowed m-0"
+                >
+                  <LockOutlined className="text-[9px]" />
+                  {r.orderStatus === 'DELIVERED' ? 'DELIVERED' : 'CANCELLED'}
+                </Tag>
+              </Tooltip>
+              {r.cancellationReason && (
+                <span className="text-[10px] text-rose-600 truncate block max-w-[180px]" title={r.cancellationReason}>
+                  Reason: {r.cancellationReason}
+                </span>
+              )}
+            </div>
+          );
+        }
+
+        return (
+          <Select
+            value={r.orderStatus}
+            onChange={(val) => handleStatusChange(r._id, val)}
+            className="w-full text-xs font-bold"
+            size="small"
+            options={STATUS_OPTIONS.map((st) => ({
+              value: st.value,
+              label: <Tag color={st.color} className="border-none font-bold text-[10px] m-0">{st.label}</Tag>,
+            }))}
+          />
+        );
+      },
     },
     {
       title: 'Action',
       key: 'action',
+      width: '6%',
       align: 'right',
-      width: '8%',
       render: (_, r) => (
-        <Button
-          size="small"
-          type="text"
-          icon={<EyeOutlined />}
-          onClick={() => setSelectedOrder(r)}
-        />
+        <Popconfirm
+          title="Delete Order?"
+          description="Permanently removes this test order and rebalances all linked stock."
+          icon={<QuestionCircleOutlined className="text-rose-500" />}
+          onConfirm={() => handleDeleteOrder(r._id)}
+          okText="Yes, Delete"
+          cancelText="No"
+          okButtonProps={{ danger: true, size: 'small' }}
+          cancelButtonProps={{ size: 'small' }}
+        >
+          <Button
+            type="text"
+            danger
+            size="small"
+            icon={<DeleteOutlined />}
+            className="hover:!bg-rose-50 rounded-lg"
+          />
+        </Popconfirm>
       ),
     },
   ];
@@ -173,13 +258,12 @@ export default function AdminOrdersPage() {
     <>
       {contextHolder}
       <PageLayout
-        title="Live Orders & Dispatch Feed"
-        subTitle="Manage incoming kitchen orders, advance preparation stages, and complete fulfillment"
+        title="Live Orders & Kitchen Feed"
+        subTitle="Manage incoming kitchen orders, advance delivery stages, handle cancellations, and purge test entries"
         searchValue={searchTerm}
         onSearch={setSearchTerm}
         searchPlaceholder="Search by Order ID, Customer Name, or Phone..."
       >
-        {/* Filter Bar */}
         <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Select
             className="w-full"
@@ -195,11 +279,13 @@ export default function AdminOrdersPage() {
             allowClear
             value={statusFilter || undefined}
             onChange={(val) => setStatusFilter(val || '')}
-            options={STATUS_OPTIONS}
+            options={STATUS_OPTIONS.filter((s) => s.value !== 'CANCELLED').concat({
+              value: 'CANCELLED',
+              label: 'Cancelled',
+            })}
           />
         </div>
 
-        {/* Orders Table */}
         <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm font-['Plus_Jakarta_Sans',sans-serif]">
           <Table
             columns={columns}
@@ -211,135 +297,71 @@ export default function AdminOrdersPage() {
           />
         </div>
 
-        {/* Order Details & Fast Action Modal */}
+        {/* Dedicated Cancellation Reason Modal */}
         <Modal
-          open={!!selectedOrder}
-          onCancel={() => setSelectedOrder(null)}
+          open={!!cancelModalOrder}
+          onCancel={() => setCancelModalOrder(null)}
           footer={null}
           title={null}
           centered
-          width={640}
+          width={480}
           className="font-['Plus_Jakarta_Sans',sans-serif]"
         >
-          {selectedOrder && (
+          {cancelModalOrder && (
             <div className="pt-2 pb-1">
-              <div className="flex justify-between items-start border-b border-neutral-200 pb-3 mb-3">
+              <div className="flex items-center gap-2 text-rose-600 mb-2">
+                <StopOutlined className="text-xl" />
+                <h3 className="text-base font-bold text-neutral-900 m-0">
+                  Cancel Order {cancelModalOrder.orderNumber}
+                </h3>
+              </div>
+              <p className="text-xs text-neutral-500 mb-4">
+                Cancelling will restore the ingredient inventory to the kitchen and update the customer&apos;s live tracking screen.
+              </p>
+
+              <div className="space-y-3 mb-6">
                 <div>
-                  <h3 className="text-base font-bold text-neutral-900 m-0">
-                    Order {selectedOrder.orderNumber}
-                  </h3>
-                  <span className="text-xs text-neutral-500 font-mono">
-                    Outlet: {selectedOrder.branch?.name || 'Main'} • Placed:{' '}
-                    {new Date(selectedOrder.createdAt).toLocaleTimeString()}
-                  </span>
+                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
+                    Select Standard Reason
+                  </label>
+                  <Select
+                    className="w-full"
+                    value={selectedReason}
+                    onChange={(val) => {
+                      setSelectedReason(val);
+                      setCustomReasonText('');
+                    }}
+                    options={PRESET_CANCEL_REASONS.map((r) => ({ value: r, label: r }))}
+                  />
                 </div>
-                <Tag color="blue" className="font-bold text-xs">
-                  {selectedOrder.orderStatus}
-                </Tag>
-              </div>
 
-              {/* Customer summary */}
-              <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 mb-3 text-xs">
-                <span className="font-bold text-neutral-700 uppercase tracking-wider block mb-1">
-                  Customer & Delivery Location
-                </span>
-                <div className="text-neutral-900 font-medium">
-                  {selectedOrder.customer?.name} ({selectedOrder.customer?.phone})
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
+                    Or Enter Custom Message for Customer
+                  </label>
+                  <Input.TextArea
+                    rows={2}
+                    placeholder="e.g. Extreme rain in your area; delivery paused for rider safety."
+                    value={customReasonText}
+                    onChange={(e) => setCustomReasonText(e.target.value)}
+                    className="text-xs rounded-xl"
+                  />
                 </div>
-                <div className="text-neutral-500">{selectedOrder.customer?.address}</div>
-                {selectedOrder.orderNotes && (
-                  <div className="text-amber-700 mt-1">
-                    <strong>Note:</strong> {selectedOrder.orderNotes}
-                  </div>
-                )}
               </div>
 
-              {/* Items List */}
-              <div className="space-y-2 mb-4 max-h-48 overflow-y-auto pr-1">
-                {selectedOrder.items?.map((itm, idx) => (
-                  <div
-                    key={idx}
-                    className="p-2.5 bg-white rounded-lg border border-neutral-200 flex justify-between items-center text-xs font-mono"
-                  >
-                    <div>
-                      <strong className="text-neutral-900 font-sans">{itm.name}</strong>
-                      <span className="text-neutral-400 block">Qty: {itm.quantity}</span>
-                    </div>
-                    <span className="font-bold text-neutral-900">
-                      {formatPrice(itm.itemTotal || itm.price * itm.quantity)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Status Stepper Progression Bar */}
-              <div className="p-3 bg-neutral-900 text-white rounded-xl mb-4 text-xs flex justify-between items-center">
-                <span>Current Stage:</span>
-                <span className="font-bold text-[#ffc400] uppercase tracking-wider">
-                  {selectedOrder.orderStatus}
-                </span>
-              </div>
-
-              {/* Quick Action Stage Buttons */}
-              <div className="pt-3 border-t border-neutral-200 flex flex-wrap gap-2 justify-end">
-                {selectedOrder.orderStatus === 'PENDING' && (
-                  <Button
-                    type="primary"
-                    icon={<FireOutlined />}
-                    onClick={() => handleStatusUpdate(selectedOrder._id, 'PREPARING')}
-                    className="!bg-amber-600 hover:!bg-amber-700 text-xs font-bold"
-                  >
-                    Start Cooking (PREPARING)
-                  </Button>
-                )}
-
-                {selectedOrder.orderStatus === 'PREPARING' && (
-                  <Button
-                    type="primary"
-                    icon={<CheckOutlined />}
-                    onClick={() => handleStatusUpdate(selectedOrder._id, 'READY')}
-                    className="!bg-cyan-600 hover:!bg-cyan-700 text-xs font-bold"
-                  >
-                    Food Ready (READY)
-                  </Button>
-                )}
-
-                {selectedOrder.orderStatus === 'READY' && (
-                  <Button
-                    type="primary"
-                    icon={<CarOutlined />}
-                    onClick={() => handleStatusUpdate(selectedOrder._id, 'ON_THE_WAY')}
-                    className="!bg-blue-600 hover:!bg-blue-700 text-xs font-bold"
-                  >
-                    Dispatch with Rider (ON THE WAY)
-                  </Button>
-                )}
-
-                {selectedOrder.orderStatus === 'ON_THE_WAY' && (
-                  <Button
-                    type="primary"
-                    icon={<CheckCircleOutlined />}
-                    onClick={() => handleStatusUpdate(selectedOrder._id, 'DELIVERED')}
-                    className="!bg-emerald-600 hover:!bg-emerald-700 text-xs font-bold"
-                  >
-                    Complete & Deliver Order (DELIVERED)
-                  </Button>
-                )}
-
-                {selectedOrder.orderStatus !== 'CANCELLED' && selectedOrder.orderStatus !== 'DELIVERED' && (
-                  <Popconfirm
-                    title="Cancel Order?"
-                    description="Cancelling will automatically restore raw ingredients back to inventory."
-                    onConfirm={() => handleStatusUpdate(selectedOrder._id, 'CANCELLED')}
-                    okText="Yes, Cancel"
-                    cancelText="No"
-                    okButtonProps={{ danger: true }}
-                  >
-                    <Button danger icon={<CloseCircleOutlined />} className="text-xs font-semibold">
-                      Cancel Order
-                    </Button>
-                  </Popconfirm>
-                )}
+              <div className="flex gap-2 justify-end pt-2 border-t border-neutral-100">
+                <Button onClick={() => setCancelModalOrder(null)} className="text-xs font-semibold">
+                  Keep Order
+                </Button>
+                <Button
+                  danger
+                  type="primary"
+                  loading={isUpdating}
+                  onClick={handleConfirmCancellation}
+                  className="text-xs font-bold"
+                >
+                  Confirm & Cancel Order
+                </Button>
               </div>
             </div>
           )}

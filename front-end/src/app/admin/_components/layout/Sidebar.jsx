@@ -26,6 +26,7 @@ import {
   HistoryOutlined,
   ReconciliationOutlined,
   DollarCircleOutlined,
+  EnvironmentOutlined,
 } from '@ant-design/icons';
 import { useRouter, usePathname } from 'next/navigation';
 import { usePermission } from '@/hooks/usePermission';
@@ -50,13 +51,13 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
       {
         key: '/admin/orders',
         icon: <ShoppingOutlined />,
-        label: 'Orders',
+        label: 'Live Orders Feed',
         permission: 'orders:view',
       },
       {
         key: 'products-submenu',
         icon: <AppstoreOutlined />,
-        label: 'Products',
+        label: 'Products & Menu',
         children: [
           {
             key: '/admin/products/categories',
@@ -133,7 +134,7 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
           },
           {
             key: '/admin/inventory/suppliers/analytics',
-            icon: <ShopOutlined />,
+            icon: <AuditOutlined />,
             label: 'Supplier Scorecards',
             permission: 'suppliers:view',
           },
@@ -161,9 +162,9 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
             label: 'Stock Valuation & Balance',
             permission: 'inventory:view',
           },
-                    {
+          {
             key: '/admin/inventory/batches',
-            icon: <SafetyCertificateOutlined/>,
+            icon: <SafetyCertificateOutlined />,
             label: 'Batch Lots & Expiry (FEFO)',
             permission: 'inventory:view',
           },
@@ -201,14 +202,26 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
         ],
       },
       {
-        key: '/admin/settings',
+        key: 'settings-submenu',
         icon: <SettingOutlined />,
-        label: 'Settings',
-        permission: 'settings:view',
+        label: 'Store Settings',
+        children: [
+          {
+            key: '/admin/settings/delivery-areas',
+            icon: <EnvironmentOutlined />,
+            label: 'Areas & Tax (SST)',
+            permission: 'settings:edit',
+          },
+          {
+            key: '/admin/settings',
+            icon: <SettingOutlined />,
+            label: 'General Configuration',
+            permission: 'settings:view',
+          },
+        ],
       },
     ];
 
-    // Filter menu items dynamically against active permissions
     return rawItems
       .map((item) => {
         if (item.children) {
@@ -227,9 +240,8 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
         return item;
       })
       .filter(Boolean);
-  }, [hasPermission]);
+  }, [hasPermission, alertCount]);
 
-  // Keep submenus expanded when visiting nested routes
   const getOpenKeys = () => {
     const keys = [];
     if (pathname.startsWith('/admin/products') || pathname.startsWith('/admin/categories')) {
@@ -241,6 +253,9 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
     if (pathname.startsWith('/admin/branchoperations')) {
       keys.push('branch-operations');
     }
+    if (pathname.startsWith('/admin/settings')) {
+      keys.push('settings-submenu');
+    }
     return keys;
   };
 
@@ -248,7 +263,8 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
     if (
       key === 'products-submenu' ||
       key === 'inventory-submenu' ||
-      key === 'branch-operations'
+      key === 'branch-operations' ||
+      key === 'settings-submenu'
     ) {
       return;
     }
@@ -264,8 +280,8 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
       onCollapse={(value) => setCollapsed(value)}
       width={240}
       theme="dark"
-      style={{ backgroundColor: '#000000' }}
-      className="shrink-0 select-none"
+      style={{ backgroundColor: '#000000', minHeight: '100vh' }}
+      className="shrink-0 select-none m-0 p-0"
     >
       <style jsx global>{`
         .ant-menu-dark .ant-menu-submenu-title {
@@ -292,7 +308,7 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
         items={menuItems}
         onClick={handleMenuClick}
         style={{ backgroundColor: '#000000' }}
-        className="py-4 font-medium text-sm sticky top-16"
+        className="pt-4 pb-6 font-medium text-sm border-r-0"
       />
     </Sider>
   );

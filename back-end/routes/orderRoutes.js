@@ -5,7 +5,10 @@ const { createStripePaymentIntent,
   getOrders,
   getOrderById,
   createOrder,
-  updateOrderStatus, } = require('../controllers/orderController');
+  updateOrderStatus, 
+  cancelCustomerOrder,
+  deleteOrder,
+} = require('../controllers/orderController');
 const { protect } = require('../middleware/authMiddleware');
 const { requirePermission } = require('../middleware/rbacMiddleware');
 
@@ -13,9 +16,12 @@ const { requirePermission } = require('../middleware/rbacMiddleware');
 router.post('/create-payment-intent', createStripePaymentIntent);
 router.post('/', createOrder);
 router.get('/:id', getOrderById);
+router.post('/:id/cancel-customer', cancelCustomerOrder);
 
 // Admin dashboard order management
 router.get('/', protect, requirePermission('orders:view', true), getOrders);
 router.put('/:id/status', protect, requirePermission('orders:edit', true), updateOrderStatus);
+// Add delete route with auth check
+router.delete('/:id', protect, requirePermission('orders:delete', true), deleteOrder);
 
 module.exports = router;

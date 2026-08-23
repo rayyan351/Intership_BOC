@@ -114,6 +114,22 @@ const orderSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Add to back-end/models/Order.js schema fields:
+    cancellationReason: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    cancelledBy: {
+      type: String,
+      enum: ['CUSTOMER', 'ADMIN', 'SYSTEM', 'NONE'],
+      default: 'NONE',
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['PENDING', 'PAID', 'FAILED', 'REFUNDED', 'VOID'],
+      default: 'PENDING',
+    },
   },
   { timestamps: true }
 );
