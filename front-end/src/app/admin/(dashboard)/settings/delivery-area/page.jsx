@@ -262,7 +262,8 @@ export default function DeliveryAreasAndTaxPage() {
                     className="w-full"
                     min={0}
                     max={100}
-                    addonAfter="%"
+                    formatter={(value) => `${value}%`}
+                    parser={(value) => value.replace('%', '')}
                     value={taxForm.codTaxPercentage}
                     onChange={(val) => setTaxForm({ ...taxForm, codTaxPercentage: val })}
                   />
@@ -276,7 +277,8 @@ export default function DeliveryAreasAndTaxPage() {
                     className="w-full"
                     min={0}
                     max={100}
-                    addonAfter="%"
+                    formatter={(value) => `${value}%`}
+                    parser={(value) => value.replace('%', '')}
                     value={taxForm.cardTaxPercentage}
                     onChange={(val) => setTaxForm({ ...taxForm, cardTaxPercentage: val })}
                   />

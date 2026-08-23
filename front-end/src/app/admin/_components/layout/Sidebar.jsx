@@ -207,7 +207,7 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
         label: 'Store Settings',
         children: [
           {
-            key: '/admin/settings/delivery-areas',
+            key: '/admin/settings/delivery-area',
             icon: <EnvironmentOutlined />,
             label: 'Areas & Tax (SST)',
             permission: 'settings:edit',
