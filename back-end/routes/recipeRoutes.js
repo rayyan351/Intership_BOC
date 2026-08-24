@@ -1,15 +1,25 @@
 // back-end/routes/recipeRoutes.js
 const express = require('express');
 const router = express.Router();
-const { getRecipeByProduct, upsertRecipe } = require('../controllers/recipeController');
+const {
+  getAllRecipes,
+  getRecipeByProduct,
+  saveRecipe,
+  produceSubRecipeBatch,
+  deleteRecipe,
+} = require('../controllers/recipeController');
 const { protect } = require('../middleware/authMiddleware');
 const { requirePermission } = require('../middleware/rbacMiddleware');
 
 router.use(protect);
 
 router
-  .route('/product/:productId')
-  .get(requirePermission(['recipes:view', 'products:view', 'inventory:view'], true), getRecipeByProduct)
-  .post(requirePermission(['recipes:create', 'recipes:edit', 'products:edit'], true), upsertRecipe);
+  .route('/')
+  .get(requirePermission(['recipes:view', 'products:view', 'inventory:view'], true), getAllRecipes)
+  .post(requirePermission(['recipes:create', 'recipes:edit'], true), saveRecipe);
+
+router.get('/product/:productId', requirePermission('recipes:view', true), getRecipeByProduct);
+router.post('/:id/produce-batch', requirePermission(['recipes:edit', 'inventory:adjust'], true), produceSubRecipeBatch);
+router.delete('/:id', requirePermission('recipes:delete', true), deleteRecipe);
 
 module.exports = router;

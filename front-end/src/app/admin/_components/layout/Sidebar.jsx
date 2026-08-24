@@ -23,6 +23,7 @@ import {
   DollarCircleOutlined,
   EnvironmentOutlined,
   SafetyCertificateOutlined,
+  ExperimentOutlined, // Added for Recipes & Prep
 } from '@ant-design/icons';
 import { useRouter, usePathname } from 'next/navigation';
 import { usePermission } from '@/hooks/usePermission';
@@ -84,6 +85,12 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
             icon: <GiftOutlined />,
             label: 'Deals & Bundles',
             permission: 'deals:view',
+          },
+          {
+            key: '/admin/recipes',
+            icon: <ExperimentOutlined />,
+            label: 'Recipes & Prep',
+            permission: 'recipes:view',
           },
         ],
       },
@@ -198,7 +205,11 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
 
   const getOpenKeys = () => {
     const keys = [];
-    if (pathname.startsWith('/admin/products') || pathname.startsWith('/admin/categories')) {
+    if (
+      pathname.startsWith('/admin/products') ||
+      pathname.startsWith('/admin/categories') ||
+      pathname.startsWith('/admin/recipes')
+    ) {
       keys.push('products-submenu');
     }
     if (pathname.startsWith('/admin/inventory')) {

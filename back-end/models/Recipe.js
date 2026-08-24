@@ -13,12 +13,6 @@ const recipeIngredientSchema = new mongoose.Schema(
       required: [true, 'Quantity is required'],
       min: [0.001, 'Quantity must be greater than 0'],
     },
-    yieldPercentage: {
-      type: Number,
-      default: 100, // 100% = no shrinkage (e.g. buns). 80% = 20% cooking loss (e.g. raw beef)
-      min: [1, 'Yield percentage must be at least 1%'],
-      max: [100, 'Yield percentage cannot exceed 100%'],
-    },
     unit: {
       type: String,
       required: true, // Auto-synced with inventoryItem.recipeUnit (g, ml, piece)
@@ -26,6 +20,7 @@ const recipeIngredientSchema = new mongoose.Schema(
     notes: {
       type: String,
       trim: true,
+      default: '',
     },
   },
   { _id: false }
@@ -33,16 +28,52 @@ const recipeIngredientSchema = new mongoose.Schema(
 
 const recipeSchema = new mongoose.Schema(
   {
+    type: {
+      type: String,
+      enum: ['PRODUCT_RECIPE', 'SUB_RECIPE_PREP'],
+      default: 'PRODUCT_RECIPE',
+      required: true,
+      index: true,
+    },
+    // If PRODUCT_RECIPE: linked menu product (e.g. "Beef Smash Burger")
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product',
-      required: true,
-      unique: true, // One BOM recipe per menu product
+      default: null,
+    },
+    // If SUB_RECIPE_PREP: custom name (e.g. "House Chipotle Sauce")
+    name: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    prepCategory: {
+      type: String,
+      enum: ['Sauces & Dressings', 'Marinades & Seasonings', 'Bakery & Dough', 'Sides & Extras', 'Other'],
+      default: 'Sauces & Dressings',
+    },
+    // Batch output for sub-recipes (e.g. makes 2000 g of sauce)
+    batchYieldQuantity: {
+      type: Number,
+      default: 1,
+      min: [0.001, 'Yield must be greater than 0'],
+    },
+    yieldUnit: {
+      type: String,
+      enum: ['g', 'ml', 'piece', 'portion'],
+      default: 'g',
+    },
+    // If sub-recipe creates an inventory item tracked in stock (e.g. Chipotle Sauce)
+    outputInventoryItem: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'InventoryItem',
+      default: null,
     },
     ingredients: [recipeIngredientSchema],
     preparationNotes: {
       type: String,
       trim: true,
+      default: '',
     },
     assemblyTimeMinutes: {
       type: Number,

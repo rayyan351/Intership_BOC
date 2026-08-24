@@ -191,6 +191,38 @@ export const inventoryApi = createApi({
       }),
       invalidatesTags: ['Batches', 'Inventory', 'Ledger', 'StockTransactions'],
     }),
+
+    // ---------------- RECIPES & BATCH PREP ----------------
+    getAllRecipes: builder.query({
+      query: (params) => ({
+        url: '/recipes',
+        params,
+      }),
+      providesTags: ['Recipes', 'Inventory'],
+    }),
+    saveRecipe: builder.mutation({
+      query: (body) => ({
+        url: '/recipes',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Recipes', 'Inventory'],
+    }),
+    produceSubRecipeBatch: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: `/recipes/${id}/produce-batch`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Recipes', 'Inventory', 'Ledger'],
+    }),
+    deleteRecipe: builder.mutation({
+      query: (id) => ({
+        url: `/recipes/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Recipes'],
+    }),
   }),
 });
 
@@ -223,4 +255,10 @@ export const {
   useSubmitStocktakeMutation,
   useGetStockBatchesQuery,
   useDiscardBatchMutation,
+
+  // Recipes & Batch Prep
+  useGetAllRecipesQuery,
+  useSaveRecipeMutation,
+  useProduceSubRecipeBatchMutation,
+  useDeleteRecipeMutation,
 } = inventoryApi;
