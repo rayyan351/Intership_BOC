@@ -18,8 +18,18 @@ export const inventoryApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Inventory', 'Ledger', 'Suppliers', 'StockTransactions', 'PurchaseOrders', 'Recipes', 'Stocktakes', 'Batches'],
+  tagTypes: [
+    'Inventory',
+    'Ledger',
+    'Suppliers',
+    'StockTransactions',
+    'PurchaseOrders',
+    'Recipes',
+    'Stocktakes',
+    'Batches',
+  ],
   endpoints: (builder) => ({
+    // ---------------- INVENTORY ITEMS ----------------
     getInventoryItems: builder.query({
       query: (params) => ({
         url: '/inventory',
@@ -43,6 +53,13 @@ export const inventoryApi = createApi({
       }),
       invalidatesTags: ['Inventory'],
     }),
+    deleteInventoryItem: builder.mutation({
+      query: (id) => ({
+        url: `/inventory/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Inventory', 'Ledger'],
+    }),
     adjustStock: builder.mutation({
       query: ({ id, ...body }) => ({
         url: `/inventory/${id}/adjust`,
@@ -58,7 +75,23 @@ export const inventoryApi = createApi({
       }),
       providesTags: ['Ledger'],
     }),
-    // Suppliers endpoints
+    getLowStockAlerts: builder.query({
+      query: (params) => ({
+        url: '/inventory/alerts/low-stock',
+        params,
+      }),
+      providesTags: ['Inventory', 'StockTransactions', 'PurchaseOrders'],
+    }),
+    transferStock: builder.mutation({
+      query: (body) => ({
+        url: '/inventory/transfer',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Inventory', 'Ledger', 'StockTransactions'],
+    }),
+
+    // ---------------- SUPPLIERS ----------------
     getSuppliers: builder.query({
       query: () => '/suppliers',
       providesTags: ['Suppliers'],
@@ -86,25 +119,48 @@ export const inventoryApi = createApi({
       }),
       invalidatesTags: ['Suppliers'],
     }),
-    getLowStockAlerts: builder.query({
+
+    // ---------------- PURCHASE ORDERS (PILLAR 2) ----------------
+    getPurchaseOrders: builder.query({
       query: (params) => ({
-        url: '/inventory/alerts/low-stock',
+        url: '/purchase-orders',
         params,
       }),
-      providesTags: ['Inventory', 'StockTransactions', 'PurchaseOrders'],
+      providesTags: ['PurchaseOrders'],
     }),
-    transferStock: builder.mutation({
+    createPurchaseOrder: builder.mutation({
       query: (body) => ({
-        url: '/inventory/transfer',
+        url: '/purchase-orders',
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Inventory', 'Ledger', 'StockTransactions'],
+      invalidatesTags: ['PurchaseOrders', 'Inventory'],
     }),
-    getRecipeMargins: builder.query({
-      query: () => '/inventory/analytics/recipe-margins',
-      providesTags: ['Recipes', 'Inventory', 'PurchaseOrders'],
+    receivePurchaseOrder: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: `/purchase-orders/${id}/receive`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['PurchaseOrders', 'Inventory', 'Ledger', 'Batches'],
     }),
+    updatePurchaseOrderStatus: builder.mutation({
+      query: ({ id, status }) => ({
+        url: `/purchase-orders/${id}/status`,
+        method: 'PUT',
+        body: { status },
+      }),
+      invalidatesTags: ['PurchaseOrders'],
+    }),
+    deletePurchaseOrder: builder.mutation({
+      query: (id) => ({
+        url: `/purchase-orders/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['PurchaseOrders'],
+    }),
+
+    // ---------------- AUDIT & RECONCILIATION ----------------
     getStocktakes: builder.query({
       query: (params) => ({
         url: '/inventory/stocktakes',
@@ -119,32 +175,6 @@ export const inventoryApi = createApi({
         body,
       }),
       invalidatesTags: ['Stocktakes', 'Inventory', 'Ledger', 'StockTransactions'],
-    }),
-    getAutoReorderSuggestions: builder.query({
-      query: (params) => ({
-        url: '/inventory/auto-reorder/suggestions',
-        params,
-      }),
-      providesTags: ['Inventory', 'PurchaseOrders', 'StockTransactions'],
-    }),
-    generateAutoReorderPO: builder.mutation({
-      query: (body) => ({
-        url: '/inventory/auto-reorder/generate-po',
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: ['PurchaseOrders', 'Inventory'],
-    }),
-    getStockValuationReport: builder.query({
-      query: (params) => ({
-        url: '/inventory/analytics/valuation',
-        params,
-      }),
-      providesTags: ['Inventory', 'StockTransactions', 'PurchaseOrders', 'Ledger'],
-    }),
-    getSupplierPerformanceAnalytics: builder.query({
-      query: () => '/suppliers/analytics/performance',
-      providesTags: ['Suppliers', 'PurchaseOrders', 'StockTransactions'],
     }),
     getStockBatches: builder.query({
       query: (params) => ({
@@ -165,24 +195,32 @@ export const inventoryApi = createApi({
 });
 
 export const {
+  // Inventory
   useGetInventoryItemsQuery,
   useCreateInventoryItemMutation,
   useUpdateInventoryItemMutation,
+  useDeleteInventoryItemMutation,
   useAdjustStockMutation,
   useGetStockLedgerQuery,
+  useGetLowStockAlertsQuery,
+  useTransferStockMutation,
+
+  // Suppliers
   useGetSuppliersQuery,
   useCreateSupplierMutation,
   useUpdateSupplierMutation,
   useDeleteSupplierMutation,
-  useGetLowStockAlertsQuery,
-  useTransferStockMutation,
-  useGetRecipeMarginsQuery,
+
+  // Purchase Orders
+  useGetPurchaseOrdersQuery,
+  useCreatePurchaseOrderMutation,
+  useReceivePurchaseOrderMutation,
+  useUpdatePurchaseOrderStatusMutation,
+  useDeletePurchaseOrderMutation,
+
+  // Stocktake & Batches
   useGetStocktakesQuery,
   useSubmitStocktakeMutation,
-  useGetAutoReorderSuggestionsQuery,
-  useGenerateAutoReorderPOMutation,
-  useGetStockValuationReportQuery,
-  useGetSupplierPerformanceAnalyticsQuery,
   useGetStockBatchesQuery,
   useDiscardBatchMutation,
 } = inventoryApi;

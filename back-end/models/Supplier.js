@@ -3,6 +3,13 @@ const mongoose = require('mongoose');
 
 const supplierSchema = new mongoose.Schema(
   {
+    supplierCode: {
+      type: String,
+      unique: true,
+      sparse: true,
+      uppercase: true,
+      trim: true,
+    },
     name: {
       type: String,
       required: [true, 'Supplier business name is required'],
@@ -11,11 +18,13 @@ const supplierSchema = new mongoose.Schema(
     contactPerson: {
       type: String,
       trim: true,
+      default: '',
     },
     email: {
       type: String,
       trim: true,
       lowercase: true,
+      default: '',
     },
     phone: {
       type: String,
@@ -25,10 +34,12 @@ const supplierSchema = new mongoose.Schema(
     address: {
       type: String,
       trim: true,
+      default: '',
     },
     taxNumber: {
-      type: String, // NTN / STRN in Pakistan
+      type: String,
       trim: true,
+      default: '',
     },
     paymentTerms: {
       type: String,
@@ -38,7 +49,7 @@ const supplierSchema = new mongoose.Schema(
     categoriesSupplied: [
       {
         type: String,
-        trim: true, // e.g. ['Meat', 'Packaging', 'Dairy']
+        trim: true,
       },
     ],
     isActive: {
@@ -48,5 +59,14 @@ const supplierSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Modern synchronous pre-save hook (no next parameter needed)
+supplierSchema.pre('save', function () {
+  if (!this.supplierCode && this.name) {
+    const cleanPrefix = this.name.slice(0, 4).toUpperCase().replace(/[^A-Z]/g, 'X') || 'SUP';
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    this.supplierCode = `SUP-${cleanPrefix}-${randomSuffix}`;
+  }
+});
 
 module.exports = mongoose.model('Supplier', supplierSchema);

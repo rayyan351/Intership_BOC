@@ -9,13 +9,13 @@ const branchStockSchema = new mongoose.Schema(
       required: true,
     },
     currentStock: {
-      type: Number, // Measured strictly in recipeUnit (e.g. grams, ml, pieces)
+      type: Number, // Measured in recipeUnit (e.g. grams, ml, pieces)
       default: 0,
       min: [0, 'Stock cannot be negative'],
     },
     reorderLevel: {
-      type: Number, // Minimum safety threshold before trigger alert
-      default: 500, // e.g. 500g or 20 pcs
+      type: Number, // Safety threshold for low stock alert
+      default: 500,
     },
     idealStock: {
       type: Number,
@@ -45,38 +45,37 @@ const inventoryItemSchema = new mongoose.Schema(
       enum: ['Meat', 'Dairy', 'Bakery', 'Produce', 'Sauces & Condiments', 'Packaging', 'Beverages', 'Other'],
       default: 'Other',
     },
-    // Purchasing Unit vs Kitchen Recipe Unit
     purchaseUnit: {
       type: String,
-      required: true, // e.g., 'kg', 'liter', 'carton_24', 'box_100'
+      required: true, // e.g. 'kg', 'liter', 'box'
       enum: ['kg', 'liter', 'piece', 'box', 'carton', 'pack', 'tray'],
     },
     recipeUnit: {
       type: String,
-      required: true, // e.g., 'g', 'ml', 'piece'
+      required: true, // e.g. 'g', 'ml', 'piece'
       enum: ['g', 'ml', 'piece'],
     },
     conversionFactor: {
       type: Number,
-      required: true, // 1 kg = 1000 g -> conversionFactor = 1000
+      required: true, // e.g. 1 kg = 1000 g -> 1000
       default: 1000,
+      min: [0.0001, 'Conversion factor must be greater than 0'],
     },
-    // Cost Tracking
     costPerPurchaseUnit: {
       type: Number,
       required: true,
-      min: 0, // e.g., Rs. 2,200 / kg
+      min: 0, // e.g. Rs. 2,200 / kg
     },
     costPerRecipeUnit: {
       type: Number,
       required: true,
-      min: 0, // Computed as: costPerPurchaseUnit / conversionFactor (Rs. 2.20 / gram)
+      min: 0, // Computed: costPerPurchaseUnit / conversionFactor (Rs. 2.20 / g)
     },
     primarySupplier: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Supplier',
+      default: null,
     },
-    // Multi-Branch Stock Ledger
     branchStocks: [branchStockSchema],
     isActive: {
       type: Boolean,
@@ -86,14 +85,11 @@ const inventoryItemSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Auto-compute costPerRecipeUnit prior to saving
-// ✅ Modern Mongoose hook (no next parameter needed)
+// Auto-compute costPerRecipeUnit prior to save
 inventoryItemSchema.pre('save', function () {
   if (this.conversionFactor && this.costPerPurchaseUnit !== undefined) {
     this.costPerRecipeUnit = Number((this.costPerPurchaseUnit / this.conversionFactor).toFixed(4));
   }
 });
-
-module.exports = mongoose.model('InventoryItem', inventoryItemSchema);
 
 module.exports = mongoose.model('InventoryItem', inventoryItemSchema);

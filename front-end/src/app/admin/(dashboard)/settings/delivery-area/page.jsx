@@ -2,14 +2,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Tag, Button, Modal, Input, InputNumber, Select, Switch, Row, Col, Popconfirm, Card } from 'antd';
+import { Table, Tag, Button, Modal, Input, InputNumber, Select, Switch, Row, Col, Popconfirm } from 'antd';
 import {
   EnvironmentOutlined,
-  PlusOutlined,
   PercentageOutlined,
   DeleteOutlined,
   EditOutlined,
-  SettingOutlined,
 } from '@ant-design/icons';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
 import {
@@ -219,28 +217,20 @@ export default function DeliveryAreasAndTaxPage() {
     <>
       {contextHolder}
       <PageLayout
-        title="Delivery Areas & Government Tax Settings"
-        subTitle="Map customer neighborhoods to fulfilling kitchen branches and manage SST / GST tax percentages"
+        title="Delivery Areas & SST Tax"
+        subTitle="Map customer delivery areas to kitchen outlets and configure SST tax percentages"
+        onAdd={handleOpenCreateModal}
+        addText="Add Delivery Area"
         searchValue={searchTerm}
         onSearch={setSearchTerm}
-        searchPlaceholder="Search areas, cities, or assigned kitchen outlets..."
-        actionButton={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleOpenCreateModal}
-            className="!bg-[#0f172a] hover:!bg-neutral-800 font-bold text-xs"
-          >
-            Add Delivery Area
-          </Button>
-        }
+        searchPlaceholder="Search areas, cities, or assigned outlets..."
       >
-        <Row gutter={[20, 20]}>
-          {/* LEFT: Government Tax & SST Engine Box */}
+        <Row gutter={[24, 24]}>
+          {/* LEFT: Government Tax & SST Engine Card */}
           <Col xs={24} lg={8}>
-            <div className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-sm font-['Plus_Jakarta_Sans',sans-serif] space-y-4">
-              <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-                <h3 className="text-sm font-black text-neutral-900 uppercase tracking-wider flex items-center gap-2 m-0">
+            <div className="bg-neutral-50/70 p-5 rounded-2xl border border-neutral-200 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+              <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
+                <h3 className="text-xs font-black text-neutral-900 uppercase tracking-wider flex items-center gap-1.5 m-0">
                   <PercentageOutlined className="text-amber-500" /> Government Tax (SST)
                 </h3>
                 <Switch
@@ -249,8 +239,8 @@ export default function DeliveryAreasAndTaxPage() {
                 />
               </div>
 
-              <p className="text-[11px] text-neutral-500">
-                Government imposed Sindh Sales Tax (SST). Card payments receive a lower tax rate to encourage cashless checkout.
+              <p className="text-[11px] text-neutral-500 m-0">
+                Sindh Sales Tax (SST) applied at checkout. Card payments calculate against the digital rate.
               </p>
 
               <div className="space-y-3">
@@ -289,29 +279,27 @@ export default function DeliveryAreasAndTaxPage() {
                 type="primary"
                 loading={isSavingTax}
                 onClick={handleSaveTaxSettings}
-                className="w-full !bg-[#F4C61A] hover:!bg-[#E0B210] text-black font-black uppercase tracking-wider text-xs border-none rounded-xl h-10 mt-2"
+                className="w-full !bg-[#0f172a] hover:!bg-neutral-800 text-white font-bold uppercase tracking-wider text-xs border-none rounded-xl h-10 mt-1"
               >
                 Save Tax Configuration
               </Button>
             </div>
           </Col>
 
-          {/* RIGHT: Mapped Delivery Areas Table */}
+          {/* RIGHT: Delivery Areas Table */}
           <Col xs={24} lg={16}>
-            <div className="bg-white p-5 rounded-3xl border border-neutral-200 shadow-sm font-['Plus_Jakarta_Sans',sans-serif]">
-              <Table
-                columns={columns}
-                dataSource={filteredAreas}
-                rowKey="_id"
-                loading={loadingAreas}
-                pagination={{ pageSize: 8 }}
-                size="middle"
-              />
-            </div>
+            <Table
+              columns={columns}
+              dataSource={filteredAreas}
+              rowKey="_id"
+              loading={loadingAreas}
+              pagination={{ pageSize: 7 }}
+              size="middle"
+            />
           </Col>
         </Row>
 
-        {/* Create / Edit Area Modal */}
+        {/* Create / Edit Modal */}
         <Modal
           open={isAreaModalOpen}
           onCancel={() => setIsAreaModalOpen(false)}
@@ -412,7 +400,7 @@ export default function DeliveryAreasAndTaxPage() {
                   type="primary"
                   htmlType="submit"
                   loading={isCreating || isUpdating}
-                  className="!bg-[#0f172a] text-white text-xs font-bold"
+                  className="!bg-[#ffc400] !text-black hover:!bg-[#e6b000] text-xs font-bold border-none"
                 >
                   Save Delivery Area
                 </Button>

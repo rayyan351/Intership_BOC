@@ -10,23 +10,19 @@ import {
   UnorderedListOutlined,
   AppstoreOutlined,
   TagsOutlined,
-  RiseOutlined,
   GiftOutlined,
   AuditOutlined,
-  DollarOutlined,
-  SafetyCertificateOutlined,
   LayoutOutlined,
   PictureOutlined,
   ShopOutlined,
   BankOutlined,
   SettingOutlined,
   TeamOutlined,
-  ThunderboltOutlined,
   InboxOutlined,
-  HistoryOutlined,
   ReconciliationOutlined,
   DollarCircleOutlined,
   EnvironmentOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { useRouter, usePathname } from 'next/navigation';
 import { usePermission } from '@/hooks/usePermission';
@@ -96,7 +92,7 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
         icon: <InboxOutlined />,
         label: (
           <div className="flex items-center justify-between w-full pr-2">
-            <span>Inventory & Stock</span>
+            <span>Inventory</span>
             {alertCount > 0 && (
               <Badge
                 count={alertCount}
@@ -111,61 +107,19 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
           {
             key: '/admin/inventory',
             icon: <ReconciliationOutlined />,
-            label: 'Raw Materials & Stock',
+            label: 'Stock & Items',
             permission: 'inventory:view',
           },
           {
-            key: '/admin/inventory/ledger',
-            icon: <HistoryOutlined />,
-            label: 'Stock Audit Ledger',
-            permission: 'inventory:view',
-          },
-          {
-            key: '/admin/inventory/margins',
-            icon: <RiseOutlined />,
-            label: 'Profitability & COGS',
-            permission: 'inventory:view',
-          },
-          {
-            key: '/admin/inventory/suppliers',
-            icon: <ShopOutlined />,
-            label: 'Vendors & Suppliers',
-            permission: 'suppliers:view',
-          },
-          {
-            key: '/admin/inventory/suppliers/analytics',
-            icon: <AuditOutlined />,
-            label: 'Supplier Scorecards',
-            permission: 'suppliers:view',
-          },
-          {
-            key: '/admin/inventory/purchase-orders',
+            key: '/admin/inventory/purchasing',
             icon: <DollarCircleOutlined />,
-            label: 'Purchase Orders',
+            label: 'Purchasing & Vendors',
             permission: 'purchase_orders:view',
           },
           {
             key: '/admin/inventory/stocktake',
             icon: <AuditOutlined />,
-            label: 'Stocktake & Audit',
-            permission: 'inventory:view',
-          },
-          {
-            key: '/admin/inventory/auto-reorder',
-            icon: <ThunderboltOutlined />,
-            label: 'Auto Reorder Engine',
-            permission: 'purchase_orders:create',
-          },
-          {
-            key: '/admin/inventory/valuation',
-            icon: <DollarOutlined />,
-            label: 'Stock Valuation & Balance',
-            permission: 'inventory:view',
-          },
-          {
-            key: '/admin/inventory/batches',
-            icon: <SafetyCertificateOutlined />,
-            label: 'Batch Lots & Expiry (FEFO)',
+            label: 'Audit & Reconciliation',
             permission: 'inventory:view',
           },
         ],
@@ -207,7 +161,7 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
         label: 'Store Settings',
         children: [
           {
-            key: '/admin/settings/delivery-area',
+            key: '/admin/settings/delivery-areas',
             icon: <EnvironmentOutlined />,
             label: 'Areas & Tax (SST)',
             permission: 'settings:edit',

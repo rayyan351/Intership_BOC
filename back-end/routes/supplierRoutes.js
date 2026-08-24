@@ -7,9 +7,7 @@ const {
   updateSupplier,
   deleteSupplier,
 } = require('../controllers/supplierController');
-const {
-  getSupplierPerformanceAnalytics,
-} = require('../controllers/supplierAnalyticsController');
+
 const { protect } = require('../middleware/authMiddleware');
 const { requirePermission } = require('../middleware/rbacMiddleware');
 
@@ -22,11 +20,5 @@ router.route('/')
 router.route('/:id')
   .put(requirePermission('suppliers:edit'), updateSupplier)
   .delete(requirePermission('suppliers:delete'), deleteSupplier);
-
-router.get(
-  '/analytics/performance',
-  requirePermission(['suppliers:view', 'purchase_orders:view'], true),
-  getSupplierPerformanceAnalytics
-);  
 
 module.exports = router;

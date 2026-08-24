@@ -4,42 +4,93 @@ const InventoryItem = require('../models/InventoryItem');
 const StockTransaction = require('../models/StockTransaction');
 const Branch = require('../models/Branch');
 
-// @desc    Get all inventory items with branch stock details
+// @desc    Get all inventory items with computed valuation & stock health metrics
 // @route   GET /api/inventory
 // @access  Private (inventory:view)
 const getInventoryItems = async (req, res) => {
   try {
-    const { category, branchId, lowStockOnly } = req.query;
+    const { category, branchId, lowStockOnly, search } = req.query;
     const filter = { isActive: true };
 
-    if (category) {
+    if (category && category !== 'ALL') {
       filter.category = category;
     }
 
-    let items = await InventoryItem.find(filter)
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const rawItems = await InventoryItem.find(filter)
       .populate('primarySupplier', 'name phone email paymentTerms')
       .populate('branchStocks.branch', 'name city branchCode')
       .sort({ name: 1 });
 
-    // Filter by branch or low stock if requested
-    if (branchId) {
-      items = items.map((item) => {
-        const itemObj = item.toObject();
-        itemObj.branchStocks = itemObj.branchStocks.filter(
+    let totalValuation = 0;
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+
+    const formattedItems = rawItems.map((item) => {
+      let filteredBranchStocks = item.branchStocks || [];
+
+      if (branchId) {
+        filteredBranchStocks = filteredBranchStocks.filter(
           (bs) => bs.branch?._id?.toString() === branchId || bs.branch?.toString() === branchId
         );
-        return itemObj;
-      });
-    }
+      }
 
-    if (lowStockOnly === 'true') {
-      items = items.filter((item) =>
-        item.branchStocks.some((bs) => bs.currentStock <= bs.reorderLevel)
-      );
-    }
+      const totalStock = filteredBranchStocks.reduce((acc, bs) => acc + (bs.currentStock || 0), 0);
+      const totalReorderThreshold = filteredBranchStocks.reduce((acc, bs) => acc + (bs.reorderLevel || 0), 0);
+      const itemValuation = Number((totalStock * (item.costPerRecipeUnit || 0)).toFixed(2));
 
-    res.status(200).json(items);
+      totalValuation += itemValuation;
+
+      let stockStatus = 'IN_STOCK';
+      if (totalStock === 0) {
+        stockStatus = 'OUT_OF_STOCK';
+        outOfStockCount++;
+      } else if (totalStock <= totalReorderThreshold) {
+        stockStatus = 'LOW_STOCK';
+        lowStockCount++;
+      }
+
+      return {
+        _id: item._id,
+        name: item.name,
+        sku: item.sku,
+        category: item.category,
+        purchaseUnit: item.purchaseUnit,
+        recipeUnit: item.recipeUnit,
+        conversionFactor: item.conversionFactor,
+        costPerPurchaseUnit: item.costPerPurchaseUnit,
+        costPerRecipeUnit: item.costPerRecipeUnit,
+        primarySupplier: item.primarySupplier,
+        branchStocks: filteredBranchStocks,
+        totalStock,
+        totalReorderThreshold,
+        stockStatus,
+        itemValuation,
+        updatedAt: item.updatedAt,
+      };
+    });
+
+    const finalItems = lowStockOnly === 'true'
+      ? formattedItems.filter((i) => i.stockStatus === 'LOW_STOCK' || i.stockStatus === 'OUT_OF_STOCK')
+      : formattedItems;
+
+    res.status(200).json({
+      metrics: {
+        totalItemsCount: formattedItems.length,
+        totalValuation: Math.round(totalValuation),
+        lowStockItemsCount: lowStockCount,
+        outOfStockCount,
+      },
+      items: finalItems,
+    });
   } catch (error) {
+    console.error('Fetch Inventory Error:', error);
     res.status(500).json({ message: 'Error fetching inventory items', error: error.message });
   }
 };
@@ -71,21 +122,20 @@ const createInventoryItem = async (req, res) => {
       return res.status(400).json({ message: `Item with SKU "${cleanSku}" already exists.` });
     }
 
-    // Safely retrieve branches
     let allBranches = [];
     try {
-      allBranches = await Branch.find({});
+      allBranches = await Branch.find({ isActive: { $ne: false } });
     } catch (e) {
       console.warn('Branch collection lookup notice:', e.message);
     }
 
     const branchStocks = (allBranches || []).map((branch) => {
       const customConfig = initialStocks?.find(
-        (s) => s.branchId?.toString() === branch._id.toString()
+        (s) => s.branchId?.toString() === branch._id.toString() || s.branch?.toString() === branch._id.toString()
       );
       return {
         branch: branch._id,
-        currentStock: Number(customConfig?.initialStock) || 0,
+        currentStock: Number(customConfig?.initialStock || customConfig?.currentStock) || 0,
         reorderLevel: Number(customConfig?.reorderLevel) || 500,
         idealStock: Number(customConfig?.idealStock) || 5000,
       };
@@ -95,7 +145,6 @@ const createInventoryItem = async (req, res) => {
     const parsedCost = Number(costPerPurchaseUnit) >= 0 ? Number(costPerPurchaseUnit) : 0;
     const computedRecipeCost = Number((parsedCost / parsedFactor).toFixed(4));
 
-    // Handle primarySupplier cleanly (null if empty or unassigned)
     let validSupplierId = null;
     if (
       primarySupplier &&
@@ -121,7 +170,7 @@ const createInventoryItem = async (req, res) => {
 
     const savedItem = await newItem.save();
 
-    // Safely log opening transaction only if initial stock > 0 and user is authenticated
+    // Safely record opening stock ledger transactions
     if (req.user?._id && branchStocks.length > 0) {
       const transactionRecords = [];
       branchStocks.forEach((bs) => {
@@ -145,14 +194,14 @@ const createInventoryItem = async (req, res) => {
         try {
           await StockTransaction.insertMany(transactionRecords);
         } catch (txErr) {
-          console.warn('Initial stock ledger warning (item still created):', txErr.message);
+          console.warn('Initial stock ledger warning:', txErr.message);
         }
       }
     }
 
     res.status(201).json(savedItem);
   } catch (error) {
-    console.error('SERVER CRASH LOG [createInventoryItem]:', error);
+    console.error('Create Inventory Item Error:', error);
     res.status(500).json({ message: error.message || 'Error creating inventory item' });
   }
 };
@@ -199,8 +248,9 @@ const updateInventoryItem = async (req, res) => {
 
     if (Array.isArray(branchStocks)) {
       branchStocks.forEach((incoming) => {
+        const branchId = incoming.branch?._id || incoming.branch;
         const existingStockIndex = item.branchStocks.findIndex(
-          (bs) => bs.branch.toString() === incoming.branch?.toString()
+          (bs) => bs.branch.toString() === branchId?.toString()
         );
         if (existingStockIndex !== -1) {
           if (incoming.reorderLevel !== undefined) {
@@ -221,7 +271,7 @@ const updateInventoryItem = async (req, res) => {
   }
 };
 
-// @desc    Record an audited stock adjustment (Inward, Spoilage, Physical Audit)
+// @desc    Record an audited stock adjustment (Inward, Physical Count Reconcile, Correction)
 // @route   POST /api/inventory/:id/adjust
 // @access  Private (inventory:adjust)
 const adjustStock = async (req, res) => {
@@ -283,7 +333,7 @@ const adjustStock = async (req, res) => {
       newStock,
       unitCostAtTime: item.costPerRecipeUnit,
       totalMonetaryValue: Math.abs(delta) * item.costPerRecipeUnit,
-      performedBy: req.user._id,
+      performedBy: req.user?._id || null,
       notes: notes || `Manual stock adjustment (${type})`,
     });
 
@@ -301,6 +351,22 @@ const adjustStock = async (req, res) => {
     await session.abortTransaction();
     session.endSession();
     res.status(500).json({ message: 'Stock adjustment transaction failed', error: error.message });
+  }
+};
+
+// @desc    Soft-delete an inventory item
+// @route   DELETE /api/inventory/:id
+// @access  Private (inventory:delete)
+const deleteInventoryItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const item = await InventoryItem.findByIdAndUpdate(id, { isActive: false }, { new: true });
+    if (!item) {
+      return res.status(404).json({ message: 'Inventory item not found.' });
+    }
+    res.status(200).json({ message: `Item "${item.name}" removed from active inventory.` });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete inventory item', error: error.message });
   }
 };
 
@@ -381,7 +447,7 @@ const logKitchenWastage = async (req, res) => {
       newStock,
       unitCostAtTime: item.costPerRecipeUnit,
       totalMonetaryValue: totalLostValue,
-      performedBy: req.user._id,
+      performedBy: req.user?._id || null,
       notes: `Kitchen Wastage (${reason || 'Standard Spoilage'}): ${notes || 'No extra notes'}`,
     });
 
@@ -408,8 +474,8 @@ const logKitchenWastage = async (req, res) => {
 const getLowStockAlerts = async (req, res) => {
   try {
     const { branchId } = req.query;
-
     const filter = { isActive: true };
+
     const items = await InventoryItem.find(filter)
       .populate('branchStocks.branch', 'name city branchCode')
       .populate('primarySupplier', 'name phone email paymentTerms')
@@ -485,7 +551,6 @@ const transferStockBetweenBranches = async (req, res) => {
       return res.status(404).json({ message: 'Inventory item not found.' });
     }
 
-    // 1. Validate Source Branch Stock
     let sourceStock = item.branchStocks.find((bs) => bs.branch.toString() === sourceBranchId.toString());
     const availableQty = sourceStock?.currentStock || 0;
     const transferQty = Number(quantity);
@@ -498,7 +563,6 @@ const transferStockBetweenBranches = async (req, res) => {
       });
     }
 
-    // 2. Locate or initialize Target Branch Stock
     let targetStock = item.branchStocks.find((bs) => bs.branch.toString() === targetBranchId.toString());
     if (!targetStock) {
       item.branchStocks.push({
@@ -510,7 +574,6 @@ const transferStockBetweenBranches = async (req, res) => {
       targetStock = item.branchStocks[item.branchStocks.length - 1];
     }
 
-    // 3. Update Balances
     const srcPrev = sourceStock.currentStock;
     const srcNew = srcPrev - transferQty;
     sourceStock.currentStock = srcNew;
@@ -521,7 +584,6 @@ const transferStockBetweenBranches = async (req, res) => {
 
     await item.save({ session });
 
-    // 4. Create Immutable Ledger Entries for both sides of transfer
     const monetaryVal = Number((transferQty * (item.costPerRecipeUnit || 0)).toFixed(2));
 
     const sourceLedger = new StockTransaction({
@@ -533,7 +595,7 @@ const transferStockBetweenBranches = async (req, res) => {
       newStock: srcNew,
       unitCostAtTime: item.costPerRecipeUnit || 0,
       totalMonetaryValue: monetaryVal,
-      performedBy: req.user._id,
+      performedBy: req.user?._id || null,
       notes: `Transfer OUT to target outlet. Notes: ${notes || 'Standard STO'}`,
     });
 
@@ -546,7 +608,7 @@ const transferStockBetweenBranches = async (req, res) => {
       newStock: tgtNew,
       unitCostAtTime: item.costPerRecipeUnit || 0,
       totalMonetaryValue: monetaryVal,
-      performedBy: req.user._id,
+      performedBy: req.user?._id || null,
       notes: `Transfer IN from source outlet. Notes: ${notes || 'Standard STO'}`,
     });
 
@@ -571,6 +633,7 @@ module.exports = {
   createInventoryItem,
   updateInventoryItem,
   adjustStock,
+  deleteInventoryItem,
   getStockLedger,
   logKitchenWastage,
   getLowStockAlerts,
