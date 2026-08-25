@@ -4,13 +4,14 @@ const Order = require('../models/Order');
 const axios = require('axios');
 const Branch = require('../models/Branch');
 const StockTransaction = require('../models/StockTransaction');
+const { resolveOptimalBranchAndETA } = require('../utils/branchRoutingEngine');
 const {
   validateStockAvailability,
   depleteInventoryForOrder,
   restoreInventoryForOrder,
 } = require('../services/inventoryDepletionService');
 
-// @desc    Initiate Local Payment Session (Safepay / 1LINK / Raast Sandbox)
+// @desc    Initiate Safepay Transaction Session
 // @route   POST /api/orders/create-payment-intent
 // @access  Public
 const createStripePaymentIntent = async (req, res) => {
@@ -59,6 +60,7 @@ const createStripePaymentIntent = async (req, res) => {
     });
   }
 };
+
 // @desc    Get all orders with filtering
 // @route   GET /api/orders
 // @access  Private (orders:view)
@@ -113,9 +115,9 @@ const getOrderById = async (req, res) => {
   }
 };
 
-// @desc    Create new order & atomically deplete kitchen raw inventory (FEFO + Yield)
+// @desc    Create new order with Automated Nearest Branch Routing & Kitchen Stock Depletion
 // @route   POST /api/orders
-// @access  Public / Private (POS / Storefront)
+// @access  Public / Storefront
 const createOrder = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -141,62 +143,42 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: 'Order must contain at least one item.' });
     }
 
-    if (!branch) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ message: 'Branch outlet selection is required.' });
-    }
-
     if (!customer?.name || !customer?.phone || !customer?.address) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ message: 'Customer name, phone, and delivery address are required.' });
     }
 
+    // 1. Auto-Resolve Kitchen Outlet (if not explicitly provided or invalid)
     let resolvedBranchId = null;
     if (typeof branch === 'string' && mongoose.Types.ObjectId.isValid(branch)) {
       resolvedBranchId = branch;
     } else if (branch?._id && mongoose.Types.ObjectId.isValid(branch._id)) {
       resolvedBranchId = branch._id;
     } else {
-      const lookupTerm = branch?.name || branch?.id || (typeof branch === 'string' ? branch : '');
-      let matchedBranch = null;
+      // Auto-resolve closest active branch based on customer city
+      const customerCity = customer.city || (customer.address?.includes('Lahore') ? 'Lahore' : customer.address?.includes('Islamabad') ? 'Islamabad' : 'Karachi');
+      const { branch: optimalBranch } = await resolveOptimalBranchAndETA({
+        city: customerCity,
+      });
 
-      if (lookupTerm) {
-        matchedBranch = await Branch.findOne({
-          $or: [
-            { name: { $regex: new RegExp(`^${lookupTerm}$`, 'i') } },
-            { branchCode: { $regex: new RegExp(`^${lookupTerm}$`, 'i') } },
-          ],
-        }).session(session);
+      if (optimalBranch) {
+        resolvedBranchId = optimalBranch._id;
       }
+    }
 
-      if (matchedBranch) {
-        resolvedBranchId = matchedBranch._id;
-      } else {
-        let fallbackBranch = await Branch.findOne({ isActive: { $ne: false } }).session(session);
-        if (!fallbackBranch) {
-          fallbackBranch = new Branch({
-            name: branch?.name || 'Main Kitchen Outlet',
-            city: branch?.city || 'Karachi',
-            branchCode: branch?.id || 'MAIN-01',
-            address: branch?.address || 'Karachi Main',
-            phone: branch?.phone || '021-111-432-532',
-            isActive: true,
-          });
-          await fallbackBranch.save({ session });
-        }
-        resolvedBranchId = fallbackBranch._id;
-      }
+    if (!resolvedBranchId) {
+      const fallback = await Branch.findOne({ isShown: { $ne: false } }).session(session);
+      resolvedBranchId = fallback ? fallback._id : null;
     }
 
     if (!resolvedBranchId) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ message: 'Could not resolve a valid branch outlet in the database.' });
+      return res.status(400).json({ message: 'No active kitchen outlet found to fulfill this order.' });
     }
 
-    // 1. Validate ingredient availability before order placement
+    // 2. Atomically validate raw kitchen ingredient availability
     await validateStockAvailability({
       orderItems: items,
       branchId: resolvedBranchId,
@@ -226,11 +208,21 @@ const createOrder = async (req, res) => {
     const isDirectPaid = paymentMethod === 'CARD';
     const isBankTransfer = paymentMethod === 'BANK_TRANSFER' || paymentMethod === 'RAAST';
 
+    const { branch: optimalBranch, dynamicETA, distanceKm } = await resolveOptimalBranchAndETA({
+      city: customer.city || 'Karachi',
+      areaLat: customer.latitude || null,
+      areaLon: customer.longitude || null,
+    });
+
+    const targetBranchId = resolvedBranchId || optimalBranch?._id;
+
     const newOrder = new Order({
       orderNumber,
       customer,
-      branch: resolvedBranchId,
+      branch: targetBranchId,
       orderType: orderType || 'DELIVERY',
+      distanceKm: distanceKm || null,
+      estimatedDeliveryMinutes: dynamicETA || 35,
       items: formattedItems,
       subtotal: Number(subtotal),
       tax: Number(tax) || 0,
@@ -244,9 +236,10 @@ const createOrder = async (req, res) => {
       inventoryDepleted: true,
     });
 
+
     const savedOrder = await newOrder.save({ session });
 
-    // 2. Deplete raw inventory ingredients
+    // 3. Atomically deplete raw ingredients
     await depleteInventoryForOrder({
       orderItems: items,
       branchId: resolvedBranchId,

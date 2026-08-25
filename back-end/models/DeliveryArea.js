@@ -5,18 +5,28 @@ const deliveryAreaSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, 'Area name is required'],
+      required: [true, 'Area / Neighborhood name is required'],
       trim: true,
     },
     city: {
       type: String,
       required: true,
       default: 'Karachi',
+      index: true,
     },
+    // Made optional so the system can auto-resolve dynamically based on proximity & kitchen queue load
     assignedBranch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch',
-      required: [true, 'Every area must be mapped to a fulfilling kitchen branch'],
+      default: null,
+    },
+    latitude: {
+      type: Number,
+      default: null,
+    },
+    longitude: {
+      type: Number,
+      default: null,
     },
     deliveryFee: {
       type: Number,
@@ -30,9 +40,10 @@ const deliveryAreaSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
+      index: true,
     },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model('DeliveryArea', deliveryAreaSchema);
+module.exports = mongoose.models.DeliveryArea || mongoose.model('DeliveryArea', deliveryAreaSchema);

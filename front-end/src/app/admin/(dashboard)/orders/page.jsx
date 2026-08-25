@@ -2,12 +2,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Tag, Select, Button, Modal, Tooltip, Input, Popconfirm, Space } from 'antd';
+import { Table, Tag, Select, Button, Modal, Tooltip, Input, Popconfirm } from 'antd';
 import {
   LockOutlined,
   StopOutlined,
   DeleteOutlined,
   QuestionCircleOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
 import {
@@ -42,7 +43,6 @@ export default function AdminOrdersPage() {
   const [branchFilter, setBranchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  // Cancellation Modal State
   const [cancelModalOrder, setCancelModalOrder] = useState(null);
   const [selectedReason, setSelectedReason] = useState(PRESET_CANCEL_REASONS[0]);
   const [customReasonText, setCustomReasonText] = useState('');
@@ -55,7 +55,7 @@ export default function AdminOrdersPage() {
 
   const { data: branches = [] } = useGetBranchesQuery();
   const [updateStatus, { isLoading: isUpdating }] = useUpdateOrderStatusMutation();
-  const [deleteOrder, { isLoading: isDeleting }] = useDeleteOrderMutation();
+  const [deleteOrder] = useDeleteOrderMutation();
 
   const handleStatusChange = async (orderId, newStatus) => {
     if (newStatus === 'CANCELLED') {
@@ -139,20 +139,32 @@ export default function AdminOrdersPage() {
       ),
     },
     {
-      title: 'Kitchen Outlet',
+      title: 'Kitchen & Transit ETA',
       dataIndex: 'branch',
       key: 'branch',
-      width: '14%',
-      render: (b) => (
-        <span className="text-xs font-semibold text-neutral-700">
-          {b?.name ? `${b.name} (${b.city})` : 'Main Outlet'}
-        </span>
+      width: '16%',
+      render: (b, r) => (
+        <div>
+          <span className="text-xs font-semibold text-neutral-800 block">
+            📍 {b?.name ? `${b.name} (${b.city})` : 'Main Outlet'}
+          </span>
+          <div className="flex items-center gap-1 mt-0.5">
+            <Tag color="gold" className="text-[9px] font-mono font-bold border-none m-0">
+              <ThunderboltOutlined /> ~{r.estimatedDeliveryMinutes || 30} mins
+            </Tag>
+            {r.distanceKm && (
+              <span className="text-[10px] text-neutral-400 font-mono font-medium">
+                ({r.distanceKm} km)
+              </span>
+            )}
+          </div>
+        </div>
       ),
     },
     {
       title: 'Bill & Payment',
       key: 'total',
-      width: '16%',
+      width: '14%',
       render: (_, r) => {
         const paymentColors = {
           PAID: 'green',
@@ -259,7 +271,7 @@ export default function AdminOrdersPage() {
       {contextHolder}
       <PageLayout
         title="Live Orders & Kitchen Feed"
-        subTitle="Manage incoming kitchen orders, advance delivery stages, handle cancellations, and purge test entries"
+        subTitle="Manage incoming kitchen orders, inspect dynamic transit metrics, advance delivery stages, and handle cancellations"
         searchValue={searchTerm}
         onSearch={setSearchTerm}
         searchPlaceholder="Search by Order ID, Customer Name, or Phone..."
@@ -297,7 +309,7 @@ export default function AdminOrdersPage() {
           />
         </div>
 
-        {/* Dedicated Cancellation Reason Modal */}
+        {/* Cancellation Reason Modal */}
         <Modal
           open={!!cancelModalOrder}
           onCancel={() => setCancelModalOrder(null)}

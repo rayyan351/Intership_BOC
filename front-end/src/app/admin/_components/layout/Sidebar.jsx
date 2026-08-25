@@ -139,7 +139,7 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
           },
         ],
       },
-      {
+    {
         key: 'settings-submenu',
         icon: <SettingOutlined />,
         label: 'Store Settings',
@@ -151,7 +151,7 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
             allowed: hasPermission('banners:view'),
           },
           {
-            key: '/admin/settings/delivery-area',
+            key: '/admin/settings/delivery-areas',
             icon: <EnvironmentOutlined />,
             label: 'Areas & Tax (SST)',
             allowed: hasPermission('settings:edit'),

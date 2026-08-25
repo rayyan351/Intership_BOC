@@ -1,7 +1,7 @@
 // src/app/(site)/track-order/page.jsx
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -27,6 +27,9 @@ function TrackOrderContent() {
   const [cancelReason, setCancelReason] = useState('Placed by mistake');
   const [remainingSeconds, setRemainingSeconds] = useState(0);
 
+  // Delivery Arrival ETA Countdown state
+  const [etaTimeLeft, setEtaTimeLeft] = useState({ minutes: 0, seconds: 0, isLate: false });
+
   useEffect(() => {
     if (initialId) {
       setInputVal(initialId);
@@ -40,12 +43,12 @@ function TrackOrderContent() {
     isError,
   } = useTrackOrderQuery(activeQueryId, {
     skip: !activeQueryId,
-    pollingInterval: 8000,
+    pollingInterval: 6000,
   });
 
   const [cancelOrder, { isLoading: isCancelling }] = useCancelCustomerOrderMutation();
 
-  // 5-Minute Cancellation Timer Countdown
+  // 1. 5-Minute Grace Cancellation Timer
   useEffect(() => {
     if (!order || order.orderStatus !== 'PENDING') {
       setRemainingSeconds(0);
@@ -60,6 +63,32 @@ function TrackOrderContent() {
 
     calculateRemaining();
     const interval = setInterval(calculateRemaining, 1000);
+    return () => clearInterval(interval);
+  }, [order]);
+
+  // 2. Live Dynamic ETA Delivery Arrival Countdown
+  useEffect(() => {
+    if (!order || order.orderStatus === 'DELIVERED' || order.orderStatus === 'CANCELLED') {
+      return;
+    }
+
+    const durationMinutes = order.estimatedDeliveryMinutes || 35;
+    const targetTimestamp = new Date(order.createdAt).getTime() + durationMinutes * 60 * 1000;
+
+    const calculateEta = () => {
+      const difference = targetTimestamp - Date.now();
+
+      if (difference <= 0) {
+        setEtaTimeLeft({ minutes: 0, seconds: 0, isLate: true });
+      } else {
+        const minutes = Math.floor((difference / 1000 / 60) % 60);
+        const seconds = Math.floor((difference / 1000) % 60);
+        setEtaTimeLeft({ minutes, seconds, isLate: false });
+      }
+    };
+
+    calculateEta();
+    const interval = setInterval(calculateEta, 1000);
     return () => clearInterval(interval);
   }, [order]);
 
@@ -92,6 +121,7 @@ function TrackOrderContent() {
 
   const currentStageIdx = getStageIndex(order?.orderStatus);
   const isCancelled = order?.orderStatus === 'CANCELLED';
+  const isDelivered = order?.orderStatus === 'DELIVERED';
   const canCancel = order?.orderStatus === 'PENDING' && remainingSeconds > 0;
 
   const formatTimer = (sec) => {
@@ -128,7 +158,7 @@ function TrackOrderContent() {
             />
             <button
               type="submit"
-              className="bg-[#F4C61A] hover:bg-[#E0B210] text-black font-black px-6 py-3 rounded-xl shadow-sm transition transform active:scale-98 uppercase tracking-wider text-xs whitespace-nowrap"
+              className="bg-[#F4C61A] hover:bg-[#E0B210] text-black font-black px-6 py-3 rounded-xl shadow-sm transition transform active:scale-98 uppercase tracking-wider text-xs whitespace-nowrap cursor-pointer"
             >
               Track Order
             </button>
@@ -164,6 +194,35 @@ function TrackOrderContent() {
 
         {order && (
           <div className="space-y-6">
+            {/* Live Delivery Arrival Countdown Card */}
+            {!isCancelled && !isDelivered && (
+              <div className="p-6 sm:p-7 rounded-3xl bg-neutral-900 text-white border border-neutral-800 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <span className="w-12 h-12 rounded-2xl bg-[#F4C61A] text-black text-2xl flex items-center justify-center font-bold shrink-0">
+                    🛵
+                  </span>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[#F4C61A] block">
+                      Live Delivery Arrival ETA
+                    </span>
+                    <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-wide m-0">
+                      {etaTimeLeft.isLate ? 'Rider Arriving Any Second' : 'Estimated Time Remaining'}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="bg-neutral-800 px-5 py-2.5 rounded-2xl border border-neutral-700 text-center min-w-[140px]">
+                  {etaTimeLeft.isLate ? (
+                    <span className="text-xs font-black uppercase text-amber-400">At Your Door</span>
+                  ) : (
+                    <div className="font-mono text-2xl sm:text-3xl font-black text-[#F4C61A]">
+                      {String(etaTimeLeft.minutes).padStart(2, '0')}:{String(etaTimeLeft.seconds).padStart(2, '0')}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Stepper / Cancellation Card */}
             <div className="p-6 sm:p-8 rounded-3xl bg-white border border-neutral-200 shadow-sm">
               <div className="flex flex-wrap justify-between items-start gap-4 pb-6 border-b border-neutral-100 mb-8">
@@ -177,7 +236,7 @@ function TrackOrderContent() {
                 </div>
                 <div className="text-right">
                   <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
-                    Fulfilling Outlet
+                    Fulfilling Kitchen Outlet
                   </span>
                   <span className="text-xs sm:text-sm font-bold text-neutral-800">
                     {order.branch?.name || 'Main Outlet'} ({order.branch?.city || 'Karachi'})
@@ -185,7 +244,6 @@ function TrackOrderContent() {
                 </div>
               </div>
 
-              {/* 🛡️ REFINED CUSTOMER-FACING CANCELLATION NOTICE */}
               {isCancelled ? (
                 <div className="p-6 sm:p-8 rounded-3xl bg-neutral-950 text-white border border-neutral-800 text-center space-y-3">
                   <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-2xl flex items-center justify-center mx-auto">
@@ -202,7 +260,6 @@ function TrackOrderContent() {
                     </p>
                   </div>
 
-                  {/* Customer Notice Reason Box */}
                   {order.cancellationReason && (
                     <div className="p-3.5 bg-neutral-900 rounded-2xl border border-neutral-800 max-w-md mx-auto text-left">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[#F4C61A] block mb-0.5">
@@ -277,7 +334,7 @@ function TrackOrderContent() {
                   </div>
                   <button
                     onClick={() => setShowCancelModal(true)}
-                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold px-4 py-2 rounded-xl text-xs uppercase tracking-wider transition"
+                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold px-4 py-2 rounded-xl text-xs uppercase tracking-wider transition cursor-pointer"
                   >
                     Cancel Order
                   </button>
@@ -353,7 +410,9 @@ function TrackOrderContent() {
                   </div>
                   <div className="flex justify-between text-neutral-500">
                     <span>Delivery Fee:</span>
-                    <span className="text-emerald-600 font-bold uppercase text-[10px]">Free</span>
+                    <span className="text-emerald-600 font-bold uppercase text-[10px]">
+                      {order.deliveryFee === 0 ? 'Free' : formatPrice(order.deliveryFee)}
+                    </span>
                   </div>
                   <div className="flex justify-between text-base font-black text-black pt-2 border-t border-neutral-200">
                     <span className="font-sans uppercase">Total:</span>
@@ -394,7 +453,7 @@ function TrackOrderContent() {
                 <button
                   type="button"
                   onClick={() => setShowCancelModal(false)}
-                  className="px-5 py-2.5 rounded-xl border border-neutral-200 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
+                  className="px-5 py-2.5 rounded-xl border border-neutral-200 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition cursor-pointer"
                 >
                   Keep Order
                 </button>
@@ -402,7 +461,7 @@ function TrackOrderContent() {
                   type="button"
                   disabled={isCancelling}
                   onClick={handleExecuteCancellation}
-                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition disabled:opacity-60"
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition disabled:opacity-60 cursor-pointer"
                 >
                   {isCancelling ? 'Cancelling...' : 'Confirm Cancellation'}
                 </button>

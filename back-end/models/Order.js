@@ -53,6 +53,8 @@ const orderSchema = new mongoose.Schema(
       email: { type: String, trim: true },
       address: { type: String, required: true },
       landmark: { type: String },
+      latitude: { type: Number, default: null },
+      longitude: { type: Number, default: null },
     },
     branch: {
       type: mongoose.Schema.Types.ObjectId,
@@ -64,6 +66,14 @@ const orderSchema = new mongoose.Schema(
       type: String,
       enum: ['DELIVERY', 'TAKEAWAY', 'DINE_IN'],
       default: 'DELIVERY',
+    },
+    distanceKm: {
+      type: Number,
+      default: null,
+    },
+    estimatedDeliveryMinutes: {
+      type: Number,
+      default: 35,
     },
     items: [orderItemSchema],
     subtotal: {
@@ -88,12 +98,12 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['COD', 'CARD', 'ONLINE'],
+      enum: ['COD', 'CARD', 'ONLINE', 'BANK_TRANSFER'],
       default: 'COD',
     },
     paymentStatus: {
       type: String,
-      enum: ['PENDING', 'PAID', 'FAILED', 'REFUNDED'],
+      enum: ['PENDING', 'PAID', 'FAILED', 'REFUNDED', 'VOID', 'AWAITING_CONFIRMATION'],
       default: 'PENDING',
     },
     stripePaymentIntentId: {
@@ -114,7 +124,6 @@ const orderSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    // Add to back-end/models/Order.js schema fields:
     cancellationReason: {
       type: String,
       default: '',
@@ -125,13 +134,8 @@ const orderSchema = new mongoose.Schema(
       enum: ['CUSTOMER', 'ADMIN', 'SYSTEM', 'NONE'],
       default: 'NONE',
     },
-    paymentStatus: {
-      type: String,
-      enum: ['PENDING', 'PAID', 'FAILED', 'REFUNDED', 'VOID'],
-      default: 'PENDING',
-    },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model('Order', orderSchema);
+module.exports = mongoose.models.Order || mongoose.model('Order', orderSchema);

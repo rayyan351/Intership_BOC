@@ -1,6 +1,9 @@
+// src/redux/store.js
 import { configureStore } from '@reduxjs/toolkit';
 import cartReducer from './cart/cartSlice';
-import { authApi } from '@/services/authApi'; // Adjust import path if needed
+import locationReducer from './location/locationSlice';
+
+import { authApi } from '@/services/authApi';
 import { productApi } from '@/services/productApi';
 import { categoryApi } from '@/services/categoryApi';
 import { dealApi } from '@/services/dealApi';
@@ -21,44 +24,42 @@ import { deliveryAreaApi } from '@/services/deliveryAreaApi';
 export const store = configureStore({
   reducer: {
     cart: cartReducer,
-    // 1. Add the RTK Query API reducer dynamically using its reducerPath
+    location: locationReducer,
     [authApi.reducerPath]: authApi.reducer,
     [productApi.reducerPath]: productApi.reducer,
     [categoryApi.reducerPath]: categoryApi.reducer,
     [dealApi.reducerPath]: dealApi.reducer,
     [sectionApi.reducerPath]: sectionApi.reducer,
-    [dealCategoryApi.reducerPath]:dealCategoryApi.reducer,
-    [menuApi.reducerPath]:menuApi.reducer,
-    [orderApi.reducerPath]:orderApi.reducer,
-    [bannerApi.reducerPath]:bannerApi.reducer,
-    [settingApi.reducerPath]:settingApi.reducer,
-    [branchApi.reducerPath]:branchApi.reducer,
-    [staffApi.reducerPath]:staffApi.reducer,
-    [roleApi.reducerPath]:roleApi.reducer,
-    [inventoryApi.reducerPath]:inventoryApi.reducer,
-    [recipeApi.reducerPath]:recipeApi.reducer,
-    [purchaseOrderApi.reducerPath]:purchaseOrderApi.reducer,
-    [orderApi.reducerPath]:orderApi.reducer,
-    [deliveryAreaApi.reducerPath]:deliveryAreaApi.reducer,
+    [dealCategoryApi.reducerPath]: dealCategoryApi.reducer,
+    [menuApi.reducerPath]: menuApi.reducer,
+    [orderApi.reducerPath]: orderApi.reducer,
+    [bannerApi.reducerPath]: bannerApi.reducer,
+    [settingApi.reducerPath]: settingApi.reducer,
+    [branchApi.reducerPath]: branchApi.reducer,
+    [staffApi.reducerPath]: staffApi.reducer,
+    [roleApi.reducerPath]: roleApi.reducer,
+    [inventoryApi.reducerPath]: inventoryApi.reducer,
+    [recipeApi.reducerPath]: recipeApi.reducer,
+    [purchaseOrderApi.reducerPath]: purchaseOrderApi.reducer,
+    [deliveryAreaApi.reducerPath]: deliveryAreaApi.reducer,
   },
-  // 2. Add the RTK Query middleware for caching, invalidation, and polling support
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware()
-     .concat(authApi.middleware)
-     .concat(productApi.middleware)
-     .concat(categoryApi.middleware)
-     .concat(dealApi.middleware)
-     .concat(sectionApi.middleware)
-     .concat(dealCategoryApi.middleware)
-     .concat(menuApi.middleware)
-     .concat(bannerApi.middleware)
-     .concat(settingApi.middleware)
-     .concat(branchApi.middleware)
-     .concat(staffApi.middleware)
-     .concat(roleApi.middleware)
-     .concat(inventoryApi.middleware)
-     .concat(recipeApi.middleware)
-     .concat(purchaseOrderApi.middleware)
-     .concat(orderApi.middleware)
-     .concat(deliveryAreaApi.middleware),
+      .concat(authApi.middleware)
+      .concat(productApi.middleware)
+      .concat(categoryApi.middleware)
+      .concat(dealApi.middleware)
+      .concat(sectionApi.middleware)
+      .concat(dealCategoryApi.middleware)
+      .concat(menuApi.middleware)
+      .concat(bannerApi.middleware)
+      .concat(settingApi.middleware)
+      .concat(branchApi.middleware)
+      .concat(staffApi.middleware)
+      .concat(roleApi.middleware)
+      .concat(inventoryApi.middleware)
+      .concat(recipeApi.middleware)
+      .concat(purchaseOrderApi.middleware)
+      .concat(orderApi.middleware)
+      .concat(deliveryAreaApi.middleware),
 });
