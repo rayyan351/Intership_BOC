@@ -30,6 +30,10 @@
 
 html {
   font-size: 16px;
+}
+
+/* src/app/globals.css */
+html[data-scroll-behavior="smooth"] {
   scroll-behavior: smooth;
 }
 

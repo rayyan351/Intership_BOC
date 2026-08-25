@@ -7,12 +7,9 @@ import { Layout, Menu, Badge } from 'antd';
 import {
   DashboardOutlined,
   ShoppingOutlined,
-  UnorderedListOutlined,
   AppstoreOutlined,
   TagsOutlined,
-  GiftOutlined,
   AuditOutlined,
-  LayoutOutlined,
   PictureOutlined,
   ShopOutlined,
   BankOutlined,
@@ -23,7 +20,8 @@ import {
   DollarCircleOutlined,
   EnvironmentOutlined,
   SafetyCertificateOutlined,
-  ExperimentOutlined, // Added for Recipes & Prep
+  ExperimentOutlined,
+  FolderOpenOutlined,
 } from '@ant-design/icons';
 import { useRouter, usePathname } from 'next/navigation';
 import { usePermission } from '@/hooks/usePermission';
@@ -43,13 +41,13 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
         key: '/admin/dashboard',
         icon: <DashboardOutlined />,
         label: 'Dashboard',
-        permission: 'dashboard:view',
+        allowed: hasPermission('dashboard:view'),
       },
       {
         key: '/admin/orders',
         icon: <ShoppingOutlined />,
         label: 'Live Orders Feed',
-        permission: 'orders:view',
+        allowed: hasPermission('orders:view'),
       },
       {
         key: 'products-submenu',
@@ -57,40 +55,25 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
         label: 'Products & Menu',
         children: [
           {
+            key: '/admin/products',
+            icon: <FolderOpenOutlined />,
+            label: 'Menu Catalog',
+            allowed: hasPermission('products:view') || hasPermission('deals:view'),
+          },
+          {
             key: '/admin/products/categories',
             icon: <TagsOutlined />,
-            label: 'Categories',
-            permission: 'categories:view',
-          },
-          {
-            key: '/admin/products/dealcategories',
-            icon: <TagsOutlined />,
-            label: 'Deal Categories',
-            permission: 'dealcategories:view',
-          },
-          {
-            key: '/admin/products/sections',
-            icon: <LayoutOutlined />,
-            label: 'Display Sections',
-            permission: 'sections:view',
-          },
-          {
-            key: '/admin/products/allproducts',
-            icon: <UnorderedListOutlined />,
-            label: 'All Products',
-            permission: 'products:view',
-          },
-          {
-            key: '/admin/products/deals',
-            icon: <GiftOutlined />,
-            label: 'Deals & Bundles',
-            permission: 'deals:view',
+            label: 'Categories & Sections',
+            allowed:
+              hasPermission('categories:view') ||
+              hasPermission('dealcategories:view') ||
+              hasPermission('sections:view'),
           },
           {
             key: '/admin/recipes',
             icon: <ExperimentOutlined />,
             label: 'Recipes & Prep',
-            permission: 'recipes:view',
+            allowed: hasPermission('recipes:view'),
           },
         ],
       },
@@ -115,27 +98,21 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
             key: '/admin/inventory',
             icon: <ReconciliationOutlined />,
             label: 'Stock & Items',
-            permission: 'inventory:view',
+            allowed: hasPermission('inventory:view'),
           },
           {
             key: '/admin/inventory/purchasing',
             icon: <DollarCircleOutlined />,
             label: 'Purchasing & Vendors',
-            permission: 'purchase_orders:view',
+            allowed: hasPermission('purchase_orders:view'),
           },
           {
             key: '/admin/inventory/stocktake',
             icon: <AuditOutlined />,
             label: 'Audit & Reconciliation',
-            permission: 'inventory:view',
+            allowed: hasPermission('inventory:view'),
           },
         ],
-      },
-      {
-        key: '/admin/banners',
-        icon: <PictureOutlined />,
-        label: 'Hero Banners',
-        permission: 'banners:view',
       },
       {
         key: 'branch-operations',
@@ -146,19 +123,19 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
             key: '/admin/branchoperations/locations',
             icon: <ShopOutlined />,
             label: 'Store Outlets',
-            permission: 'locations:view',
+            allowed: hasPermission('locations:view'),
           },
           {
             key: '/admin/branchoperations/roles',
             icon: <SafetyCertificateOutlined />,
             label: 'Roles & Matrix',
-            permission: 'roles:view',
+            allowed: hasPermission('roles:view'),
           },
           {
             key: '/admin/branchoperations/staff',
             icon: <TeamOutlined />,
             label: 'Staff & Accounts',
-            permission: 'staff:view',
+            allowed: hasPermission('staff:view'),
           },
         ],
       },
@@ -168,37 +145,46 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
         label: 'Store Settings',
         children: [
           {
-            key: '/admin/settings/delivery-areas',
+            key: '/admin/settings/banners',
+            icon: <PictureOutlined />,
+            label: 'Hero Banners',
+            allowed: hasPermission('banners:view'),
+          },
+          {
+            key: '/admin/settings/delivery-area',
             icon: <EnvironmentOutlined />,
             label: 'Areas & Tax (SST)',
-            permission: 'settings:edit',
+            allowed: hasPermission('settings:edit'),
           },
           {
             key: '/admin/settings',
             icon: <SettingOutlined />,
             label: 'General Configuration',
-            permission: 'settings:view',
+            allowed: hasPermission('settings:view'),
           },
         ],
       },
     ];
 
+    // Cleanly strips out custom permission flags so Ant Design doesn't forward them to HTML <li> tags
     return rawItems
       .map((item) => {
         if (item.children) {
-          const visibleChildren = item.children.filter((child) =>
-            child.permission ? hasPermission(child.permission) : true
-          );
+          const visibleChildren = item.children
+            .filter((child) => (child.allowed !== undefined ? child.allowed : true))
+            .map(({ allowed, ...cleanChild }) => cleanChild);
 
           if (visibleChildren.length === 0) return null;
-          return { ...item, children: visibleChildren };
+          const { allowed, ...cleanItem } = item;
+          return { ...cleanItem, children: visibleChildren };
         }
 
-        if (item.permission && !hasPermission(item.permission)) {
+        if (item.allowed === false) {
           return null;
         }
 
-        return item;
+        const { allowed, ...cleanItem } = item;
+        return cleanItem;
       })
       .filter(Boolean);
   }, [hasPermission, alertCount]);
@@ -207,7 +193,6 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
     const keys = [];
     if (
       pathname.startsWith('/admin/products') ||
-      pathname.startsWith('/admin/categories') ||
       pathname.startsWith('/admin/recipes')
     ) {
       keys.push('products-submenu');
@@ -223,6 +208,22 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
     }
     return keys;
   };
+
+  // Precise highlight matching: Specific sub-routes are checked before general prefix paths
+  const activeSelectedKey = useMemo(() => {
+    if (pathname.startsWith('/admin/products/categories')) return '/admin/products/categories';
+    if (pathname === '/admin/products' || pathname.startsWith('/admin/products/')) return '/admin/products';
+    if (pathname.startsWith('/admin/recipes')) return '/admin/recipes';
+    if (pathname.startsWith('/admin/inventory/purchasing')) return '/admin/inventory/purchasing';
+    if (pathname.startsWith('/admin/inventory/stocktake')) return '/admin/inventory/stocktake';
+    if (pathname.startsWith('/admin/inventory')) return '/admin/inventory';
+    if (pathname.startsWith('/admin/branchoperations/locations')) return '/admin/branchoperations/locations';
+    if (pathname.startsWith('/admin/branchoperations/roles')) return '/admin/branchoperations/roles';
+    if (pathname.startsWith('/admin/branchoperations/staff')) return '/admin/branchoperations/staff';
+    if (pathname.startsWith('/admin/settings/delivery-areas')) return '/admin/settings/delivery-areas';
+    if (pathname.startsWith('/admin/settings')) return '/admin/settings';
+    return pathname;
+  }, [pathname]);
 
   const handleMenuClick = ({ key }) => {
     if (
@@ -268,7 +269,7 @@ export default function AdminSidebar({ collapsed, setCollapsed }) {
       <Menu
         mode="inline"
         theme="dark"
-        selectedKeys={[pathname]}
+        selectedKeys={[activeSelectedKey]}
         defaultOpenKeys={getOpenKeys()}
         items={menuItems}
         onClick={handleMenuClick}

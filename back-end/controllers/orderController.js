@@ -1,6 +1,7 @@
 // back-end/controllers/orderController.js
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
+const axios = require('axios');
 const Branch = require('../models/Branch');
 const StockTransaction = require('../models/StockTransaction');
 const {
@@ -9,45 +10,55 @@ const {
   restoreInventoryForOrder,
 } = require('../services/inventoryDepletionService');
 
-// Safe Stripe initialization for free test mode
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? require('stripe')(process.env.STRIPE_SECRET_KEY)
-  : null;
-
-// @desc    Create Stripe PaymentIntent for Card Checkout (Free Sandbox / Test Mode)
+// @desc    Initiate Local Payment Session (Safepay / 1LINK / Raast Sandbox)
 // @route   POST /api/orders/create-payment-intent
 // @access  Public
 const createStripePaymentIntent = async (req, res) => {
   try {
-    const { amount, currency = 'pkr' } = req.body;
+    const { amount, currency = 'PKR' } = req.body;
+    const apiKey = process.env.SAFEPAY_API_KEY;
 
-    if (!stripe) {
-      // Mock client secret fallback if running locally without keys
-      return res.status(200).json({
-        clientSecret: `mock_pi_secret_${Date.now()}`,
-        paymentIntentId: `pi_mock_${Date.now()}`,
-        isMock: true,
+    if (!apiKey) {
+      return res.status(400).json({
+        message: 'SAFEPAY_API_KEY is not configured in backend environment.',
       });
     }
 
-    // Stripe processes smallest currency subunit (paisa / cents)
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(Number(amount) * 100),
-      currency: currency.toLowerCase(),
-      payment_method_types: ['card'],
-      metadata: { integration_check: 'burger_oclock_checkout' },
-    });
+    const response = await axios.post(
+      'https://sandbox.api.getsafepay.com/order/v1/init',
+      {
+        client: apiKey,
+        amount: Math.round(Number(amount)),
+        currency: currency.toUpperCase(),
+        environment: 'sandbox',
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+      }
+    );
+
+    const trackerToken = response.data?.data?.token;
+
+    if (!trackerToken) {
+      return res.status(500).json({ message: 'Safepay token generation failed' });
+    }
 
     res.status(200).json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
+      success: true,
+      token: trackerToken,
+      paymentIntentId: trackerToken,
     });
   } catch (error) {
-    console.error('Stripe Intent Error:', error);
-    res.status(500).json({ message: 'Failed to initialize payment session', error: error.message });
+    console.error('Safepay Backend Error:', error?.response?.data || error.message);
+    res.status(500).json({
+      message: 'Failed to initialize Safepay transaction',
+      error: error?.response?.data || error.message,
+    });
   }
 };
-
 // @desc    Get all orders with filtering
 // @route   GET /api/orders
 // @access  Private (orders:view)
@@ -120,7 +131,7 @@ const createOrder = async (req, res) => {
       deliveryFee,
       totalAmount,
       paymentMethod,
-      stripePaymentIntentId,
+      transactionReference,
       orderNotes,
     } = req.body;
 
@@ -142,9 +153,7 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: 'Customer name, phone, and delivery address are required.' });
     }
 
-    // --- 🛡️ ROBUST BRANCH RESOLUTION ---
     let resolvedBranchId = null;
-
     if (typeof branch === 'string' && mongoose.Types.ObjectId.isValid(branch)) {
       resolvedBranchId = branch;
     } else if (branch?._id && mongoose.Types.ObjectId.isValid(branch._id)) {
@@ -187,14 +196,13 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: 'Could not resolve a valid branch outlet in the database.' });
     }
 
-    // 1. Guard Check: Pre-validate kitchen raw materials availability
+    // 1. Validate ingredient availability before order placement
     await validateStockAvailability({
       orderItems: items,
       branchId: resolvedBranchId,
       session,
     });
 
-    // 2. Generate clean tracking ID: BOC-YYYYMMDD-XXXX
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const orderNumber = `BOC-${dateStr}-${randomSuffix}`;
@@ -215,7 +223,8 @@ const createOrder = async (req, res) => {
       };
     });
 
-    const isCardPaid = paymentMethod === 'CARD' || paymentMethod === 'ONLINE';
+    const isDirectPaid = paymentMethod === 'CARD';
+    const isBankTransfer = paymentMethod === 'BANK_TRANSFER' || paymentMethod === 'RAAST';
 
     const newOrder = new Order({
       orderNumber,
@@ -228,8 +237,8 @@ const createOrder = async (req, res) => {
       deliveryFee: Number(deliveryFee) || 0,
       totalAmount: Number(totalAmount),
       paymentMethod: paymentMethod || 'COD',
-      paymentStatus: isCardPaid ? 'PAID' : 'PENDING',
-      stripePaymentIntentId: stripePaymentIntentId || null,
+      paymentStatus: isDirectPaid ? 'PAID' : isBankTransfer ? 'AWAITING_CONFIRMATION' : 'PENDING',
+      stripePaymentIntentId: transactionReference || null,
       orderStatus: 'PENDING',
       orderNotes: orderNotes || '',
       inventoryDepleted: true,
@@ -237,7 +246,7 @@ const createOrder = async (req, res) => {
 
     const savedOrder = await newOrder.save({ session });
 
-    // 3. Atomically deplete raw materials via FEFO batch engine & yield formulas
+    // 2. Deplete raw inventory ingredients
     await depleteInventoryForOrder({
       orderItems: items,
       branchId: resolvedBranchId,
@@ -266,7 +275,7 @@ const createOrder = async (req, res) => {
   }
 };
 
-// @desc    Update order status (with auto payment settlement, cancellation reason & stock rollback)
+// @desc    Update order status
 // @route   PUT /api/orders/:id/status
 // @access  Private (orders:edit)
 const updateOrderStatus = async (req, res) => {
@@ -286,7 +295,6 @@ const updateOrderStatus = async (req, res) => {
 
     const previousStatus = order.orderStatus;
 
-    // Terminal Status Lock: already completed or cancelled orders cannot be modified
     if (previousStatus === 'DELIVERED' || previousStatus === 'CANCELLED') {
       await session.abortTransaction();
       session.endSession();
@@ -297,16 +305,13 @@ const updateOrderStatus = async (req, res) => {
 
     if (orderStatus) order.orderStatus = orderStatus;
 
-    // Auto-resolve payment status based on new order state
     if (orderStatus === 'DELIVERED') {
       order.paymentStatus = 'PAID';
     } else if (orderStatus === 'CANCELLED') {
       order.cancellationReason = cancellationReason || 'Order cancelled by restaurant manager.';
       order.cancelledBy = 'ADMIN';
-      // If card was paid, mark REFUNDED; if unpaid/COD, mark VOID
       order.paymentStatus = order.paymentStatus === 'PAID' ? 'REFUNDED' : 'VOID';
 
-      // Restore raw ingredients back to inventory
       if (order.inventoryDepleted) {
         await restoreInventoryForOrder({
           orderItems: order.items,
@@ -334,7 +339,7 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
-// @desc    Customer self-service order cancellation (5-min window & PENDING only)
+// @desc    Customer self-service order cancellation
 // @route   POST /api/orders/:id/cancel-customer
 // @access  Public
 const cancelCustomerOrder = async (req, res) => {
@@ -407,7 +412,7 @@ const cancelCustomerOrder = async (req, res) => {
   }
 };
 
-// @desc    Delete/Purge order (Safely restores inventory if active, deletes order document)
+// @desc    Delete/Purge order
 // @route   DELETE /api/orders/:id
 // @access  Private (orders:delete / Super Admin)
 const deleteOrder = async (req, res) => {
@@ -424,7 +429,6 @@ const deleteOrder = async (req, res) => {
       return res.status(404).json({ message: 'Order not found.' });
     }
 
-    // If order was active and had depleted inventory, restore stock before deleting
     if (order.inventoryDepleted && order.orderStatus !== 'DELIVERED' && order.orderStatus !== 'CANCELLED') {
       await restoreInventoryForOrder({
         orderItems: order.items,
@@ -435,7 +439,6 @@ const deleteOrder = async (req, res) => {
       });
     }
 
-    // Clean up or adjust linked stock transactions
     await StockTransaction.deleteMany({
       notes: { $regex: order.orderNumber, $options: 'i' },
     }).session(session);

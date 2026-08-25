@@ -1,8 +1,12 @@
 // back-end/services/inventoryDepletionService.js
+const mongoose = require('mongoose');
 const Recipe = require('../models/Recipe');
 const InventoryItem = require('../models/InventoryItem');
 const StockTransaction = require('../models/StockTransaction');
 const StockBatch = require('../models/StockBatch');
+
+// Prevent Mongoose StrictPopulateError globally in this service
+mongoose.set('strictPopulate', false);
 
 /**
  * Pre-validates if branch has sufficient raw ingredients before committing the order.
@@ -19,7 +23,10 @@ const validateStockAvailability = async ({ orderItems, branchId, session }) => {
     if (!productId) continue;
 
     const recipe = await Recipe.findOne({ product: productId, isActive: { $ne: false } })
-      .populate('ingredients.inventoryItem')
+      .populate({
+        path: 'ingredients.inventoryItem',
+        strictPopulate: false,
+      })
       .session(session);
 
     if (!recipe) continue;
@@ -48,7 +55,7 @@ const validateStockAvailability = async ({ orderItems, branchId, session }) => {
       }
     }
 
-    // 2. Accumulate Customization / Add-on Ingredients (if sent from cart)
+    // 2. Accumulate Customization / Add-on Ingredients (if present)
     const customizations = lineItem.customizations || [];
     if (Array.isArray(customizations) && customizations.length > 0 && recipe.customizationRules) {
       for (const mod of customizations) {
@@ -134,13 +141,14 @@ const depleteInventoryForOrder = async ({
     if (!productId) continue;
 
     const recipe = await Recipe.findOne({ product: productId, isActive: { $ne: false } })
-      .populate('ingredients.inventoryItem')
-      .populate('customizationRules.additionalIngredients.inventoryItem')
+      .populate({
+        path: 'ingredients.inventoryItem',
+        strictPopulate: false,
+      })
       .session(session);
 
     if (!recipe) continue;
 
-    // Collect base ingredients + customizations into raw requirements array
     const rawReqs = [];
 
     if (recipe.ingredients) {
@@ -223,7 +231,7 @@ const depleteInventoryForOrder = async ({
       status: 'ACTIVE',
       remainingQuantity: { $gt: 0 },
     })
-      .sort({ expiryDate: 1 }) // FEFO ordering
+      .sort({ expiryDate: 1 })
       .session(session);
 
     for (const batch of activeBatches) {
@@ -277,7 +285,10 @@ const restoreInventoryForOrder = async ({
     const orderedQty = Number(lineItem.quantity) || 1;
 
     const recipe = await Recipe.findOne({ product: productId })
-      .populate('ingredients.inventoryItem')
+      .populate({
+        path: 'ingredients.inventoryItem',
+        strictPopulate: false,
+      })
       .session(session);
 
     if (!recipe) continue;

@@ -1,7 +1,7 @@
 // src/app/(site)/checkout/page.jsx
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -17,12 +17,11 @@ export default function CheckoutPage() {
   const dispatch = useDispatch();
   const { items, totalPrice } = useSelector((state) => state.cart);
 
-  // Queries for dynamic areas & government tax
   const { data: deliveryAreas = [] } = useGetDeliveryAreasQuery({ activeOnly: 'true' });
   const { data: settings } = useGetSystemSettingsQuery();
 
   const [createOrder, { isLoading: isPlacingOrder }] = useCreateOrderMutation();
-  const [createPaymentIntent] = useCreatePaymentIntentMutation();
+  const [createPaymentIntent, { isLoading: isInitiatingPayment }] = useCreatePaymentIntentMutation();
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -32,18 +31,22 @@ export default function CheckoutPage() {
     selectedAreaId: '',
     address: '',
     notes: '',
-    paymentMethod: 'COD', // 'COD' or 'CARD'
+    paymentMethod: 'COD', // 'COD' | 'CARD' | 'BANK_TRANSFER'
+    transactionRef: '',
   });
 
   const [errorMessage, setErrorMessage] = useState('');
   const [placedOrder, setPlacedOrder] = useState(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  // Filter areas by city
+  const activePopupRef = useRef(null);
+  const currentTrackerRef = useRef(null);
+  const isOrderSubmittedRef = useRef(false);
+
   const cityAreas = useMemo(() => {
     return deliveryAreas.filter((a) => a.city?.toLowerCase() === formData.city?.toLowerCase());
   }, [deliveryAreas, formData.city]);
 
-  // Selected Area details (Auto-resolves fulfilling branch & delivery fee)
   const selectedAreaObj = useMemo(() => {
     return deliveryAreas.find((a) => a._id === formData.selectedAreaId);
   }, [deliveryAreas, formData.selectedAreaId]);
@@ -52,10 +55,10 @@ export default function CheckoutPage() {
   const deliveryFee = selectedAreaObj?.deliveryFee || 0;
   const subtotal = Number(totalPrice) || 0;
 
-  // Real-time Dynamic Tax Calculation (e.g. 15% on COD, 13% on Card)
   const taxConfig = settings?.taxSettings || { codTaxPercentage: 15, cardTaxPercentage: 13, isTaxEnabled: true };
+  const isCard = formData.paymentMethod === 'CARD';
   const activeTaxRate = taxConfig.isTaxEnabled
-    ? formData.paymentMethod === 'CARD'
+    ? isCard
       ? taxConfig.cardTaxPercentage
       : taxConfig.codTaxPercentage
     : 0;
@@ -67,6 +70,94 @@ export default function CheckoutPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setErrorMessage('');
   };
+
+  const executeOrderPlacement = async (transactionReference = null) => {
+    if (isOrderSubmittedRef.current) return;
+    isOrderSubmittedRef.current = true;
+
+    const formattedItems = items.map((itm) => ({
+      product: itm.productId || itm._id || itm.id,
+      name: itm.name,
+      price: Number(itm.price),
+      quantity: Number(itm.quantity),
+      customizations: itm.customizations || [],
+      itemTotal: Number(itm.price) * Number(itm.quantity),
+      image: itm.image || '',
+    }));
+
+    const payload = {
+      customer: {
+        name: formData.fullName,
+        phone: formData.phone,
+        email: formData.email,
+        address: `${formData.address}, ${selectedAreaObj.name}, ${formData.city}`,
+      },
+      branch: assignedKitchenBranch._id,
+      orderType: 'DELIVERY',
+      items: formattedItems,
+      subtotal,
+      tax: taxAmount,
+      deliveryFee,
+      totalAmount: finalTotal,
+      paymentMethod: formData.paymentMethod,
+      transactionReference,
+      orderNotes: formData.notes,
+    };
+
+    try {
+      const res = await createOrder(payload).unwrap();
+      dispatch(clearCart());
+      setPlacedOrder(res.order || res);
+    } catch (err) {
+      isOrderSubmittedRef.current = false;
+      if (err?.data?.shortages) {
+        setErrorMessage(
+          `Kitchen Out of Stock: ${err.data.shortages
+            .map((s) => `${s.ingredient} (short by ${s.shortage} ${s.unit})`)
+            .join(', ')}`
+        );
+      } else {
+        setErrorMessage(err?.data?.message || 'Failed to finalize order in database.');
+      }
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // 🛡️ Listen to Safepay PostMessage Events & Auto-Close Popup
+  useEffect(() => {
+    const handleSafepayMessage = async (event) => {
+      // Safepay origins
+      if (!event.origin.includes('getsafepay.com')) return;
+
+      let eventData = event.data;
+      if (typeof eventData === 'string') {
+        try {
+          eventData = JSON.parse(eventData);
+        } catch {
+          // not json
+        }
+      }
+
+      const msgType = eventData?.MessageType || eventData?.type || eventData?.event;
+      const isSuccess =
+        msgType === 'profile.completed' ||
+        msgType === 'payment.completed' ||
+        msgType === 'transaction.success' ||
+        eventData?.Status === true ||
+        eventData?.status === 'success';
+
+      if (isSuccess && currentTrackerRef.current && !isOrderSubmittedRef.current) {
+        if (activePopupRef.current && !activePopupRef.current.closed) {
+          activePopupRef.current.close();
+        }
+        await executeOrderPlacement(currentTrackerRef.current);
+      }
+    };
+
+    window.addEventListener('message', handleSafepayMessage);
+    return () => window.removeEventListener('message', handleSafepayMessage);
+  }, [items, finalTotal, formData, selectedAreaObj, assignedKitchenBranch]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -82,51 +173,66 @@ export default function CheckoutPage() {
       return;
     }
 
-    try {
-      let stripePaymentIntentId = null;
+    if (formData.paymentMethod === 'BANK_TRANSFER' && !formData.transactionRef.trim()) {
+      setErrorMessage('Please provide your 6-digit Raast/Bank transaction reference number.');
+      return;
+    }
 
+    try {
       if (formData.paymentMethod === 'CARD') {
+        setIsProcessingPayment(true);
+
         const intentRes = await createPaymentIntent({
           amount: finalTotal,
           currency: 'PKR',
+          paymentMethod: 'CARD',
         }).unwrap();
-        stripePaymentIntentId = intentRes.paymentIntentId || 'MOCK_STRIPE_TEST_ID';
+
+        const tracker = intentRes.token || intentRes.paymentIntentId;
+
+        if (!tracker) {
+          setErrorMessage('Could not generate payment authorization tracker.');
+          setIsProcessingPayment(false);
+          return;
+        }
+
+        currentTrackerRef.current = tracker;
+        isOrderSubmittedRef.current = false;
+
+        const width = 460;
+        const height = 680;
+        const left = window.screen.width / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
+
+        const safepayUrl = `https://sandbox.api.getsafepay.com/checkout/pay?beacon=${tracker}&env=sandbox`;
+        const popup = window.open(
+          safepayUrl,
+          'Safepay Checkout',
+          `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=no`
+        );
+
+        activePopupRef.current = popup;
+
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+          setErrorMessage('Popup blocked! Please allow popups for this site to complete card payment.');
+          setIsProcessingPayment(false);
+          return;
+        }
+
+        // Fallback: If customer finishes and manually closes the popup window
+        const checkCloseInterval = setInterval(async () => {
+          if (!popup || popup.closed) {
+            clearInterval(checkCloseInterval);
+            if (!isOrderSubmittedRef.current && currentTrackerRef.current) {
+              await executeOrderPlacement(currentTrackerRef.current);
+            }
+          }
+        }, 800);
+      } else {
+        await executeOrderPlacement(formData.transactionRef || null);
       }
-
-      const formattedItems = items.map((itm) => ({
-        product: itm.productId || itm._id || itm.id,
-        name: itm.name,
-        price: Number(itm.price),
-        quantity: Number(itm.quantity),
-        customizations: itm.customizations || [],
-        itemTotal: Number(itm.price) * Number(itm.quantity),
-        image: itm.image || '',
-      }));
-
-      const payload = {
-        customer: {
-          name: formData.fullName,
-          phone: formData.phone,
-          email: formData.email,
-          address: `${formData.address}, ${selectedAreaObj.name}, ${formData.city}`,
-        },
-        branch: assignedKitchenBranch._id, // ✅ Auto-mapped nearest branch
-        orderType: 'DELIVERY',
-        items: formattedItems,
-        subtotal,
-        tax: taxAmount,
-        deliveryFee,
-        totalAmount: finalTotal,
-        paymentMethod: formData.paymentMethod,
-        stripePaymentIntentId,
-        orderNotes: formData.notes,
-      };
-
-      const res = await createOrder(payload).unwrap();
-
-      dispatch(clearCart());
-      setPlacedOrder(res.order || res);
     } catch (err) {
+      setIsProcessingPayment(false);
       if (err?.data?.shortages) {
         setErrorMessage(
           `Kitchen Out of Stock: ${err.data.shortages
@@ -146,7 +252,7 @@ export default function CheckoutPage() {
           Your Cart is Empty
         </h2>
         <p className="text-neutral-500 mb-6 font-medium text-sm">
-          Add some delicious burgers before checking out!
+          Add items to your cart before checking out.
         </p>
         <Link
           href="/"
@@ -158,7 +264,6 @@ export default function CheckoutPage() {
     );
   }
 
-  // Order Success Screen
   if (placedOrder) {
     return (
       <div className="bg-[#fcfcfb] min-h-[75vh] flex items-center justify-center py-12 px-4 font-['Plus_Jakarta_Sans',sans-serif]">
@@ -170,7 +275,7 @@ export default function CheckoutPage() {
             Order Confirmed!
           </h2>
           <p className="text-xs text-neutral-500 font-medium mb-6">
-            Your order has been transmitted directly to the kitchen display.
+            Your order has been sent to the kitchen display.
           </p>
 
           <div className="bg-neutral-50 p-4 rounded-2xl border border-neutral-100 text-left space-y-2 mb-6 font-mono text-xs">
@@ -181,7 +286,11 @@ export default function CheckoutPage() {
             <div className="flex justify-between items-center">
               <span className="text-neutral-500 font-sans">Payment Method:</span>
               <span className="font-bold text-neutral-900">
-                {placedOrder.paymentMethod === 'CARD' ? 'Visa / Mastercard (Paid)' : 'Cash on Delivery (COD)'}
+                {placedOrder.paymentMethod === 'CARD'
+                  ? 'Safepay Online Card (Processed)'
+                  : placedOrder.paymentMethod === 'BANK_TRANSFER'
+                  ? 'Raast / Bank Transfer'
+                  : 'Cash on Delivery (COD)'}
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -233,7 +342,7 @@ export default function CheckoutPage() {
 
         <form onSubmit={handleSubmit} className="flex flex-col lg:flex-row gap-8 items-start">
           <div className="flex-1 w-full space-y-6">
-            {/* 1. Customer Delivery Location & Area Selection */}
+            {/* 1. Delivery Location */}
             <div className="p-6 sm:p-8 rounded-3xl bg-white border border-neutral-200 shadow-sm">
               <h2 className="font-display text-xl sm:text-2xl font-black text-black mb-6 pb-3 border-b border-neutral-100 uppercase tracking-wide">
                 1. Delivery Location
@@ -282,7 +391,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Auto-Dispatched Kitchen Info Banner */}
                 {selectedAreaObj && assignedKitchenBranch && (
                   <div className="p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200 text-xs flex items-center justify-between">
                     <div>
@@ -290,7 +398,7 @@ export default function CheckoutPage() {
                         ✓ Nearest Kitchen Outlet Assigned
                       </span>
                       <span className="text-emerald-700 text-[11px]">
-                        Order will be freshly prepared at <strong>{assignedKitchenBranch.name}</strong> (~{selectedAreaObj.estimatedDeliveryMinutes || 35} mins)
+                        Order prepared at <strong>{assignedKitchenBranch.name}</strong> (~{selectedAreaObj.estimatedDeliveryMinutes || 35} mins)
                       </span>
                     </div>
                   </div>
@@ -352,7 +460,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* 3. Payment Method & Live Tax Rates */}
+            {/* 3. Payment Method */}
             <div className="p-6 sm:p-8 rounded-3xl bg-white border border-neutral-200 shadow-sm">
               <h2 className="font-display text-xl sm:text-2xl font-black text-black mb-5 pb-3 border-b border-neutral-100 uppercase tracking-wide">
                 3. Payment Method
@@ -379,18 +487,21 @@ export default function CheckoutPage() {
                       className="w-4 h-4 text-[#F4C61A] accent-[#F4C61A] cursor-pointer"
                     />
                     <div>
-                      <label htmlFor="cod" className="text-sm font-black text-black cursor-pointer uppercase tracking-wider block">
+                      <label
+                        htmlFor="cod"
+                        className="text-sm font-black text-black cursor-pointer uppercase tracking-wider block"
+                      >
                         Cash on Delivery (COD)
                       </label>
                       <span className="text-[11px] text-neutral-500 font-medium">
-                        Standard Govt SST: {taxConfig.codTaxPercentage}%
+                        Govt SST: {taxConfig.codTaxPercentage}%
                       </span>
                     </div>
                   </div>
                   <span className="text-lg">💵</span>
                 </div>
 
-                {/* Digital Card (Reduced SST Tax) */}
+                {/* Digital Card (Safepay) */}
                 <div
                   onClick={() => setFormData({ ...formData, paymentMethod: 'CARD' })}
                   className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition ${
@@ -411,32 +522,94 @@ export default function CheckoutPage() {
                     />
                     <div>
                       <div className="flex items-center gap-2">
-                        <label htmlFor="card" className="text-sm font-black text-black cursor-pointer uppercase tracking-wider block">
-                          Credit / Debit Card (Online)
+                        <label
+                          htmlFor="card"
+                          className="text-sm font-black text-black cursor-pointer uppercase tracking-wider block"
+                        >
+                          Debit / Credit Card (Safepay)
                         </label>
                         <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
                           Save {taxConfig.codTaxPercentage - taxConfig.cardTaxPercentage}% Tax
                         </span>
                       </div>
                       <span className="text-[11px] text-neutral-500 font-medium">
-                        Reduced Govt SST: {taxConfig.cardTaxPercentage}%
+                        PayPak, 1LINK, Visa, Mastercard • Reduced Govt SST: {taxConfig.cardTaxPercentage}%
                       </span>
                     </div>
                   </div>
                   <span className="text-lg">💳</span>
                 </div>
+
+                {/* Raast / Instant Bank Transfer */}
+                <div
+                  onClick={() => setFormData({ ...formData, paymentMethod: 'BANK_TRANSFER' })}
+                  className={`p-4 rounded-2xl border-2 cursor-pointer transition ${
+                    formData.paymentMethod === 'BANK_TRANSFER'
+                      ? 'border-[#F4C61A] bg-amber-50/40'
+                      : 'border-neutral-200 bg-white hover:border-neutral-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        id="bank_transfer"
+                        name="paymentMethod"
+                        value="BANK_TRANSFER"
+                        checked={formData.paymentMethod === 'BANK_TRANSFER'}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-[#F4C61A] accent-[#F4C61A] cursor-pointer"
+                      />
+                      <div>
+                        <label
+                          htmlFor="bank_transfer"
+                          className="text-sm font-black text-black cursor-pointer uppercase tracking-wider block"
+                        >
+                          Raast / Direct Bank Transfer
+                        </label>
+                        <span className="text-[11px] text-neutral-500 font-medium">
+                          1LINK & Raast instant transfer
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-lg">🏦</span>
+                  </div>
+
+                  {formData.paymentMethod === 'BANK_TRANSFER' && (
+                    <div className="mt-3 pt-3 border-t border-amber-200/60 text-xs space-y-2">
+                      <div className="bg-white p-3 rounded-xl border border-neutral-200 font-mono text-[11px] space-y-1">
+                        <div>
+                          <strong className="text-neutral-500">Bank:</strong> Meezan Bank Ltd
+                        </div>
+                        <div>
+                          <strong className="text-neutral-500">Account Title:</strong> Burger O'Clock Pvt Ltd
+                        </div>
+                        <div>
+                          <strong className="text-neutral-500">Raast ID / IBAN:</strong> 03001234567
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        name="transactionRef"
+                        placeholder="Enter 6-digit Transaction Reference / TID *"
+                        value={formData.transactionRef}
+                        onChange={handleChange}
+                        className="w-full min-h-[42px] px-3.5 rounded-xl border border-neutral-300 bg-white text-xs text-neutral-900 focus:border-[#F4C61A] outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Order Summary & Dynamic Tax Ledger Breakdown */}
+          {/* Right Column: Order Summary */}
           <div className="w-full lg:w-[380px] shrink-0 sticky top-24">
             <div className="p-6 sm:p-7 rounded-3xl bg-white border border-neutral-200 shadow-sm">
               <h2 className="font-display text-xl sm:text-2xl font-black text-black mb-4 pb-3 border-b border-neutral-100 uppercase tracking-wide">
                 Order Summary
               </h2>
 
-              {/* Item List */}
               <div className="max-h-56 overflow-y-auto divide-y divide-neutral-100 mb-4 pr-1">
                 {items.map((item) => {
                   const itemKey = item.cartItemId || item._id || item.id;
@@ -463,7 +636,6 @@ export default function CheckoutPage() {
                 })}
               </div>
 
-              {/* Dynamic Bill Calculation */}
               <div className="border-t border-neutral-100 pt-4 space-y-2 text-xs font-semibold">
                 <div className="flex justify-between text-neutral-600">
                   <span>Subtotal</span>
@@ -497,11 +669,13 @@ export default function CheckoutPage() {
               </div>
 
               <button
-                disabled={isPlacingOrder || !formData.selectedAreaId}
+                disabled={isPlacingOrder || isInitiatingPayment || isProcessingPayment || !formData.selectedAreaId}
                 type="submit"
                 className="w-full mt-6 bg-[#F4C61A] hover:bg-[#E0B210] text-black font-black py-4 rounded-xl shadow-md transition transform active:scale-98 uppercase tracking-wider text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
-                {isPlacingOrder ? 'Processing Order...' : `Place Order • ${formatPrice(finalTotal)}`}
+                {isPlacingOrder || isInitiatingPayment || isProcessingPayment
+                  ? 'Processing Payment...'
+                  : `Place Order • ${formatPrice(finalTotal)}`}
               </button>
             </div>
           </div>
