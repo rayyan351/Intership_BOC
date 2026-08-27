@@ -1,9 +1,11 @@
+// src/app/admin/(dashboard)/inventory/_components/CreatePOModal.jsx
 'use client';
 
 import React, { useState } from 'react';
-import { Modal, Select, Button, DatePicker } from 'antd';
+import { Select, DatePicker, Space } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
+import CustomModal from '@/app/admin/_components/modal/CustomModal';
 import { useToast } from '@/utils/toast';
 
 export default function CreatePOModal({
@@ -104,186 +106,185 @@ export default function CreatePOModal({
   );
 
   return (
-    <Modal
+    <CustomModal
       open={open}
       onCancel={onClose}
-      footer={null}
-      title={null}
-      centered
+      title="Create Inward Purchase Order (PO)"
       width={720}
-      className="font-['Plus_Jakarta_Sans',sans-serif]"
     >
-      <div className="pt-2 pb-1">
-        <h3 className="text-lg font-bold text-neutral-900 m-0">Create Inward Purchase Order</h3>
-        <p className="text-xs text-neutral-500 mt-1 mb-4">
-          Order raw materials and packaging from registered suppliers.
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Supplier / Vendor <span className="text-red-500">*</span>
-              </label>
-              <Select
-                className="w-full h-10"
-                placeholder="Select Vendor"
-                showSearch
-                filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
-                value={supplierId || undefined}
-                onChange={setSupplierId}
-                options={suppliers.map((s) => ({
-                  value: s._id,
-                  label: `${s.name} (${s.paymentTerms || 'Standard'})`,
-                }))}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Destination Outlet <span className="text-red-500">*</span>
-              </label>
-              <Select
-                className="w-full h-10"
-                placeholder="Select Outlet"
-                value={branchId || undefined}
-                onChange={setBranchId}
-                options={branches.map((b) => ({
-                  value: b._id,
-                  label: `${b.name} (${b.city})`,
-                }))}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Expected Delivery Date
-              </label>
-              <DatePicker
-                className="w-full h-10"
-                onChange={(date) => setExpectedDate(date)}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Order Notes / Instructions
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Early morning delivery required"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm font-medium text-neutral-900 focus:outline-none focus:border-[#ffc400]"
-              />
-            </div>
+      <form onSubmit={handleSubmit} className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+        {/* Supplier & Destination Outlet */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+              Supplier / Vendor <span className="text-red-500">*</span>
+            </label>
+            <Select
+              className="w-full h-10 staff-modern-select"
+              placeholder="Select Vendor"
+              showSearch
+              filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+              value={supplierId || undefined}
+              onChange={setSupplierId}
+              options={suppliers.map((s) => ({
+                value: s._id,
+                label: `${s.name} (${s.paymentTerms || 'Standard'})`,
+              }))}
+            />
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
-                Order Line Items
-              </span>
-              <Button
-                size="small"
-                type="dashed"
-                icon={<PlusOutlined />}
-                onClick={handleAddItem}
-                className="!text-xs font-semibold"
+            <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+              Destination Outlet <span className="text-red-500">*</span>
+            </label>
+            <Select
+              className="w-full h-10 staff-modern-select"
+              placeholder="Select Outlet"
+              value={branchId || undefined}
+              onChange={setBranchId}
+              options={branches.map((b) => ({
+                value: b._id,
+                label: `${b.name} (${b.city})`,
+              }))}
+            />
+          </div>
+        </div>
+
+        {/* Expected Date & Order Notes */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+              Expected Delivery Date
+            </label>
+            <DatePicker
+              className="w-full h-10 rounded-xl border-neutral-200 bg-slate-50/60 hover:bg-white text-xs"
+              onChange={(date) => setExpectedDate(date)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+              Order Notes / Handling Instructions
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Early morning delivery before 10 AM"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-normal text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+            />
+          </div>
+        </div>
+
+        {/* Line Items List */}
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-neutral-800">
+              Order Line Items ({items.length})
+            </span>
+            <button
+              type="button"
+              onClick={handleAddItem}
+              className="h-8 px-3 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <PlusOutlined className="text-xs" /> Add Raw Material
+            </button>
+          </div>
+
+          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+            {items.map((itm, idx) => (
+              <div
+                key={idx}
+                className="p-3 bg-slate-50/70 rounded-2xl border border-slate-100 grid grid-cols-12 gap-2.5 items-center text-xs"
               >
-                Add Item
-              </Button>
-            </div>
-
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-              {items.map((itm, idx) => (
-                <div
-                  key={idx}
-                  className="p-2.5 bg-neutral-50 rounded-lg border border-neutral-200 grid grid-cols-12 gap-2 items-center text-xs"
-                >
-                  <div className="col-span-5">
-                    <Select
-                      value={itm.item}
-                      onChange={(val) => handleItemSelect(idx, val)}
-                      className="w-full"
-                      showSearch
-                      filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
-                      options={inventoryItems.map((inv) => ({
-                        value: inv._id,
-                        label: `${inv.name} (${inv.purchaseUnit})`,
-                      }))}
-                    />
-                  </div>
-
-                  <div className="col-span-3 flex items-center">
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="any"
-                      value={itm.orderedQuantity}
-                      onChange={(e) => handleQtyChange(idx, e.target.value)}
-                      className="w-full h-8 px-2 border border-neutral-300 rounded bg-white font-mono font-bold text-xs"
-                      required
-                    />
-                    <span className="ml-1 text-[11px] font-bold text-neutral-500 w-8 truncate">
-                      {itm.purchaseUnit}
-                    </span>
-                  </div>
-
-                  <div className="col-span-3 flex items-center">
-                    <span className="text-[11px] text-neutral-400 mr-1 font-bold">Rs.</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={itm.unitPurchasePrice}
-                      onChange={(e) => handlePriceChange(idx, e.target.value)}
-                      className="w-full h-8 px-2 border border-neutral-300 rounded bg-white font-mono font-bold text-xs"
-                      required
-                    />
-                  </div>
-
-                  <div className="col-span-1 text-right">
-                    <Button
-                      size="small"
-                      danger
-                      type="text"
-                      icon={<DeleteOutlined />}
-                      onClick={() => handleRemoveItem(idx)}
-                    />
-                  </div>
+                {/* Item Select */}
+                <div className="col-span-5">
+                  <Select
+                    value={itm.item}
+                    onChange={(val) => handleItemSelect(idx, val)}
+                    className="w-full h-9 staff-modern-select"
+                    showSearch
+                    filterOption={(input, opt) => (opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                    options={inventoryItems.map((inv) => ({
+                      value: inv._id,
+                      label: `${inv.name} (${inv.purchaseUnit})`,
+                    }))}
+                  />
                 </div>
-              ))}
 
-              {items.length === 0 && (
-                <div className="py-6 text-center text-xs text-neutral-400 border border-dashed border-neutral-300 rounded-lg">
-                  No items added yet. Click &quot;Add Item&quot; to start your order.
+                {/* Ordered Qty */}
+                <div className="col-span-3 flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="any"
+                    value={itm.orderedQuantity}
+                    onChange={(e) => handleQtyChange(idx, e.target.value)}
+                    className="w-full h-9 px-2.5 border border-neutral-200 rounded-xl bg-white font-mono font-semibold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
+                    required
+                  />
+                  <span className="text-[11px] font-semibold text-neutral-400 shrink-0 w-8 truncate">
+                    {itm.purchaseUnit}
+                  </span>
                 </div>
-              )}
-            </div>
-          </div>
 
-          <div className="p-3 bg-neutral-900 rounded-xl text-white flex items-center justify-between text-xs">
-            <span className="text-neutral-400 font-bold uppercase tracking-wider">
-              Total Estimated PO Value:
-            </span>
-            <span className="font-mono font-bold text-base text-[#ffc400]">
-              Rs. {totalCalculated.toLocaleString()}
-            </span>
-          </div>
+                {/* Unit Cost */}
+                <div className="col-span-3 flex items-center gap-1">
+                  <span className="text-[11px] text-neutral-400 font-semibold shrink-0">Rs.</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={itm.unitPurchasePrice}
+                    onChange={(e) => handlePriceChange(idx, e.target.value)}
+                    className="w-full h-9 px-2.5 border border-neutral-200 rounded-xl bg-white font-mono font-semibold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
+                    required
+                  />
+                </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-200">
+                {/* Delete Row Button */}
+                <div className="col-span-1 text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveItem(idx)}
+                    className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                  >
+                    <DeleteOutlined className="text-xs" />
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {items.length === 0 && (
+              <div className="py-8 text-center text-xs text-neutral-400 border border-dashed border-neutral-200 rounded-2xl bg-neutral-50/50">
+                No items added yet. Click &quot;Add Raw Material&quot; to configure purchase quantities.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Total Summary Footer */}
+        <div className="p-4 bg-neutral-900 rounded-2xl text-white flex items-center justify-between">
+          <span className="text-xs font-semibold text-neutral-400 tracking-tight">
+            Total Estimated PO Value
+          </span>
+          <span className="font-mono font-bold text-base text-[#F4C61A]">
+            Rs. {totalCalculated.toLocaleString()}
+          </span>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center justify-end pt-3 mt-4 border-t border-neutral-100">
+          <Space size="middle">
             <CustomButton variant="secondary" type="button" onClick={onClose}>
               Cancel
             </CustomButton>
             <CustomButton variant="primary" htmlType="submit" loading={loading}>
               Create Purchase Order
             </CustomButton>
-          </div>
-        </form>
-      </div>
-    </Modal>
+          </Space>
+        </div>
+      </form>
+    </CustomModal>
   );
 }

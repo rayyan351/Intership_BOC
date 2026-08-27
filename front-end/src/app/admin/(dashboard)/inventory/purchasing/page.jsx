@@ -2,27 +2,18 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Table, Tabs, Select, Space } from 'antd';
 import {
-  Table,
-  Tag,
-  Button,
-  Modal,
-  Drawer,
-  Input,
-  InputNumber,
-  Select,
-  Popconfirm,
-  Tabs,
-} from 'antd';
-import {
-  PlusOutlined,
   CheckCircleOutlined,
   ShopOutlined,
   FileTextOutlined,
+  PlusOutlined,
   DeleteOutlined,
-  EditOutlined,
 } from '@ant-design/icons';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
+import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
+import CustomModal from '@/app/admin/_components/modal/CustomModal';
+import TableActions from '@/app/admin/_components/table/TableActions';
 import {
   useGetPurchaseOrdersQuery,
   useCreatePurchaseOrderMutation,
@@ -39,11 +30,11 @@ import { formatPrice } from '@/lib/currency';
 
 export default function PurchasingAndVendorsPage() {
   const { contextHolder, showSuccess, showError } = useToast();
-  const [activeTab, setActiveTab] = useState('POS'); // 'POS' | 'VENDORS'
+  const [activeTab, setActiveTab] = useState('POS');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Modals / Drawers
-  const [isPODrawerOpen, setIsPODrawerOpen] = useState(false);
+  // Modals
+  const [isPOModalOpen, setIsPOModalOpen] = useState(false);
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
 
@@ -90,7 +81,7 @@ export default function PurchasingAndVendorsPage() {
     paymentTerms: 'COD',
   });
 
-  // ---------------- PO Item Line Handlers ----------------
+  // ---------------- PO Line Handlers ----------------
   const handleAddItemLine = () => {
     setPOForm({
       ...poForm,
@@ -132,7 +123,7 @@ export default function PurchasingAndVendorsPage() {
       notes: '',
       items: [{ item: '', orderedQuantity: 1, unitPurchasePrice: 0, purchaseUnit: 'kg' }],
     });
-    setIsPODrawerOpen(true);
+    setIsPOModalOpen(true);
   };
 
   const handleSavePO = async (e) => {
@@ -143,7 +134,7 @@ export default function PurchasingAndVendorsPage() {
 
     const validItems = poForm.items.filter((i) => i.item && Number(i.orderedQuantity) > 0);
     if (validItems.length === 0) {
-      return showError('Please select at least one item with valid quantity.');
+      return showError('Please select at least one item with a valid quantity.');
     }
 
     try {
@@ -156,17 +147,16 @@ export default function PurchasingAndVendorsPage() {
       }).unwrap();
 
       showSuccess('Purchase order created and issued.');
-      setIsPODrawerOpen(false);
+      setIsPOModalOpen(false);
     } catch (err) {
       showError(err?.data?.message || 'Failed to create purchase order');
     }
   };
 
-  // ---------------- Goods Receiving Handlers (Auto GRN / Invoice) ----------------
+  // ---------------- Goods Receiving Handlers ----------------
   const handleOpenReceiveModal = (po) => {
     setReceivingPO(po);
 
-    // Auto-generate a default GRN / Invoice Number
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const rand = Math.floor(1000 + Math.random() * 9000);
     const autoInvoiceNo = `GRN-${dateStr}-${rand}`;
@@ -194,7 +184,7 @@ export default function PurchasingAndVendorsPage() {
         notes: receivingForm.notes,
       }).unwrap();
 
-      showSuccess('Goods received! Stock balances updated and batches logged.');
+      showSuccess('Goods received! Stock balances updated.');
       setReceivingPO(null);
     } catch (err) {
       showError(err?.data?.message || 'Failed to receive stock');
@@ -275,16 +265,57 @@ export default function PurchasingAndVendorsPage() {
       s.contactPerson?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // ---------------- Tables Configuration ----------------
+  const getPOStatusBadge = (status) => {
+    switch (status) {
+      case 'DRAFT':
+        return (
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
+            Draft
+          </span>
+        );
+      case 'ORDERED':
+        return (
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700">
+            Ordered
+          </span>
+        );
+      case 'PARTIALLY_RECEIVED':
+        return (
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700">
+            Partial
+          </span>
+        );
+      case 'RECEIVED':
+        return (
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+            Received
+          </span>
+        );
+      case 'CANCELLED':
+        return (
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-600">
+            Cancelled
+          </span>
+        );
+      default:
+        return (
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
+            {status}
+          </span>
+        );
+    }
+  };
+
   const poColumns = [
     {
       title: 'PO Number',
       dataIndex: 'poNumber',
       key: 'poNumber',
+      width: '18%',
       render: (num, r) => (
         <div>
-          <strong className="text-xs text-neutral-900 font-mono block">{num}</strong>
-          <span className="text-[10px] text-neutral-400">
+          <span className="font-mono font-bold text-neutral-900 text-xs block">{num}</span>
+          <span className="text-[11px] text-neutral-400 font-normal">
             {new Date(r.createdAt).toLocaleDateString()}
           </span>
         </div>
@@ -294,23 +325,26 @@ export default function PurchasingAndVendorsPage() {
       title: 'Supplier',
       dataIndex: 'supplier',
       key: 'supplier',
+      width: '24%',
       render: (s) => (
         <div>
-          <strong className="text-xs text-neutral-800 block">{s?.name || 'Unknown'}</strong>
-          <span className="text-[10px] text-neutral-400">{s?.phone}</span>
+          <span className="font-semibold text-neutral-900 text-xs block">{s?.name || 'Unknown'}</span>
+          <span className="text-[11px] text-neutral-400 font-normal">{s?.phone}</span>
         </div>
       ),
     },
     {
-      title: 'Target Outlet',
+      title: 'Destination Outlet',
       dataIndex: 'branch',
       key: 'branch',
-      render: (b) => <span className="text-xs font-semibold text-neutral-700">📍 {b?.name}</span>,
+      width: '20%',
+      render: (b) => <span className="text-xs font-semibold text-neutral-800">{b?.name}</span>,
     },
     {
       title: 'Total Amount',
       dataIndex: 'totalAmount',
       key: 'totalAmount',
+      width: '18%',
       render: (amt) => (
         <span className="text-xs font-mono font-bold text-neutral-900">{formatPrice(amt)}</span>
       ),
@@ -319,37 +353,23 @@ export default function PurchasingAndVendorsPage() {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => {
-        const colors = {
-          DRAFT: 'default',
-          ORDERED: 'blue',
-          PARTIALLY_RECEIVED: 'orange',
-          RECEIVED: 'green',
-          CANCELLED: 'red',
-        };
-        return (
-          <Tag color={colors[status] || 'default'} className="font-extrabold text-[10px] border-none">
-            {status}
-          </Tag>
-        );
-      },
+      width: '10%',
+      render: (status) => getPOStatusBadge(status),
     },
     {
       title: 'Action',
       key: 'action',
       align: 'right',
+      width: '10%',
       render: (_, r) => (
-        <div className="flex items-center justify-end gap-1.5">
+        <div className="flex items-center justify-end">
           {(r.status === 'ORDERED' || r.status === 'PARTIALLY_RECEIVED') && (
-            <Button
-              size="small"
-              type="primary"
-              icon={<CheckCircleOutlined />}
+            <button
               onClick={() => handleOpenReceiveModal(r)}
-              className="!bg-emerald-600 hover:!bg-emerald-700 text-white font-bold text-[11px] border-none flex items-center gap-1"
+              className="px-2.5 py-1 text-xs font-bold rounded-lg text-neutral-900 bg-[#F4C61A] hover:bg-[#e5b713] transition cursor-pointer flex items-center gap-1 shadow-2xs"
             >
-              Receive Goods
-            </Button>
+              <CheckCircleOutlined className="text-xs" /> Receive
+            </button>
           )}
         </div>
       ),
@@ -361,32 +381,35 @@ export default function PurchasingAndVendorsPage() {
       title: 'Supplier Name',
       dataIndex: 'name',
       key: 'name',
+      width: '28%',
       render: (name, r) => (
         <div>
-          <strong className="text-xs text-neutral-900 block">{name}</strong>
-          <span className="text-[10px] text-neutral-400 font-mono">
-            {r.supplierCode || 'SUP-AUTO'} • Contact: {r.contactPerson || 'N/A'}
+          <span className="font-semibold text-neutral-900 text-xs block">{name}</span>
+          <span className="text-[11px] text-neutral-400 font-mono">
+            {r.supplierCode || 'SUP-AUTO'} • {r.contactPerson || 'No contact'}
           </span>
         </div>
       ),
     },
     {
-      title: 'Phone / Email',
+      title: 'Contact Details',
       key: 'contact',
+      width: '24%',
       render: (_, r) => (
         <div>
-          <span className="text-xs font-mono text-neutral-800 block">{r.phone}</span>
-          <span className="text-[10px] text-neutral-400">{r.email || '—'}</span>
+          <span className="text-xs font-mono font-semibold text-neutral-800 block">{r.phone}</span>
+          <span className="text-[11px] text-neutral-400">{r.email || '—'}</span>
         </div>
       ),
     },
     {
-      title: 'Warehouse / Office Address',
+      title: 'Dispatch Address',
       dataIndex: 'address',
       key: 'address',
+      width: '26%',
       render: (address) => (
-        <span className="text-xs text-neutral-600 line-clamp-1">
-          {address ? `📍 ${address}` : <span className="text-neutral-300 font-mono text-[11px]">No address provided</span>}
+        <span className="text-xs text-neutral-600 line-clamp-1 font-normal">
+          {address || <span className="text-neutral-400">No address provided</span>}
         </span>
       ),
     },
@@ -394,25 +417,25 @@ export default function PurchasingAndVendorsPage() {
       title: 'Payment Terms',
       dataIndex: 'paymentTerms',
       key: 'paymentTerms',
-      render: (terms) => <Tag className="font-bold text-[10px] border-none bg-neutral-100">{terms}</Tag>,
+      width: '12%',
+      render: (terms) => (
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+          {terms}
+        </span>
+      ),
     },
     {
       title: 'Action',
       key: 'action',
       align: 'right',
+      width: '10%',
       render: (_, r) => (
-        <div className="flex items-center justify-end gap-1">
-          <Button size="small" type="text" icon={<EditOutlined />} onClick={() => handleOpenEditSupplier(r)} />
-          <Popconfirm
-            title="Delete this supplier?"
-            onConfirm={() => handleDeleteSupplier(r._id)}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{ danger: true, size: 'small' }}
-          >
-            <Button size="small" type="text" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
-        </div>
+        <TableActions
+          onEdit={() => handleOpenEditSupplier(r)}
+          onDelete={() => handleDeleteSupplier(r._id)}
+          deleteTitle="Delete Supplier?"
+          deleteDescription={`Permanently remove "${r.name}" from active vendors?`}
+        />
       ),
     },
   ];
@@ -429,65 +452,72 @@ export default function PurchasingAndVendorsPage() {
         onSearch={setSearchTerm}
         searchPlaceholder="Search PO number, vendor, or address..."
       >
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={[
-            {
-              key: 'POS',
-              label: (
-                <span className="flex items-center gap-2 font-bold text-xs">
-                  <FileTextOutlined /> Purchase Orders ({purchaseOrders.length})
-                </span>
-              ),
-              children: (
-                <Table
-                  columns={poColumns}
-                  dataSource={filteredPOs}
-                  rowKey="_id"
-                  loading={loadingPOs}
-                  pagination={{ pageSize: 8 }}
-                  size="middle"
-                />
-              ),
-            },
-            {
-              key: 'VENDORS',
-              label: (
-                <span className="flex items-center gap-2 font-bold text-xs">
-                  <ShopOutlined /> Vendor Directory ({suppliers.length})
-                </span>
-              ),
-              children: (
-                <Table
-                  columns={supplierColumns}
-                  dataSource={filteredSuppliers}
-                  rowKey="_id"
-                  loading={loadingSuppliers}
-                  pagination={{ pageSize: 8 }}
-                  size="middle"
-                />
-              ),
-            },
-          ]}
-        />
+        <div className="space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+          {/* Custom Pill Tabs */}
+          <div className="flex gap-1.5 p-1 bg-neutral-100/80 rounded-xl w-fit">
+            <button
+              onClick={() => setActiveTab('POS')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                activeTab === 'POS'
+                  ? 'bg-white text-neutral-900 shadow-xs font-bold'
+                  : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+            >
+              <FileTextOutlined className={activeTab === 'POS' ? 'text-amber-500' : ''} />
+              <span>Purchase Orders ({purchaseOrders.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('VENDORS')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                activeTab === 'VENDORS'
+                  ? 'bg-white text-neutral-900 shadow-xs font-bold'
+                  : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+            >
+              <ShopOutlined className={activeTab === 'VENDORS' ? 'text-amber-500' : ''} />
+              <span>Vendor Directory ({suppliers.length})</span>
+            </button>
+          </div>
 
-        {/* DRAWER: Create Purchase Order */}
-        <Drawer
-          open={isPODrawerOpen}
-          onClose={() => setIsPODrawerOpen(false)}
-          size={560}
+          {/* Tables Display */}
+          <div className="overflow-hidden">
+            {activeTab === 'POS' ? (
+              <Table
+                columns={poColumns}
+                dataSource={filteredPOs}
+                rowKey="_id"
+                loading={loadingPOs}
+                pagination={{ pageSize: 8 }}
+                size="middle"
+              />
+            ) : (
+              <Table
+                columns={supplierColumns}
+                dataSource={filteredSuppliers}
+                rowKey="_id"
+                loading={loadingSuppliers}
+                pagination={{ pageSize: 8 }}
+                size="middle"
+              />
+            )}
+          </div>
+        </div>
+
+        {/* MODAL: Create Purchase Order */}
+        <CustomModal
+          open={isPOModalOpen}
+          onCancel={() => setIsPOModalOpen(false)}
           title="Create New Purchase Order"
-          className="font-['Plus_Jakarta_Sans',sans-serif]"
+          width={640}
         >
-          <form onSubmit={handleSavePO} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+          <form onSubmit={handleSavePO} className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                  Supplier *
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Supplier / Vendor <span className="text-red-500">*</span>
                 </label>
                 <Select
-                  className="w-full h-10"
+                  className="w-full h-10 staff-modern-select"
                   value={poForm.supplier || undefined}
                   onChange={(val) => setPOForm({ ...poForm, supplier: val })}
                   options={suppliers.map((s) => ({ value: s._id, label: s.name }))}
@@ -496,11 +526,11 @@ export default function PurchasingAndVendorsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                  Receiving Outlet *
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Receiving Kitchen Outlet <span className="text-red-500">*</span>
                 </label>
                 <Select
-                  className="w-full h-10"
+                  className="w-full h-10 staff-modern-select"
                   value={poForm.branch || undefined}
                   onChange={(val) => setPOForm({ ...poForm, branch: val })}
                   options={branches.map((b) => ({ value: b._id, label: `${b.name} (${b.city})` }))}
@@ -509,29 +539,27 @@ export default function PurchasingAndVendorsPage() {
               </div>
             </div>
 
-            {/* Item Line Rows */}
-            <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200 space-y-3">
+            {/* Line Items */}
+            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-100 space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-black text-neutral-900 uppercase tracking-wider">
+                <span className="text-xs font-semibold text-neutral-800">
                   Order Line Items
                 </span>
-                <Button
-                  size="small"
-                  type="link"
-                  icon={<PlusOutlined />}
+                <button
+                  type="button"
                   onClick={handleAddItemLine}
-                  className="text-xs font-bold"
+                  className="text-xs font-semibold text-neutral-700 hover:text-black flex items-center gap-1 cursor-pointer"
                 >
-                  Add Row
-                </Button>
+                  <PlusOutlined className="text-[10px]" /> Add Line
+                </button>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {poForm.items.map((line, idx) => (
                   <div key={idx} className="flex gap-2 items-center bg-white p-2.5 rounded-xl border border-neutral-200">
                     <div className="flex-1">
                       <Select
-                        className="w-full"
+                        className="w-full h-9 staff-modern-select"
                         placeholder="Pick raw item"
                         value={line.item || undefined}
                         onChange={(val) => handleItemChange(idx, 'item', val)}
@@ -543,284 +571,265 @@ export default function PurchasingAndVendorsPage() {
                     </div>
 
                     <div className="w-20">
-                      <InputNumber
-                        className="w-full"
-                        min={0.1}
+                      <input
+                        type="number"
+                        min="0.1"
+                        step="any"
                         placeholder="Qty"
                         value={line.orderedQuantity}
-                        onChange={(val) => handleItemChange(idx, 'orderedQuantity', val || 1)}
+                        onChange={(e) => handleItemChange(idx, 'orderedQuantity', e.target.value)}
+                        className="w-full h-9 px-2.5 border border-neutral-200 rounded-xl bg-white font-mono font-bold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
                       />
                     </div>
 
-                    <div className="w-24">
-                      <InputNumber
-                        className="w-full"
-                        min={0}
-                        placeholder="Unit Price"
+                    <div className="w-28">
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="Price"
                         value={line.unitPurchasePrice}
-                        onChange={(val) => handleItemChange(idx, 'unitPurchasePrice', val || 0)}
+                        onChange={(e) => handleItemChange(idx, 'unitPurchasePrice', e.target.value)}
+                        className="w-full h-9 px-2.5 border border-neutral-200 rounded-xl bg-white font-mono font-bold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
                       />
                     </div>
 
                     {poForm.items.length > 1 && (
-                      <Button
-                        size="small"
-                        type="text"
-                        danger
-                        icon={<DeleteOutlined />}
+                      <button
+                        type="button"
                         onClick={() => handleRemoveItemLine(idx)}
-                      />
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                      >
+                        <DeleteOutlined className="text-xs" />
+                      </button>
                     )}
                   </div>
                 ))}
               </div>
 
-              <div className="pt-2 border-t border-neutral-200 flex justify-between items-center text-xs font-bold">
-                <span>Estimated Total:</span>
-                <span className="text-base font-black font-mono text-neutral-900">
+              <div className="pt-2 border-t border-neutral-200/60 flex justify-between items-center text-xs">
+                <span className="text-neutral-500 font-medium">Estimated PO Total:</span>
+                <span className="text-base font-bold font-mono text-neutral-900">
                   {formatPrice(calculatePOTotal())}
                 </span>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Notes / Delivery Instructions
+              <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                Delivery Instructions & Notes
               </label>
-              <Input.TextArea
+              <textarea
                 rows={2}
-                placeholder="e.g. Deliver before 10 AM, check freshness on delivery"
+                placeholder="e.g. Deliver before 10 AM, check freshness on intake"
                 value={poForm.notes}
                 onChange={(e) => setPOForm({ ...poForm, notes: e.target.value })}
+                className="w-full p-3 rounded-xl border border-neutral-200 bg-white text-xs font-normal text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
               />
             </div>
 
-            <div className="pt-4 border-t border-neutral-100 flex gap-2 justify-end">
-              <Button onClick={() => setIsPODrawerOpen(false)}>Cancel</Button>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={isCreatingPO}
-                className="!bg-[#ffc400] !text-black font-bold border-none"
-              >
-                Issue Purchase Order
-              </Button>
+            <div className="flex justify-end pt-3 mt-4 border-t border-neutral-100">
+              <Space size="middle">
+                <CustomButton variant="secondary" type="button" onClick={() => setIsPOModalOpen(false)}>
+                  Cancel
+                </CustomButton>
+                <CustomButton variant="primary" htmlType="submit" loading={isCreatingPO}>
+                  Issue Purchase Order
+                </CustomButton>
+              </Space>
             </div>
           </form>
-        </Drawer>
+        </CustomModal>
 
-        {/* MODAL: Goods Receiving Note (GRN) with Auto ID Pre-fill */}
-        <Modal
+        {/* MODAL: Goods Receiving Note (GRN) */}
+        <CustomModal
           open={!!receivingPO}
           onCancel={() => setReceivingPO(null)}
-          footer={null}
-          title={null}
-          centered
-          width={520}
-          className="font-['Plus_Jakarta_Sans',sans-serif]"
+          title={`Receive Goods: ${receivingPO?.poNumber || ''}`}
+          width={540}
         >
           {receivingPO && (
-            <div className="pt-2">
-              <h3 className="text-base font-black text-neutral-900 uppercase tracking-wide mb-1 flex items-center gap-2">
-                <CheckCircleOutlined className="text-emerald-600" />
-                Receive Goods: {receivingPO.poNumber}
-              </h3>
-              <p className="text-xs text-neutral-500 mb-4">
-                Confirm incoming quantities and invoice details. Stock balances will be credited automatically.
-              </p>
-
-              <div className="space-y-4 mb-6">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider">
-                      Supplier Invoice / GRN #
-                    </label>
-                    <span className="text-[10px] text-neutral-400 font-semibold">Auto-Generated (Editable)</span>
-                  </div>
-                  <Input
-                    placeholder="e.g. GRN-20260824-1234 or vendor's bill number"
-                    value={receivingForm.supplierInvoiceNo}
-                    onChange={(e) => setReceivingForm({ ...receivingForm, supplierInvoiceNo: e.target.value })}
-                    className="h-10 rounded-xl font-mono text-xs"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider">
-                    Received Quantities
-                  </label>
-                  {receivingForm.receivedItems.map((recItm, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl border border-neutral-200">
-                      <div>
-                        <strong className="text-xs text-neutral-900 block">{recItm.name}</strong>
-                        <span className="text-[10px] text-neutral-400">
-                          Ordered: {recItm.orderedQuantity} {recItm.purchaseUnit}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <InputNumber
-                          min={0}
-                          value={recItm.receivedQuantity}
-                          onChange={(val) => {
-                            const copy = [...receivingForm.receivedItems];
-                            copy[idx].receivedQuantity = val || 0;
-                            setReceivingForm({ ...receivingForm, receivedItems: copy });
-                          }}
-                          className="w-24"
-                        />
-                        <span className="text-xs font-bold text-neutral-600">{recItm.purchaseUnit}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Supplier Invoice / GRN Reference No. <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. GRN-20260824-1234"
+                  value={receivingForm.supplierInvoiceNo}
+                  onChange={(e) => setReceivingForm({ ...receivingForm, supplierInvoiceNo: e.target.value })}
+                  className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-mono font-bold text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+                  required
+                />
               </div>
 
-              <div className="flex gap-2 justify-end pt-3 border-t border-neutral-100">
-                <Button onClick={() => setReceivingPO(null)}>Cancel</Button>
-                <Button
-                  type="primary"
-                  loading={isReceiving}
-                  onClick={handleExecuteReceive}
-                  className="!bg-emerald-600 hover:!bg-emerald-700 text-white font-bold border-none"
-                >
-                  Confirm & Credit Stock
-                </Button>
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-neutral-700">
+                  Verify Received Quantities
+                </label>
+                {receivingForm.receivedItems.map((recItm, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-slate-50/70 rounded-2xl border border-slate-100">
+                    <div>
+                      <span className="text-xs font-semibold text-neutral-900 block">{recItm.name}</span>
+                      <span className="text-[11px] text-neutral-400 font-normal">
+                        Ordered: {recItm.orderedQuantity} {recItm.purchaseUnit}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={recItm.receivedQuantity}
+                        onChange={(e) => {
+                          const copy = [...receivingForm.receivedItems];
+                          copy[idx].receivedQuantity = Number(e.target.value) || 0;
+                          setReceivingForm({ ...receivingForm, receivedItems: copy });
+                        }}
+                        className="w-20 h-9 px-2.5 rounded-xl border border-neutral-200 bg-white font-mono font-bold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
+                      />
+                      <span className="text-xs font-semibold text-neutral-500">{recItm.purchaseUnit}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end pt-3 mt-4 border-t border-neutral-100">
+                <Space size="middle">
+                  <CustomButton variant="secondary" type="button" onClick={() => setReceivingPO(null)}>
+                    Cancel
+                  </CustomButton>
+                  <CustomButton variant="primary" loading={isReceiving} onClick={handleExecuteReceive}>
+                    Confirm & Credit Stock
+                  </CustomButton>
+                </Space>
               </div>
             </div>
           )}
-        </Modal>
+        </CustomModal>
 
-        {/* MODAL: Register / Edit Supplier with Address Field */}
-        <Modal
+        {/* MODAL: Register / Edit Supplier */}
+        <CustomModal
           open={isSupplierModalOpen}
           onCancel={() => setIsSupplierModalOpen(false)}
-          footer={null}
-          title={null}
-          centered
-          width={460}
-          className="font-['Plus_Jakarta_Sans',sans-serif]"
+          title={editingSupplier ? 'Edit Supplier' : 'Register New Supplier'}
+          width={480}
         >
-          <div className="pt-2">
-            <h3 className="text-base font-black text-neutral-900 uppercase tracking-wide mb-1">
-              {editingSupplier ? 'Edit Supplier' : 'Register New Supplier'}
-            </h3>
-            <p className="text-xs text-neutral-500 mb-4">
-              Add vendor contact information, location address, and payment terms.
-            </p>
+          <form onSubmit={handleSaveSupplier} className="mt-4 space-y-3.5 font-['Plus_Jakarta_Sans',sans-serif]">
+            <div>
+              <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                Supplier Business Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Dawn Bread Supplies, Meat Masters"
+                value={supplierForm.name}
+                onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
+                className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-semibold text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+              />
+            </div>
 
-            <form onSubmit={handleSaveSupplier} className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                  Supplier Business Name *
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Contact Person
                 </label>
-                <Input
+                <input
+                  type="text"
+                  placeholder="e.g. Tariq Khan"
+                  value={supplierForm.contactPerson}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, contactPerson: e.target.value })}
+                  className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-normal text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Phone Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
                   required
-                  placeholder="e.g. Dawn Bread Supplies, Meat Masters"
-                  value={supplierForm.name}
-                  onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
-                  className="h-10 rounded-xl"
+                  placeholder="0300 1234567"
+                  value={supplierForm.phone}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })}
+                  className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-mono font-bold text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
                 />
               </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                    Contact Person
-                  </label>
-                  <Input
-                    placeholder="e.g. Tariq Khan"
-                    value={supplierForm.contactPerson}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, contactPerson: e.target.value })}
-                    className="h-10 rounded-xl"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                    Phone Number *
-                  </label>
-                  <Input
-                    required
-                    placeholder="0300 1234567"
-                    value={supplierForm.phone}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })}
-                    className="h-10 rounded-xl"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                    Email Address
-                  </label>
-                  <Input
-                    type="email"
-                    placeholder="vendor@supplies.com"
-                    value={supplierForm.email}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, email: e.target.value })}
-                    className="h-10 rounded-xl"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                    Payment Terms
-                  </label>
-                  <Select
-                    className="w-full h-10"
-                    value={supplierForm.paymentTerms}
-                    onChange={(val) => setSupplierForm({ ...supplierForm, paymentTerms: val })}
-                    options={[
-                      { value: 'COD', label: 'Cash on Delivery (COD)' },
-                      { value: 'NET_7', label: 'Net 7 Days' },
-                      { value: 'NET_15', label: 'Net 15 Days' },
-                      { value: 'NET_30', label: 'Net 30 Days' },
-                      { value: 'PREPAID', label: 'Prepaid' },
-                    ]}
-                  />
-                </div>
-              </div>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                  Warehouse / Dispatch Address
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Email Address
                 </label>
-                <Input.TextArea
-                  rows={2}
-                  placeholder="e.g. Plot 42-C, Korangi Industrial Area, Sector 15, Karachi"
-                  value={supplierForm.address}
-                  onChange={(e) => setSupplierForm({ ...supplierForm, address: e.target.value })}
-                  className="rounded-xl text-xs"
+                <input
+                  type="email"
+                  placeholder="vendor@supplies.com"
+                  value={supplierForm.email}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, email: e.target.value })}
+                  className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-normal text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                  NTN / STRN #
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Payment Terms
                 </label>
-                <Input
-                  placeholder="e.g. 1234567-8"
-                  value={supplierForm.taxNumber}
-                  onChange={(e) => setSupplierForm({ ...supplierForm, taxNumber: e.target.value })}
-                  className="h-10 rounded-xl"
-                />
-              </div>
-
-              <div className="flex gap-2 justify-end pt-3 border-t border-neutral-100">
-                <Button onClick={() => setIsSupplierModalOpen(false)}>Cancel</Button>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={isSavingSupplier}
-                  className="!bg-[#ffc400] !text-black font-bold border-none"
+                <select
+                  value={supplierForm.paymentTerms}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, paymentTerms: e.target.value })}
+                  className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-xs font-semibold text-neutral-900 focus:outline-none focus:border-[#F4C61A] cursor-pointer transition"
                 >
-                  Save Supplier
-                </Button>
+                  <option value="COD">Cash on Delivery (COD)</option>
+                  <option value="NET_7">Net 7 Days</option>
+                  <option value="NET_15">Net 15 Days</option>
+                  <option value="NET_30">Net 30 Days</option>
+                  <option value="PREPAID">Prepaid</option>
+                </select>
               </div>
-            </form>
-          </div>
-        </Modal>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                Warehouse / Dispatch Address
+              </label>
+              <textarea
+                rows={2}
+                placeholder="e.g. Plot 42-C, Korangi Industrial Area, Sector 15, Karachi"
+                value={supplierForm.address}
+                onChange={(e) => setSupplierForm({ ...supplierForm, address: e.target.value })}
+                className="w-full p-3 rounded-xl border border-neutral-200 bg-white text-xs font-normal text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                NTN / STRN # (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 1234567-8"
+                value={supplierForm.taxNumber}
+                onChange={(e) => setSupplierForm({ ...supplierForm, taxNumber: e.target.value })}
+                className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-mono text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+              />
+            </div>
+
+            <div className="flex justify-end pt-3 mt-4 border-t border-neutral-100">
+              <Space size="middle">
+                <CustomButton variant="secondary" type="button" onClick={() => setIsSupplierModalOpen(false)}>
+                  Cancel
+                </CustomButton>
+                <CustomButton variant="primary" htmlType="submit" loading={isSavingSupplier}>
+                  Save Supplier
+                </CustomButton>
+              </Space>
+            </div>
+          </form>
+        </CustomModal>
       </PageLayout>
     </>
   );

@@ -1,9 +1,11 @@
-// front-end/src/app/admin/(dashboard)/inventory/_components/StockTransferModal.jsx
+// src/app/admin/(dashboard)/inventory/_components/StockTransferModal.jsx
 'use client';
 
 import React, { useState } from 'react';
-import { Modal, Select } from 'antd';
+import { Select, Space } from 'antd';
+import { ArrowRightOutlined } from '@ant-design/icons';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
+import CustomModal from '@/app/admin/_components/modal/CustomModal';
 import { useToast } from '@/utils/toast';
 
 export default function StockTransferModal({
@@ -37,7 +39,9 @@ export default function StockTransferModal({
       return showError('Please enter a valid transfer quantity.');
     }
     if (Number(quantity) > selectedSourceStock) {
-      return showError(`Transfer quantity exceeds available source stock (${selectedSourceStock} ${item?.recipeUnit}).`);
+      return showError(
+        `Transfer quantity exceeds available stock (${selectedSourceStock} ${item?.recipeUnit}).`
+      );
     }
 
     onTransfer({
@@ -50,97 +54,114 @@ export default function StockTransferModal({
   };
 
   return (
-    <Modal
+    <CustomModal
       open={open}
       onCancel={onClose}
-      footer={null}
-      title={null}
-      centered
+      title="Inter-Branch Stock Transfer (STO)"
       width={520}
-      className="font-['Plus_Jakarta_Sans',sans-serif]"
     >
-      <div className="pt-2 pb-1">
-        <h3 className="text-lg font-bold text-neutral-900 m-0">Inter-Branch Stock Transfer (STO)</h3>
-        <p className="text-xs text-neutral-500 mt-1 mb-4">
-          Transfer <strong className="text-neutral-900">{item?.name}</strong> between kitchen locations
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Source Outlet <span className="text-red-500">*</span>
-              </label>
-              <Select
-                className="w-full h-10"
-                placeholder="From Branch"
-                value={sourceBranchId || undefined}
-                onChange={(val) => setSourceBranchId(val)}
-                options={branches.map((b) => ({ value: b._id, label: `${b.name} (${b.city})` }))}
-              />
-              {sourceBranchId && (
-                <span className="text-[10px] font-bold text-neutral-500 block mt-1">
-                  Available: <strong className="text-neutral-900 font-mono">{selectedSourceStock} {item?.recipeUnit}</strong>
-                </span>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Target Outlet <span className="text-red-500">*</span>
-              </label>
-              <Select
-                className="w-full h-10"
-                placeholder="To Branch"
-                value={targetBranchId || undefined}
-                onChange={(val) => setTargetBranchId(val)}
-                options={branches
-                  .filter((b) => b._id !== sourceBranchId)
-                  .map((b) => ({ value: b._id, label: `${b.name} (${b.city})` }))}
-              />
-            </div>
-          </div>
-
+      <form onSubmit={handleSubmit} className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+        {/* Item Summary Banner */}
+        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between">
           <div>
-            <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-              Quantity to Transfer ({item?.recipeUnit}) <span className="text-red-500">*</span>
+            <span className="text-xs font-semibold text-neutral-900 block">
+              {item?.name}
+            </span>
+            <span className="text-[11px] font-mono text-neutral-400">
+              SKU: {item?.sku}
+            </span>
+          </div>
+          {sourceBranchId && (
+            <div className="text-right">
+              <span className="text-[10px] text-neutral-400 font-medium block">Source Available</span>
+              <span className="text-xs font-bold text-neutral-900 font-mono">
+                {selectedSourceStock} {item?.recipeUnit}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Source & Destination Branches */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+              Source Outlet <span className="text-red-500">*</span>
             </label>
-            <input
-              type="number"
-              min="0.01"
-              step="any"
-              max={selectedSourceStock || undefined}
-              placeholder={`e.g. 500 (${item?.recipeUnit})`}
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className="w-full h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm font-mono font-bold text-neutral-900 focus:outline-none focus:border-[#ffc400]"
-              required
+            <Select
+              className="w-full h-10 staff-modern-select"
+              placeholder="From Outlet"
+              value={sourceBranchId || undefined}
+              onChange={(val) => setSourceBranchId(val)}
+              options={branches.map((b) => ({
+                value: b._id,
+                label: `${b.name} (${b.city})`,
+              }))}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-              Transfer Reason / Notes
+            <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+              Destination Outlet <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Emergency restock for evening rush"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm font-medium text-neutral-900 focus:outline-none focus:border-[#ffc400]"
+            <Select
+              className="w-full h-10 staff-modern-select"
+              placeholder="To Outlet"
+              value={targetBranchId || undefined}
+              onChange={(val) => setTargetBranchId(val)}
+              options={branches
+                .filter((b) => b._id !== sourceBranchId)
+                .map((b) => ({
+                  value: b._id,
+                  label: `${b.name} (${b.city})`,
+                }))}
             />
           </div>
+        </div>
 
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-200">
+        {/* Transfer Quantity */}
+        <div>
+          <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+            Quantity to Transfer ({item?.recipeUnit}) <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            min="0.01"
+            step="any"
+            max={selectedSourceStock || undefined}
+            placeholder={`e.g. 500 (${item?.recipeUnit || 'g'})`}
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-mono font-bold text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+            required
+          />
+        </div>
+
+        {/* Transfer Notes */}
+        <div>
+          <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+            Transfer Reason / Logistics Notes
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. Emergency restock for evening dinner rush"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-normal text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+          />
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center justify-end pt-3 mt-4 border-t border-neutral-100">
+          <Space size="middle">
             <CustomButton variant="secondary" type="button" onClick={onClose}>
               Cancel
             </CustomButton>
-            <CustomButton variant="primary" htmlType="submit" loading={loading}>
-              Execute Stock Transfer
+            <CustomButton variant="primary" htmlType="submit" loading={loading} icon={<ArrowRightOutlined />}>
+              Dispatch Transfer
             </CustomButton>
-          </div>
-        </form>
-      </div>
-    </Modal>
+          </Space>
+        </div>
+      </form>
+    </CustomModal>
   );
 }

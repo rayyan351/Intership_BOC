@@ -1,10 +1,17 @@
-// front-end/src/app/admin/(dashboard)/inventory/_components/StockAdjustmentModal.jsx
+// src/app/admin/(dashboard)/inventory/_components/StockAdjustmentModal.jsx
 'use client';
 
 import React, { useState } from 'react';
-import { Modal, Radio } from 'antd';
+import { Space } from 'antd';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
+import CustomModal from '@/app/admin/_components/modal/CustomModal';
 import { useToast } from '@/utils/toast';
+
+const ADJUSTMENT_TYPES = [
+  { value: 'SPOILAGE_WASTE', label: 'Wastage / Spoilage' },
+  { value: 'PHYSICAL_AUDIT_ADJUSTMENT', label: 'Physical Audit' },
+  { value: 'PURCHASE_INWARD', label: 'Manual Inward' },
+];
 
 export default function StockAdjustmentModal({
   open,
@@ -18,7 +25,7 @@ export default function StockAdjustmentModal({
   const [branchId, setBranchId] = useState('');
   const [adjustmentType, setAdjustmentType] = useState('SPOILAGE_WASTE');
   const [quantity, setQuantity] = useState('');
-  const [wasteReason, setWasteReason] = useState('Expired');
+  const [wasteReason, setWasteReason] = useState('Expired / Sour');
   const [notes, setNotes] = useState('');
 
   const handleSubmit = (e) => {
@@ -26,7 +33,6 @@ export default function StockAdjustmentModal({
     if (!branchId) return showError('Please select a branch outlet.');
     if (!quantity || Number(quantity) <= 0) return showError('Please enter a valid quantity.');
 
-    // Outward adjustments subtract, inward adds
     const numQty = Number(quantity);
     const finalQty = adjustmentType === 'PURCHASE_INWARD' ? numQty : -numQty;
 
@@ -42,130 +48,148 @@ export default function StockAdjustmentModal({
     });
   };
 
-  const selectedBranchStock = item?.branchStocks?.find(
-    (bs) => bs.branch?._id === branchId || bs.branch === branchId
-  )?.currentStock || 0;
+  const selectedBranchStock =
+    item?.branchStocks?.find(
+      (bs) => bs.branch?._id === branchId || bs.branch === branchId
+    )?.currentStock || 0;
 
   return (
-    <Modal
+    <CustomModal
       open={open}
       onCancel={onClose}
-      footer={null}
-      title={null}
-      centered
+      title="Stock Adjustment & Wastage Audit"
       width={520}
-      className="font-['Plus_Jakarta_Sans',sans-serif]"
     >
-      <div className="pt-2 pb-1">
-        <h3 className="text-lg font-bold text-neutral-900 m-0">Stock Adjustment & Wastage</h3>
-        <p className="text-xs text-neutral-500 mt-1 mb-4">
-          Adjusting inventory for <strong className="text-neutral-900">{item?.name}</strong> (SKU: {item?.sku})
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+        {/* Item Summary Banner */}
+        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between">
           <div>
-            <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-              Select Outlet / Branch <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={branchId}
-              onChange={(e) => setBranchId(e.target.value)}
-              className="w-full h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm font-semibold text-neutral-900 focus:outline-none focus:border-[#ffc400]"
-              required
-            >
-              <option value="">Choose Branch</option>
-              {branches.map((b) => (
-                <option key={b._id} value={b._id}>
-                  {b.name} ({b.city})
-                </option>
-              ))}
-            </select>
-            {branchId && (
-              <span className="text-[11px] font-bold text-neutral-500 block mt-1">
-                Current Branch Stock: <strong className="text-neutral-900 font-mono">{selectedBranchStock} {item?.recipeUnit}</strong>
+            <span className="text-xs font-semibold text-neutral-900 block">
+              {item?.name}
+            </span>
+            <span className="text-[11px] font-mono text-neutral-400">
+              SKU: {item?.sku}
+            </span>
+          </div>
+          {branchId && (
+            <div className="text-right">
+              <span className="text-[10px] text-neutral-400 font-medium block">Current Branch Stock</span>
+              <span className="text-xs font-bold text-neutral-900 font-mono">
+                {selectedBranchStock} {item?.recipeUnit}
               </span>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
-              Adjustment Type
-            </label>
-            <Radio.Group
-              value={adjustmentType}
-              onChange={(e) => setAdjustmentType(e.target.value)}
-              className="w-full grid grid-cols-3 gap-2"
-            >
-              <Radio.Button value="SPOILAGE_WASTE" className="text-center !text-xs font-bold !rounded-lg">
-                Wastage / Loss
-              </Radio.Button>
-              <Radio.Button value="PHYSICAL_AUDIT_ADJUSTMENT" className="text-center !text-xs font-bold !rounded-lg">
-                Physical Audit
-              </Radio.Button>
-              <Radio.Button value="PURCHASE_INWARD" className="text-center !text-xs font-bold !rounded-lg">
-                Manual Inward
-              </Radio.Button>
-            </Radio.Group>
-          </div>
-
-          {adjustmentType === 'SPOILAGE_WASTE' && (
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Wastage Reason
-              </label>
-              <select
-                value={wasteReason}
-                onChange={(e) => setWasteReason(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm font-semibold text-neutral-900 focus:outline-none focus:border-[#ffc400]"
-              >
-                <option value="Expired / Sour">Expired / Sour</option>
-                <option value="Burnt / Overcooked in Kitchen">Burnt / Overcooked in Kitchen</option>
-                <option value="Dropped / Contaminated">Dropped / Contaminated</option>
-                <option value="Damaged Packaging">Damaged Packaging</option>
-                <option value="Wrong Preparation">Wrong Preparation</option>
-              </select>
             </div>
           )}
+        </div>
 
-          <div>
-            <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-              Quantity to Adjust ({item?.recipeUnit}) <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              min="0.01"
-              step="any"
-              placeholder={`e.g. 500 (${item?.recipeUnit})`}
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className="w-full h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm font-mono font-bold text-neutral-900 focus:outline-none focus:border-[#ffc400]"
-              required
-            />
+        {/* Branch Outlet Selector */}
+        <div>
+          <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+            Select Branch Outlet <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={branchId}
+            onChange={(e) => setBranchId(e.target.value)}
+            className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-semibold text-neutral-900 focus:outline-none focus:border-[#F4C61A] cursor-pointer transition"
+            required
+          >
+            <option value="">Choose Branch Outlet</option>
+            {branches.map((b) => (
+              <option key={b._id} value={b._id}>
+                {b.name} ({b.city})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Adjustment Type Segmented Pills */}
+        <div>
+          <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+            Adjustment Type
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {ADJUSTMENT_TYPES.map((type) => {
+              const isSelected = adjustmentType === type.value;
+              return (
+                <button
+                  key={type.value}
+                  type="button"
+                  onClick={() => setAdjustmentType(type.value)}
+                  className={`py-2 px-2 rounded-xl text-xs font-semibold transition text-center cursor-pointer border ${
+                    isSelected
+                      ? 'bg-neutral-900 text-white border-neutral-900 shadow-xs'
+                      : 'bg-slate-50/70 text-neutral-600 border-neutral-200 hover:bg-slate-100/70'
+                  }`}
+                >
+                  {type.label}
+                </button>
+              );
+            })}
           </div>
+        </div>
 
+        {/* Wastage Reason Dropdown */}
+        {adjustmentType === 'SPOILAGE_WASTE' && (
           <div>
-            <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-              Audit Notes
+            <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+              Specific Wastage Reason
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Shift end fridge check verification"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm font-medium text-neutral-900 focus:outline-none focus:border-[#ffc400]"
-            />
+            <select
+              value={wasteReason}
+              onChange={(e) => setWasteReason(e.target.value)}
+              className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-semibold text-neutral-900 focus:outline-none focus:border-[#F4C61A] cursor-pointer transition"
+            >
+              <option value="Expired / Sour">Expired / Sour</option>
+              <option value="Burnt / Overcooked in Kitchen">Burnt / Overcooked in Kitchen</option>
+              <option value="Dropped / Contaminated">Dropped / Contaminated</option>
+              <option value="Damaged Packaging">Damaged Packaging</option>
+              <option value="Wrong Preparation">Wrong Preparation</option>
+            </select>
           </div>
+        )}
 
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-200">
+        {/* Quantity to Adjust */}
+        <div>
+          <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+            Quantity to Adjust ({item?.recipeUnit}) <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            min="0.01"
+            step="any"
+            placeholder={`e.g. 500 (${item?.recipeUnit || 'g'})`}
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-mono font-bold text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+            required
+          />
+        </div>
+
+        {/* Audit Notes */}
+        <div>
+          <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+            Audit Ledger Notes
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. Shift-end fridge audit verification"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-normal text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+          />
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center justify-end pt-3 mt-4 border-t border-neutral-100">
+          <Space size="middle">
             <CustomButton variant="secondary" type="button" onClick={onClose}>
               Cancel
             </CustomButton>
             <CustomButton variant="primary" htmlType="submit" loading={loading}>
-              Apply & Log Audit Ledger
+              Apply & Log Audit
             </CustomButton>
-          </div>
-        </form>
-      </div>
-    </Modal>
+          </Space>
+        </div>
+      </form>
+    </CustomModal>
   );
 }

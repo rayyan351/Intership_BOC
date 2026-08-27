@@ -1,8 +1,8 @@
-// front-end/src/app/admin/locations/_components/BranchModal.jsx
+// src/app/admin/(dashboard)/branchoperations/locations/_components/BranchModal.jsx
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { Space, Tooltip, Divider } from 'antd';
+import { Space } from 'antd';
 import {
   EnvironmentOutlined,
   CompassOutlined,
@@ -10,7 +10,7 @@ import {
   PlusOutlined,
   CheckOutlined,
 } from '@ant-design/icons';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 
@@ -150,25 +150,25 @@ export default function BranchModal({
     <CustomModal
       title={
         initialValues
-          ? `Edit Branch (${initialValues.branchCode || 'Outlet'})`
-          : 'Add New Store Branch'
+          ? `Edit Branch Outlet (${initialValues.branchCode || 'Outlet'})`
+          : 'Add New Branch Outlet'
       }
       open={open}
       onCancel={onClose}
-      width={620}
+      width={600}
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-4">
-        {/* Name & Dynamic City */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+        {/* Name & City Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <FormInput
             name="name"
             label="Branch / Outlet Name"
-            placeholder="e.g. SMCHS, Clifton Block 2, MM Alam Road"
+            placeholder="e.g. SMCHS, Clifton Block 2"
             control={control}
           />
 
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
               City
             </label>
             {!isAddingNewCity ? (
@@ -176,7 +176,7 @@ export default function BranchModal({
                 <select
                   value={currentCity}
                   onChange={(e) => setValue('city', e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:border-[#F4C61A] font-semibold"
+                  className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-slate-50/60 hover:bg-white text-xs font-semibold text-neutral-900 focus:outline-none focus:border-[#F4C61A] cursor-pointer transition"
                 >
                   {availableCities.map((c) => (
                     <option key={c} value={c}>
@@ -187,33 +187,33 @@ export default function BranchModal({
                 <button
                   type="button"
                   onClick={() => setIsAddingNewCity(true)}
-                  className="h-10 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg border border-neutral-300 text-xs font-bold transition shrink-0 flex items-center gap-1"
+                  className="h-10 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-xs font-semibold transition shrink-0 flex items-center gap-1 cursor-pointer"
                   title="Add Custom City"
                 >
-                  <PlusOutlined /> Add
+                  <PlusOutlined className="text-xs" /> Add
                 </button>
               </div>
             ) : (
               <div className="flex gap-1.5">
                 <input
                   type="text"
-                  placeholder="Enter new city name..."
+                  placeholder="Enter city..."
                   value={newCityName}
                   onChange={(e) => setNewCityName(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-[#F4C61A] bg-white text-sm focus:outline-none"
+                  className="w-full h-10 px-3 rounded-xl border border-[#F4C61A] bg-white text-xs font-semibold focus:outline-none"
                   autoFocus
                 />
                 <button
                   type="button"
                   onClick={handleAddNewCity}
-                  className="h-10 px-3 bg-[#F4C61A] hover:bg-[#e2b714] text-black font-bold rounded-lg text-xs transition shrink-0 flex items-center gap-1"
+                  className="h-10 px-3 bg-[#F4C61A] hover:bg-[#e5b713] text-black font-bold rounded-xl text-xs transition shrink-0 flex items-center gap-1 cursor-pointer"
                 >
                   <CheckOutlined /> Save
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsAddingNewCity(false)}
-                  className="h-10 px-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-lg text-xs font-bold transition shrink-0"
+                  className="h-10 px-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xl text-xs font-semibold transition shrink-0 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -224,33 +224,33 @@ export default function BranchModal({
 
         <FormInput
           name="address"
-          label="Complete Street Address / Landmark"
+          label="Street Address & Landmark"
           placeholder="e.g. Plot 14-C, Main Commercial Street, Phase 2"
           control={control}
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <FormInput
             name="phone"
-            label="Branch Phone Number"
+            label="Contact Phone"
             placeholder="e.g. 0300-1234567"
             control={control}
           />
           <FormInput
             name="deliveryFee"
-            label="Delivery Fee (Rs.)"
+            label="Base Delivery Fee (Rs.)"
             type="number"
             placeholder="0"
             control={control}
           />
         </div>
 
-        {/* Smart Coordinates & Maps Card */}
-        <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200 space-y-3">
+        {/* Location & GPS Mapping Surface */}
+        <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-neutral-800 flex items-center gap-1.5">
               <EnvironmentOutlined className="text-[#F4C61A]" />
-              Pinpoint Location (Maps & GPS)
+              GPS & Kitchen Geofencing
             </span>
 
             {lat && lng && (
@@ -258,37 +258,37 @@ export default function BranchModal({
                 href={`https://www.google.com/maps?q=${lat},${lng}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                className="text-[11px] font-semibold text-blue-600 hover:underline flex items-center gap-1"
               >
-                <LinkOutlined /> Verify Pin on Map
+                <LinkOutlined /> Verify on Map
               </a>
             )}
           </div>
 
-          {/* Map Link / Coords Paste Input */}
+          {/* Quick URL / Coordinates Auto-Extract */}
           <div className="space-y-1">
-            <label className="block text-[11px] font-semibold text-neutral-600">
-              Paste Google Maps URL or Coordinates to Auto-Fill:
+            <label className="block text-[11px] font-medium text-neutral-500">
+              Paste Google Maps link or coordinates to auto-extract:
             </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={mapInputText}
                 onChange={(e) => setMapInputText(e.target.value)}
-                placeholder="Paste Google Maps URL OR '24.8607, 67.0011'"
-                className="w-full h-9 px-3 rounded-lg border border-neutral-300 bg-white text-xs focus:outline-none focus:border-[#F4C61A]"
+                placeholder="Paste Maps URL or '24.8607, 67.0011'"
+                className="w-full h-9 px-3 rounded-xl border border-neutral-200 bg-white text-xs font-mono focus:outline-none focus:border-[#F4C61A]"
               />
               <button
                 type="button"
                 onClick={handleExtractFromMap}
-                className="h-9 px-3.5 bg-black hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition shrink-0 flex items-center gap-1"
+                className="h-9 px-3.5 bg-neutral-900 hover:bg-black text-white rounded-xl text-xs font-semibold transition shrink-0 flex items-center gap-1.5 cursor-pointer"
               >
                 <CompassOutlined /> Extract
               </button>
             </div>
           </div>
 
-          {/* Latitude & Longitude Manual Numeric Inputs */}
+          {/* Manual Numeric Coordinates */}
           <div className="grid grid-cols-2 gap-3 pt-1">
             <FormInput
               name="latitude"
@@ -311,13 +311,13 @@ export default function BranchModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormInput
               name="googleMapsUrl"
-              label="Saved Google Maps URL"
+              label="Google Maps URL (Optional)"
               placeholder="https://maps.google.com/?q=..."
               control={control}
             />
             <FormInput
               name="deliveryRadiusKm"
-              label="Delivery Radius (KM)"
+              label="Dispatch Radius (KM)"
               type="number"
               placeholder="8"
               control={control}
@@ -333,13 +333,14 @@ export default function BranchModal({
           control={control}
         />
 
-        <div className="flex justify-end pt-4 mt-6 border-t border-gray-100">
+        {/* Modal Action Buttons */}
+        <div className="flex justify-end pt-3 mt-4 border-t border-neutral-100">
           <Space size="middle">
             <CustomButton variant="secondary" onClick={onClose} type="button">
               Cancel
             </CustomButton>
             <CustomButton variant="primary" htmlType="submit" loading={loading}>
-              {initialValues ? 'Update Branch' : 'Add Branch'}
+              {initialValues ? 'Save Changes' : 'Create Branch'}
             </CustomButton>
           </Space>
         </div>

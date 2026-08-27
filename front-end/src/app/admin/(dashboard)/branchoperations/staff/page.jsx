@@ -1,20 +1,31 @@
 // src/app/admin/(dashboard)/branchoperations/staff/page.jsx
 'use client';
 
-import React, { useState } from 'react';
-import { Table, Button, Popconfirm, Tag } from 'antd';
+import React, { useState, useMemo } from 'react';
+import { Table, Tag, Popconfirm } from 'antd';
 import {
   EditOutlined,
   DeleteOutlined,
   ArrowLeftOutlined,
   ShopOutlined,
+  UserOutlined,
+  KeyOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
-import { usePermission } from '@/hooks/usePermission';
+import { useForm, Controller } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 
+import { usePermission } from '@/hooks/usePermission';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
+import FormInput from '@/app/admin/_components/formElements/inputfield/Forminput';
+import FormSelect from '@/app/admin/_components/formElements/select/FormSelect';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
 import CustomSwitch from '@/app/admin/_components/formElements/switch/CustomSwitch';
 import PermissionMatrixTable from '../roles/_components/PermissionMatrixTable';
+import TableActions from '@/app/admin/_components/table/TableActions';
+import StaffMetricsBar from './_components/StaffMetricsBar';
+import StaffFilterBar from './_components/StaffFilterBar';
 import { useToast } from '@/utils/toast';
 
 import {
@@ -25,6 +36,15 @@ import {
 } from '@/services/staffApi';
 import { useGetRolesAndModulesQuery } from '@/services/roleApi';
 import { useGetBranchesQuery } from '@/services/branchApi';
+
+const staffSchema = yup.object().shape({
+  name: yup.string().required('Full name is required'),
+  email: yup.string().email('Enter a valid email').required('Email is required'),
+  password: yup.string().optional(),
+  roleId: yup.string().required('Role template assignment is required'),
+  branchId: yup.string().required('Branch outlet assignment is required'),
+  isActive: yup.boolean().default(true),
+});
 
 export default function StaffPage() {
   const { contextHolder, showSuccess, showError } = useToast();
@@ -41,51 +61,135 @@ export default function StaffPage() {
 
   const roles = rolesData?.roles || [];
 
-  const [viewMode, setViewMode] = useState('list'); // 'list' | 'form'
+  const [viewMode, setViewMode] = useState('list');
+  const [activeTab, setActiveTab] = useState('account_details');
   const [selectedStaffId, setSelectedStaffId] = useState(null);
+  const [customPermissions, setCustomPermissions] = useState([]);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    roleId: '',
-    branchId: '',
-    customPermissions: [],
-    isActive: true,
-  });
+  // Multi-Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState('');
+  const [selectedCityFilter, setSelectedCityFilter] = useState('');
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState('');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState('');
 
   const [createStaff, { isLoading: isCreating }] = useCreateStaffMutation();
   const [updateStaff, { isLoading: isUpdating }] = useUpdateStaffMutation();
   const [deleteStaff] = useDeleteStaffMutation();
 
+  const { control, handleSubmit, reset, setValue } = useForm({
+    resolver: yupResolver(staffSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      roleId: '',
+      branchId: '',
+      isActive: true,
+    },
+  });
+
+  const availableCities = useMemo(() => {
+    const cities = new Set(branches.map((b) => b.city).filter(Boolean));
+    return Array.from(cities);
+  }, [branches]);
+
+  const filteredBranchOptions = useMemo(() => {
+    if (!selectedCityFilter) return branches;
+    return branches.filter((b) => b.city?.toLowerCase() === selectedCityFilter.toLowerCase());
+  }, [branches, selectedCityFilter]);
+
+  const filteredStaffList = useMemo(() => {
+    return staffList.filter((staff) => {
+      const staffBranchId = staff.branch?._id || staff.branch;
+      const staffRoleId = staff.roleId?._id || staff.roleId;
+      const staffCity = staff.branch?.city;
+
+      if (searchTerm) {
+        const query = searchTerm.toLowerCase();
+        const matchesName = staff.name?.toLowerCase().includes(query);
+        const matchesEmail = staff.email?.toLowerCase().includes(query);
+        const matchesEmpId = staff.employeeId?.toLowerCase().includes(query);
+        if (!matchesName && !matchesEmail && !matchesEmpId) return false;
+      }
+
+      if (selectedCityFilter && staffCity?.toLowerCase() !== selectedCityFilter.toLowerCase()) {
+        return false;
+      }
+
+      if (selectedBranchFilter && String(staffBranchId) !== String(selectedBranchFilter)) {
+        return false;
+      }
+
+      if (selectedRoleFilter && String(staffRoleId) !== String(selectedRoleFilter) && staff.role !== selectedRoleFilter) {
+        return false;
+      }
+
+      if (selectedStatusFilter !== '') {
+        const isActiveBool = selectedStatusFilter === 'active';
+        if (staff.isActive !== isActiveBool) return false;
+      }
+
+      return true;
+    });
+  }, [
+    staffList,
+    searchTerm,
+    selectedCityFilter,
+    selectedBranchFilter,
+    selectedRoleFilter,
+    selectedStatusFilter,
+  ]);
+
+  const metrics = useMemo(() => {
+    const total = staffList.length;
+    const active = staffList.filter((s) => s.isActive !== false).length;
+    const inactive = staffList.filter((s) => s.isActive === false).length;
+    return { total, active, inactive };
+  }, [staffList]);
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setSelectedCityFilter('');
+    setSelectedBranchFilter('');
+    setSelectedRoleFilter('');
+    setSelectedStatusFilter('');
+  };
+
+  const hasActiveFilters = Boolean(
+    searchTerm || selectedCityFilter || selectedBranchFilter || selectedRoleFilter || selectedStatusFilter !== ''
+  );
+
   const handleStartCreate = () => {
     setSelectedStaffId(null);
+    setActiveTab('account_details');
     const defaultBranch = branches[0]?._id || '';
     const defaultRole = roles[0];
 
-    setFormData({
+    reset({
       name: '',
       email: '',
       password: '',
       roleId: defaultRole?._id || '',
       branchId: defaultBranch,
-      customPermissions: defaultRole?.permissions ? [...defaultRole.permissions] : [],
       isActive: true,
     });
+    setCustomPermissions(defaultRole?.permissions ? [...defaultRole.permissions] : []);
     setViewMode('form');
   };
 
   const handleStartEdit = (user) => {
     setSelectedStaffId(user._id);
-    setFormData({
+    setActiveTab('account_details');
+    reset({
       name: user.name || '',
       email: user.email || '',
-      password: '', // Keep empty unless resetting
+      password: '',
       roleId: user.roleId?._id || user.roleId || '',
       branchId: user.branch?._id || user.branch || '',
-      customPermissions: user.customPermissions || [],
       isActive: user.isActive ?? true,
     });
+    setCustomPermissions(user.customPermissions || []);
     setViewMode('form');
   };
 
@@ -94,36 +198,32 @@ export default function StaffPage() {
     setSelectedStaffId(null);
   };
 
-  const handleRoleChange = (roleId) => {
+  const handleRoleSelection = (roleId) => {
+    setValue('roleId', roleId);
     const matchedRole = roles.find((r) => r._id === roleId);
-    setFormData((prev) => ({
-      ...prev,
-      roleId,
-      customPermissions: matchedRole?.permissions ? [...matchedRole.permissions] : prev.customPermissions,
-    }));
+    if (matchedRole?.permissions) {
+      setCustomPermissions([...matchedRole.permissions]);
+    }
   };
 
-  const handleSaveForm = async (e) => {
-    e.preventDefault();
-    if (!formData.name.trim() || !formData.email.trim() || !formData.roleId || !formData.branchId) {
-      showError('Please fill all required profile fields');
-      return;
-    }
-
-    if (!selectedStaffId && !formData.password.trim()) {
+  const handleSaveForm = async (values) => {
+    if (!selectedStaffId && !values.password?.trim()) {
       showError('Password is required for new accounts');
       return;
     }
 
     try {
-      if (selectedStaffId) {
-        const payload = { ...formData };
-        if (!payload.password.trim()) delete payload.password;
+      const payload = {
+        ...values,
+        customPermissions,
+      };
 
+      if (selectedStaffId) {
+        if (!payload.password?.trim()) delete payload.password;
         await updateStaff({ id: selectedStaffId, ...payload }).unwrap();
         showSuccess('Staff account updated successfully');
       } else {
-        await createStaff(formData).unwrap();
+        await createStaff(payload).unwrap();
         showSuccess('Staff account created successfully');
       }
       setViewMode('list');
@@ -160,8 +260,8 @@ export default function StaffPage() {
       render: (_, record) => (
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-bold text-neutral-900 text-sm">{record.name}</span>
-            <span className="text-[10px] font-mono font-bold bg-neutral-100 text-neutral-700 px-1.5 py-0.5 rounded border border-neutral-200">
+            <span className="font-semibold text-neutral-900 text-sm">{record.name}</span>
+            <span className="text-[11px] font-mono font-bold bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md">
               {record.employeeId || 'EMP-1000'}
             </span>
           </div>
@@ -172,7 +272,7 @@ export default function StaffPage() {
     {
       title: 'Assigned Role',
       key: 'role',
-      width: '20%',
+      width: '22%',
       render: (_, record) => {
         const isMasterAdmin = record.role === 'admin' || record.role === 'super_admin';
         const activeCount = Array.isArray(record.customPermissions)
@@ -181,14 +281,14 @@ export default function StaffPage() {
 
         return (
           <div>
-            <Tag
-              color={isMasterAdmin ? 'gold' : 'blue'}
-              className="m-0 font-bold uppercase text-[10px] px-2 py-0.5 border-none"
+            <span
+              className={`inline-block font-bold text-[11px] px-2.5 py-0.5 rounded-full ${isMasterAdmin ? 'bg-amber-100 text-amber-900' : 'bg-blue-50 text-blue-700'
+                }`}
             >
               {record.roleId?.name || record.role || 'Staff'}
-            </Tag>
+            </span>
             <span className="text-[11px] text-neutral-400 block mt-1">
-              {isMasterAdmin ? 'Full Master Access' : `${activeCount} Capabilities Active`}
+              {isMasterAdmin ? 'Full Master Access' : `${activeCount} capabilities active`}
             </span>
           </div>
         );
@@ -199,14 +299,16 @@ export default function StaffPage() {
       key: 'branch',
       width: '22%',
       render: (_, record) => (
-        <div className="flex items-center gap-1.5">
-          <ShopOutlined className="text-neutral-400 text-xs" />
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-neutral-100 text-neutral-500 flex items-center justify-center text-xs">
+            <ShopOutlined />
+          </div>
           <div>
             <span className="text-xs font-semibold text-neutral-800 block">
               {record.branch?.name || 'Unassigned'}
             </span>
-            <span className="text-[10px] text-neutral-400">
-              {record.branch?.city || 'HQ'} ({record.branch?.branchCode || 'HQ-001'})
+            <span className="text-[11px] text-neutral-400 font-mono">
+              {record.branch?.city || 'HQ'} {record.branch?.branchCode ? `(${record.branch.branchCode})` : ''}
             </span>
           </div>
         </div>
@@ -223,7 +325,7 @@ export default function StaffPage() {
             disabled={!canToggleStatus}
             onChange={(checked) => handleToggleActiveState(record, checked)}
           />
-          <span className={`text-[11px] font-bold ${record.isActive ? 'text-emerald-600' : 'text-neutral-400'}`}>
+          <span className={`text-[11px] font-semibold ${record.isActive ? 'text-emerald-600' : 'text-neutral-400'}`}>
             {record.isActive ? 'Active' : 'Inactive'}
           </span>
         </div>
@@ -233,41 +335,25 @@ export default function StaffPage() {
       title: 'Actions',
       key: 'actions',
       align: 'right',
-      width: '16%',
+      width: '14%',
       render: (_, record) => {
         if (!canEdit && !canDelete) {
           return (
-            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+            <Tag color="default" className="text-[10px] font-bold text-neutral-400 border-none">
               View Only
             </Tag>
           );
         }
 
         return (
-          <div className="flex items-center justify-end gap-1.5">
-            {canEdit && (
-              <Button
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => handleStartEdit(record)}
-                className="!text-xs font-semibold"
-              >
-                Edit
-              </Button>
-            )}
-
-            {canDelete && (
-              <Popconfirm
-                title="Delete Staff"
-                description={`Delete account for ${record.name}?`}
-                onConfirm={() => handleDeleteStaff(record._id)}
-                okText="Yes"
-                cancelText="No"
-              >
-                <Button size="small" danger icon={<DeleteOutlined />} className="!text-xs" />
-              </Popconfirm>
-            )}
-          </div>
+          <TableActions
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onEdit={() => handleStartEdit(record)}
+            onDelete={() => handleDeleteStaff(record._id)}
+            deleteTitle="Delete Staff Member?"
+            deleteDescription={`Permanently delete credentials for ${record.name}?`}
+          />
         );
       },
     },
@@ -277,33 +363,60 @@ export default function StaffPage() {
     <>
       {contextHolder}
       <PageLayout
-        title={viewMode === 'form' ? (selectedStaffId ? 'Edit Staff Account' : 'Create Staff Member') : 'Staff & Accounts'}
-        subTitle="Manage outlet employees, credential assignments, and custom capability overrides"
+        title={viewMode === 'form' ? (selectedStaffId ? 'Edit Staff Profile' : 'Create Staff Member') : 'Staff & Accounts'}
+        subTitle={
+          viewMode === 'form'
+            ? 'Configure profile credentials, assign outlet, and customize permissions'
+            : 'Manage outlet employees, credential assignments, and custom capability overrides'
+        }
         onAdd={viewMode === 'list' && canAdd ? handleStartCreate : null}
         addText="Add Staff Member"
       >
         {viewMode === 'form' ? (
-          <form onSubmit={handleSaveForm} className="space-y-5 font-['Plus_Jakarta_Sans',sans-serif]">
-            {/* Top Action Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-200">
+          <form onSubmit={handleSubmit(handleSaveForm)} className="space-y-6">
+            {/* Top Bar: Tabs & Action Buttons */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={handleCancelForm}
-                  className="w-8 h-8 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 flex items-center justify-center text-neutral-600 transition shadow-sm"
+                  className="w-9 h-9 rounded-xl bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-700 transition cursor-pointer shrink-0"
                 >
                   <ArrowLeftOutlined className="text-xs" />
                 </button>
-                <div>
-                  <h3 className="text-sm font-bold text-neutral-900 m-0">
-                    {selectedStaffId ? 'Edit Staff Credentials & Capabilities' : 'New Staff Credentials & Capabilities'}
-                  </h3>
-                  <span className="text-[11px] text-neutral-400 font-medium">
-                    {formData.customPermissions.length} capabilities configured for this user
-                  </span>
+
+                {/* Navigation Pill Tabs */}
+                <div className="flex gap-1.5 p-1 bg-neutral-100/80 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('account_details')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${activeTab === 'account_details'
+                        ? 'bg-white text-neutral-900 shadow-xs font-bold'
+                        : 'text-neutral-500 hover:text-neutral-900'
+                      }`}
+                  >
+                    <UserOutlined className={activeTab === 'account_details' ? 'text-amber-500' : ''} />
+                    <span>Account & Role Setup</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('permissions')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${activeTab === 'permissions'
+                        ? 'bg-white text-neutral-900 shadow-xs font-bold'
+                        : 'text-neutral-500 hover:text-neutral-900'
+                      }`}
+                  >
+                    <KeyOutlined className={activeTab === 'permissions' ? 'text-amber-500' : ''} />
+                    <span>Permission Matrix</span>
+                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded-md bg-neutral-50 text-neutral-700 border border-neutral-200/60">
+                      {customPermissions.length}
+                    </span>
+                  </button>
                 </div>
               </div>
 
+              {/* Action Buttons */}
               <div className="flex items-center gap-2">
                 <CustomButton variant="secondary" onClick={handleCancelForm} type="button">
                   Cancel
@@ -314,127 +427,171 @@ export default function StaffPage() {
               </div>
             </div>
 
-            {/* Profile Inputs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Ali Ahmed"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full h-10 px-3.5 rounded-lg border border-neutral-200 bg-white text-sm font-semibold text-neutral-900 focus:outline-none focus:border-[#ffc400] transition"
-                  required
+            {/* TAB 1: Account Setup */}
+            {activeTab === 'account_details' && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-1">
+                {/* Column 1: Personal Credentials */}
+                <div className="space-y-4">
+                  <div className="border-b border-neutral-100 pb-2">
+                    <span className="text-sm font-semibold text-neutral-900 tracking-tight block">
+                      1. Login Credentials
+                    </span>
+                    <span className="text-xs text-neutral-400 font-normal">
+                      Authentication details used to access the management portal
+                    </span>
+                  </div>
+
+                  <FormInput
+                    name="name"
+                    label="Full Name"
+                    placeholder="e.g. Ali Ahmed"
+                    control={control}
+                  />
+
+                  <FormInput
+                    name="email"
+                    label="Email / Login ID"
+                    placeholder="staff@burgeroclock.com"
+                    type="email"
+                    control={control}
+                  />
+
+                  <FormInput
+                    name="password"
+                    label={selectedStaffId ? 'Password (Leave blank to retain current)' : 'Password'}
+                    placeholder="••••••••"
+                    type="password"
+                    control={control}
+                  />
+                </div>
+
+                {/* Column 2: Kitchen Branch & Role Blueprint */}
+                <div className="space-y-4">
+                  <div className="border-b border-neutral-100 pb-2">
+                    <span className="text-sm font-semibold text-neutral-900 tracking-tight block">
+                      2. Outlet & Role Assignment
+                    </span>
+                    <span className="text-xs text-neutral-400 font-normal">
+                      Assign kitchen outlet and default permission blueprint
+                    </span>
+                  </div>
+
+                  <FormSelect
+                    name="branchId"
+                    label="Assigned Kitchen Branch"
+                    placeholder="Select Outlet"
+                    control={control}
+                    options={branches.map((b) => ({
+                      value: b._id,
+                      label: `${b.name} (${b.city})`,
+                    }))}
+                  />
+
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                      Base Role Template
+                    </label>
+                    <Controller
+                      name="roleId"
+                      control={control}
+                      render={({ field }) => (
+                        <FormSelect
+                          name="roleId"
+                          control={control}
+                          placeholder="Select Role Template"
+                          options={roles.map((r) => ({
+                            value: r._id,
+                            label: `${r.name} (${r.permissions?.length || 0} permissions template)`,
+                          }))}
+                          onChange={(val) => handleRoleSelection(val)}
+                        />
+                      )}
+                    />
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-neutral-50/70 border border-neutral-100 mt-4">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-neutral-800 mb-1">
+                      <SafetyCertificateOutlined className="text-amber-500" />
+                      <span>Custom Permission Overrides</span>
+                    </div>
+                    <p className="text-xs text-neutral-500 m-0 leading-relaxed font-normal">
+                      This user currently has <strong>{customPermissions.length}</strong> active capabilities. Switch to the <strong>Permission Matrix</strong> tab to customize individual permissions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: Permission Matrix */}
+            {activeTab === 'permissions' && (
+              <div className="space-y-4 pt-1 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
+                  <div>
+                    <span className="text-sm font-semibold text-neutral-900 tracking-tight block">
+                      Granular Permission Overrides
+                    </span>
+                    <span className="text-xs text-neutral-400 font-normal">
+                      Toggle specific module and action privileges for this employee
+                    </span>
+                  </div>
+                  <span className="text-xs font-semibold text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-full">
+                    {customPermissions.length} permissions active
+                  </span>
+                </div>
+
+                <PermissionMatrixTable
+                  value={customPermissions}
+                  onChange={(updatedPermissions) => setCustomPermissions(updatedPermissions)}
                 />
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
-                  Email / Login ID <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  placeholder="staff@burgeroclock.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full h-10 px-3.5 rounded-lg border border-neutral-200 bg-white text-sm font-semibold text-neutral-900 focus:outline-none focus:border-[#ffc400] transition"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
-                  Password {selectedStaffId ? '(Leave blank to keep current)' : <span className="text-red-500">*</span>}
-                </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full h-10 px-3.5 rounded-lg border border-neutral-200 bg-white text-sm font-semibold text-neutral-900 focus:outline-none focus:border-[#ffc400] transition"
-                  required={!selectedStaffId}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
-                  Assigned Branch Outlet <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.branchId}
-                  onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
-                  className="w-full h-10 px-3 rounded-lg border border-neutral-200 bg-white text-sm font-semibold text-neutral-900 focus:outline-none focus:border-[#ffc400]"
-                  required
-                >
-                  <option value="" disabled>Select Outlet</option>
-                  {branches.map((b) => (
-                    <option key={b._id} value={b._id}>
-                      {b.name} ({b.city} - {b.branchCode})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Role Template Selector Strip */}
-            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <span className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
-                  Select Base Role Template
-                </span>
-                <span className="text-[11px] text-neutral-500">
-                  Selecting a role auto-populates its default capabilities below. You can customize them for this user.
-                </span>
-              </div>
-
-              <div className="min-w-[240px]">
-                <select
-                  value={formData.roleId}
-                  onChange={(e) => handleRoleChange(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm font-bold text-neutral-900 focus:outline-none focus:border-[#ffc400]"
-                  required
-                >
-                  <option value="" disabled>Select Role Template</option>
-                  {roles.map((r) => (
-                    <option key={r._id} value={r._id}>
-                      {r.name} ({r.permissions?.length || 0} permissions)
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* User Custom Permissions Matrix */}
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
-                  User-Specific Permission Overrides
-                </span>
-                <span className="text-[11px] text-neutral-400 font-medium">
-                  {formData.customPermissions.length} Capabilities Granted
-                </span>
-              </div>
-
-              <PermissionMatrixTable
-                value={formData.customPermissions}
-                onChange={(updatedPermissions) =>
-                  setFormData((prev) => ({ ...prev, customPermissions: updatedPermissions }))
-                }
-              />
-            </div>
+            )}
           </form>
         ) : (
-          <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm font-['Plus_Jakarta_Sans',sans-serif]">
-            <Table
-              columns={columns}
-              dataSource={staffList}
-              rowKey="_id"
-              loading={isStaffLoading || isRolesLoading || isBranchesLoading}
-              pagination={{ pageSize: 10 }}
-              size="middle"
+          <div className="space-y-6">
+            <StaffMetricsBar
+              metrics={metrics}
+              activeStatusFilter={selectedStatusFilter}
+              onStatusFilterChange={setSelectedStatusFilter}
             />
+
+            <StaffFilterBar
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              cityFilter={selectedCityFilter}
+              onCityFilterChange={(city) => {
+                setSelectedCityFilter(city);
+                setSelectedBranchFilter('');
+              }}
+              branchFilter={selectedBranchFilter}
+              onBranchFilterChange={setSelectedBranchFilter}
+              roleFilter={selectedRoleFilter}
+              onRoleFilterChange={setSelectedRoleFilter}
+              statusFilter={selectedStatusFilter}
+              onStatusFilterChange={setSelectedStatusFilter}
+              onResetFilters={handleResetFilters}
+              hasActiveFilters={hasActiveFilters}
+              availableCities={availableCities}
+              branchOptions={filteredBranchOptions}
+              roles={roles}
+            />
+
+            <div className="overflow-hidden">
+              <Table
+                columns={columns}
+                dataSource={filteredStaffList}
+                rowKey="_id"
+                loading={isStaffLoading || isRolesLoading || isBranchesLoading}
+                pagination={{
+                  pageSize: 10,
+                  showTotal: (total, range) => (
+                    <span className="text-xs text-neutral-400 font-normal">
+                      Showing {range[0]}-{range[1]} of {total} staff accounts
+                    </span>
+                  ),
+                }}
+                size="middle"
+              />
+            </div>
           </div>
         )}
       </PageLayout>

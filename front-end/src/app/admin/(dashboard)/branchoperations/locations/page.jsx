@@ -1,15 +1,17 @@
+// src/app/admin/(dashboard)/branchoperations/locations/page.jsx
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Button, Space, Tag } from 'antd';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Tag } from 'antd';
+import { EnvironmentOutlined } from '@ant-design/icons';
 import { usePermission } from '@/hooks/usePermission';
 
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
-import ConfirmModal from '@/app/admin/_components/modal/ConfirmModal';
+import TableActions from '@/app/admin/_components/table/TableActions';
 import CustomSwitch from '@/app/admin/_components/formElements/switch/CustomSwitch';
 import BranchModal from './_components/BranchModal';
 import { useToast } from '@/utils/toast';
+import { formatPrice } from '@/lib/currency';
 import {
   useGetBranchesQuery,
   useCreateBranchMutation,
@@ -21,9 +23,6 @@ export default function LocationsPage() {
   const { contextHolder, showSuccess, showError } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState(null);
-
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [branchToDelete, setBranchToDelete] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -36,21 +35,21 @@ export default function LocationsPage() {
   const { data: branches = [], isLoading } = useGetBranchesQuery({ all: 'true' });
   const [createBranch, { isLoading: isCreating }] = useCreateBranchMutation();
   const [updateBranch, { isLoading: isUpdating }] = useUpdateBranchMutation();
-  const [deleteBranch, { isLoading: isDeleting }] = useDeleteBranchMutation();
+  const [deleteBranch] = useDeleteBranchMutation();
 
   const handleSave = async (values) => {
     try {
       if (selectedBranch) {
         await updateBranch({ id: selectedBranch._id, ...values }).unwrap();
-        showSuccess('Branch updated successfully!');
+        showSuccess('Branch outlet updated successfully!');
       } else {
         await createBranch(values).unwrap();
-        showSuccess('Branch added successfully!');
+        showSuccess('New branch outlet created successfully!');
       }
       setIsModalOpen(false);
       setSelectedBranch(null);
     } catch (error) {
-      showError(error?.data?.message || 'Failed to save branch');
+      showError(error?.data?.message || 'Failed to save branch outlet');
     }
   };
 
@@ -61,44 +60,45 @@ export default function LocationsPage() {
       await updateBranch({ id: record._id, isShown: isChecked }).unwrap();
       showSuccess(`"${record.name}" is now ${isChecked ? 'active' : 'hidden'}`);
     } catch (error) {
-      showError(error?.data?.message || 'Failed to update status');
+      showError(error?.data?.message || 'Failed to update branch status');
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const handleDelete = async () => {
-    if (!branchToDelete) return;
+  const handleDelete = async (id) => {
     try {
-      await deleteBranch(branchToDelete._id).unwrap();
-      showSuccess('Branch deleted successfully!');
-      setIsDeleteModalOpen(false);
-      setBranchToDelete(null);
+      await deleteBranch(id).unwrap();
+      showSuccess('Branch outlet deleted successfully!');
     } catch (error) {
-      showError(error?.data?.message || 'Failed to delete branch');
+      showError(error?.data?.message || 'Failed to delete branch outlet');
     }
   };
 
   const filteredBranches = branches.filter(
     (b) =>
       b.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.city?.toLowerCase().includes(searchTerm.toLowerCase())
+      b.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      b.branchCode?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const columns = [
     {
-      title: 'Branch / Area',
+      title: 'Branch Outlet',
       dataIndex: 'name',
       key: 'name',
+      width: '28%',
       render: (text, r) => (
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-bold text-gray-900">{text}</span>
-            <span className="text-[11px] font-mono font-semibold px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-900 border border-yellow-300">
-              {r.branchCode || 'NO-CODE'}
+            <span className="font-semibold text-neutral-900 text-sm">{text}</span>
+            <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-600">
+              {r.branchCode || 'HQ-001'}
             </span>
           </div>
-          <span className="text-xs text-gray-400 block">{r.address || 'No address specified'}</span>
+          <span className="text-xs text-neutral-400 block mt-0.5 font-normal">
+            {r.address || 'No physical address specified'}
+          </span>
         </div>
       ),
     },
@@ -106,90 +106,93 @@ export default function LocationsPage() {
       title: 'City',
       dataIndex: 'city',
       key: 'city',
+      width: '14%',
       render: (city) => (
-        <Tag color={city === 'Karachi' ? 'gold' : city === 'Lahore' ? 'green' : 'blue'}>
+        <Tag
+          color={city === 'Karachi' ? 'gold' : city === 'Lahore' ? 'green' : 'blue'}
+          className="border-none font-semibold text-[11px] px-2.5 py-0.5 rounded-full"
+        >
           {city}
         </Tag>
       ),
     },
     {
-      title: 'Map & Coordinates',
+      title: 'Coordinates & Geo-Radius',
       key: 'coords',
+      width: '24%',
       render: (_, r) => (
         r.latitude && r.longitude ? (
           <a
             href={r.googleMapsUrl || `https://www.google.com/maps?q=${r.latitude},${r.longitude}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-blue-600 hover:underline font-mono"
+            className="text-xs text-blue-600 hover:underline font-mono inline-flex items-center gap-1.5"
           >
-            {r.latitude.toFixed(4)}, {r.longitude.toFixed(4)} ({r.deliveryRadiusKm || 8}km)
+            <EnvironmentOutlined className="text-neutral-400 text-xs" />
+            <span>{r.latitude.toFixed(4)}, {r.longitude.toFixed(4)}</span>
+            <span className="text-[11px] font-sans font-semibold text-neutral-400">({r.deliveryRadiusKm || 8} km radius)</span>
           </a>
         ) : (
-          <span className="text-xs text-gray-400 italic">No GPS set</span>
+          <span className="text-xs text-neutral-400 font-normal">No GPS coordinates set</span>
         )
       ),
     },
     {
-      title: 'Delivery Fee',
+      title: 'Base Delivery Fee',
       dataIndex: 'deliveryFee',
       key: 'deliveryFee',
-      render: (fee) => <span className="font-semibold text-gray-800">Rs. {fee || 0}</span>,
+      width: '14%',
+      render: (fee) => (
+        <span className="text-xs font-semibold text-neutral-800">
+          {fee ? formatPrice(fee) : 'Free'}
+        </span>
+      ),
     },
     {
       title: 'Status',
       dataIndex: 'isShown',
       key: 'isShown',
+      width: '10%',
       render: (isShown, record) => (
-        <Space size="small">
+        <div className="flex items-center gap-2">
           <CustomSwitch
             checked={record.isShown ?? true}
             disabled={!canToggleStatus}
             loading={updatingId === record._id}
             onChange={(checked) => handleStatusToggle(record, checked)}
           />
-          <span className="text-xs font-semibold text-gray-600">
-            {record.isShown ?? true ? 'Active' : 'Disabled'}
+          <span className={`text-[11px] font-semibold ${record.isShown ?? true ? 'text-emerald-600' : 'text-neutral-400'}`}>
+            {record.isShown ?? true ? 'Active' : 'Hidden'}
           </span>
-        </Space>
+        </div>
       ),
     },
     {
       title: 'Actions',
       key: 'actions',
+      align: 'right',
+      width: '10%',
       render: (_, record) => {
         if (!canEdit && !canDelete) {
           return (
-            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+            <Tag color="default" className="text-[10px] font-bold text-neutral-400 border-none">
               View Only
             </Tag>
           );
         }
 
         return (
-          <Space size="middle">
-            {canEdit && (
-              <Button
-                type="text"
-                icon={<EditOutlined className="text-gray-600" />}
-                onClick={() => {
-                  setSelectedBranch(record);
-                  setIsModalOpen(true);
-                }}
-              />
-            )}
-            {canDelete && (
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => {
-                  setBranchToDelete(record);
-                  setIsDeleteModalOpen(true);
-                }}
-              />
-            )}
-          </Space>
+          <TableActions
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onEdit={() => {
+              setSelectedBranch(record);
+              setIsModalOpen(true);
+            }}
+            onDelete={() => handleDelete(record._id)}
+            deleteTitle="Delete Store Branch?"
+            deleteDescription={`Are you sure you want to remove "${record.name}"? Orders routing to this outlet may be disrupted.`}
+          />
         );
       },
     },
@@ -200,7 +203,7 @@ export default function LocationsPage() {
       {contextHolder}
       <PageLayout
         title="Store Locations & Outlets"
-        subTitle="Manage operational cities, branch delivery areas, and fees"
+        subTitle="Manage operational cities, branch kitchen coordinates, and delivery dispatch radius"
         onAdd={
           canAdd
             ? () => {
@@ -212,16 +215,25 @@ export default function LocationsPage() {
         addText="Add New Branch"
         searchValue={searchTerm}
         onSearch={setSearchTerm}
-        searchPlaceholder="Search branch or city..."
+        searchPlaceholder="Search by outlet name, code, or city..."
       >
-        <Table
-          columns={columns}
-          dataSource={filteredBranches}
-          rowKey="_id"
-          loading={isLoading}
-          pagination={{ pageSize: 8 }}
-          bordered={false}
-        />
+        <div className="overflow-hidden">
+          <Table
+            columns={columns}
+            dataSource={filteredBranches}
+            rowKey="_id"
+            loading={isLoading}
+            pagination={{
+              pageSize: 8,
+              showTotal: (total, range) => (
+                <span className="text-xs text-neutral-400 font-normal">
+                  Showing {range[0]}-{range[1]} of {total} branch locations
+                </span>
+              ),
+            }}
+            size="middle"
+          />
+        </div>
 
         <BranchModal
           open={isModalOpen}
@@ -233,15 +245,6 @@ export default function LocationsPage() {
           loading={isCreating || isUpdating}
           initialValues={selectedBranch}
           existingBranches={branches}
-        />
-
-        <ConfirmModal
-          open={isDeleteModalOpen}
-          onCancel={() => setIsDeleteModalOpen(false)}
-          onConfirm={handleDelete}
-          title="Delete Store Branch"
-          description={`Are you sure you want to remove "${branchToDelete?.name}"?`}
-          loading={isDeleting}
         />
       </PageLayout>
     </>

@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Tag, Select, Button, Modal, Tooltip, Input, Popconfirm } from 'antd';
+import { Table, Select, Tooltip, Popconfirm, Space } from 'antd';
 import {
   LockOutlined,
   StopOutlined,
@@ -11,6 +11,8 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
+import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
+import CustomModal from '@/app/admin/_components/modal/CustomModal';
 import {
   useGetOrdersQuery,
   useUpdateOrderStatusMutation,
@@ -21,12 +23,12 @@ import { useToast } from '@/utils/toast';
 import { formatPrice } from '@/lib/currency';
 
 const STATUS_OPTIONS = [
-  { value: 'PENDING', label: 'Pending', color: 'blue' },
-  { value: 'PREPARING', label: 'Cooking / Preparing', color: 'gold' },
-  { value: 'READY', label: 'Ready for Pickup', color: 'cyan' },
-  { value: 'ON_THE_WAY', label: 'On The Way', color: 'orange' },
-  { value: 'DELIVERED', label: 'Delivered (Completed)', color: 'green' },
-  { value: 'CANCELLED', label: 'Cancel Order...', color: 'red' },
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'PREPARING', label: 'Cooking / Preparing' },
+  { value: 'READY', label: 'Ready for Pickup' },
+  { value: 'ON_THE_WAY', label: 'On The Way' },
+  { value: 'DELIVERED', label: 'Delivered (Completed)' },
+  { value: 'CANCELLED', label: 'Cancel Order...' },
 ];
 
 const PRESET_CANCEL_REASONS = [
@@ -69,7 +71,7 @@ export default function AdminOrdersPage() {
         id: orderId,
         orderStatus: newStatus,
       }).unwrap();
-      showSuccess(`Order updated to ${newStatus}`);
+      showSuccess(`Order updated to ${newStatus.toLowerCase().replace(/_/g, ' ')}`);
     } catch (err) {
       showError(err?.data?.message || 'Failed to update order status');
     }
@@ -112,7 +114,7 @@ export default function AdminOrdersPage() {
       render: (num, r) => (
         <div>
           <span className="font-mono font-bold text-neutral-900 text-xs block">{num}</span>
-          <span className="text-[10px] text-neutral-400 font-mono">
+          <span className="text-[11px] text-neutral-400 font-normal">
             {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} •{' '}
             {new Date(r.createdAt).toLocaleDateString()}
           </span>
@@ -122,17 +124,17 @@ export default function AdminOrdersPage() {
     {
       title: 'Customer & Items',
       key: 'customer',
-      width: '26%',
+      width: '28%',
       render: (_, r) => (
         <div>
           <div className="flex items-center gap-1.5">
-            <span className="font-bold text-neutral-900 text-xs">{r.customer?.name}</span>
-            <span className="text-[11px] text-neutral-500 font-mono">({r.customer?.phone})</span>
+            <span className="font-semibold text-neutral-900 text-xs">{r.customer?.name}</span>
+            <span className="text-[11px] text-neutral-400 font-mono">({r.customer?.phone})</span>
           </div>
-          <span className="text-[10px] text-neutral-400 truncate block max-w-xs" title={r.customer?.address}>
-            {r.customer?.address}
+          <span className="text-[11px] text-neutral-400 truncate block max-w-xs font-normal" title={r.customer?.address}>
+            {r.customer?.address || 'Pickup / Counter Order'}
           </span>
-          <div className="text-[11px] text-neutral-700 font-medium mt-1">
+          <div className="text-xs text-neutral-700 font-medium mt-1">
             {r.items?.map((i) => `${i.quantity}x ${i.name}`).join(', ')}
           </div>
         </div>
@@ -142,18 +144,18 @@ export default function AdminOrdersPage() {
       title: 'Kitchen & Transit ETA',
       dataIndex: 'branch',
       key: 'branch',
-      width: '16%',
+      width: '18%',
       render: (b, r) => (
         <div>
           <span className="text-xs font-semibold text-neutral-800 block">
             📍 {b?.name ? `${b.name} (${b.city})` : 'Main Outlet'}
           </span>
-          <div className="flex items-center gap-1 mt-0.5">
-            <Tag color="gold" className="text-[9px] font-mono font-bold border-none m-0">
-              <ThunderboltOutlined /> ~{r.estimatedDeliveryMinutes || 30} mins
-            </Tag>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/60">
+              <ThunderboltOutlined className="text-amber-500" /> ~{r.estimatedDeliveryMinutes || 30} mins
+            </span>
             {r.distanceKm && (
-              <span className="text-[10px] text-neutral-400 font-mono font-medium">
+              <span className="text-[11px] text-neutral-400 font-mono">
                 ({r.distanceKm} km)
               </span>
             )}
@@ -164,60 +166,52 @@ export default function AdminOrdersPage() {
     {
       title: 'Bill & Payment',
       key: 'total',
-      width: '14%',
+      width: '16%',
       render: (_, r) => {
-        const paymentColors = {
-          PAID: 'green',
-          PENDING: 'gold',
-          REFUNDED: 'purple',
-          VOID: 'default',
-        };
+        const isPaid = r.paymentStatus === 'PAID';
+        const isCard = r.paymentMethod === 'CARD' || r.paymentMethod === 'ONLINE';
 
         return (
           <div>
             <span className="font-mono font-bold text-xs text-neutral-900 block">
               {formatPrice(r.totalAmount)}
             </span>
-            <div className="flex gap-1 mt-0.5">
-              <Tag
-                color={r.paymentMethod === 'CARD' || r.paymentMethod === 'ONLINE' ? 'purple' : 'default'}
-                className="font-bold text-[9px] border-none"
-              >
-                {r.paymentMethod === 'CARD' || r.paymentMethod === 'ONLINE' ? 'CARD' : 'COD'}
-              </Tag>
-              <Tag
-                color={paymentColors[r.paymentStatus] || 'default'}
-                className="font-bold text-[9px] border-none"
-              >
+            <div className="flex gap-1.5 mt-1">
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${isCard ? 'bg-purple-50 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>
+                {isCard ? 'Card' : 'COD'}
+              </span>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${isPaid ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                 {r.paymentStatus}
-              </Tag>
+              </span>
             </div>
           </div>
         );
       },
     },
     {
-      title: 'Kitchen Status',
+      title: 'Kitchen Stage',
       key: 'orderStatus',
       width: '20%',
       render: (_, r) => {
         const isLocked = r.orderStatus === 'DELIVERED' || r.orderStatus === 'CANCELLED';
 
         if (isLocked) {
+          const isDelivered = r.orderStatus === 'DELIVERED';
           return (
             <div className="space-y-0.5">
               <Tooltip title="This order has reached its final state and cannot be modified.">
-                <Tag
-                  color={r.orderStatus === 'DELIVERED' ? 'green' : 'red'}
-                  className="font-bold text-[10px] border-none flex items-center gap-1 w-fit cursor-not-allowed m-0"
+                <span
+                  className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full cursor-not-allowed ${
+                    isDelivered ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'
+                  }`}
                 >
-                  <LockOutlined className="text-[9px]" />
-                  {r.orderStatus === 'DELIVERED' ? 'DELIVERED' : 'CANCELLED'}
-                </Tag>
+                  <LockOutlined className="text-[10px]" />
+                  {isDelivered ? 'Delivered' : 'Cancelled'}
+                </span>
               </Tooltip>
               {r.cancellationReason && (
-                <span className="text-[10px] text-rose-600 truncate block max-w-[180px]" title={r.cancellationReason}>
-                  Reason: {r.cancellationReason}
+                <span className="text-[11px] text-rose-500 truncate block max-w-[180px] font-normal" title={r.cancellationReason}>
+                  {r.cancellationReason}
                 </span>
               )}
             </div>
@@ -228,39 +222,37 @@ export default function AdminOrdersPage() {
           <Select
             value={r.orderStatus}
             onChange={(val) => handleStatusChange(r._id, val)}
-            className="w-full text-xs font-bold"
-            size="small"
+            className="w-full h-8 staff-modern-select"
             options={STATUS_OPTIONS.map((st) => ({
               value: st.value,
-              label: <Tag color={st.color} className="border-none font-bold text-[10px] m-0">{st.label}</Tag>,
+              label: <span className="text-xs font-semibold">{st.label}</span>,
             }))}
           />
         );
       },
     },
     {
-      title: 'Action',
+      title: 'Actions',
       key: 'action',
       width: '6%',
       align: 'right',
       render: (_, r) => (
         <Popconfirm
-          title="Delete Order?"
-          description="Permanently removes this test order and rebalances all linked stock."
+          title={<span className="font-bold text-xs text-neutral-900">Delete Order?</span>}
+          description={<span className="text-[11px] text-neutral-500 max-w-[200px] block">Permanently deletes this order and reconciles all linked kitchen inventory.</span>}
           icon={<QuestionCircleOutlined className="text-rose-500" />}
           onConfirm={() => handleDeleteOrder(r._id)}
           okText="Yes, Delete"
-          cancelText="No"
-          okButtonProps={{ danger: true, size: 'small' }}
-          cancelButtonProps={{ size: 'small' }}
+          cancelText="Cancel"
+          okButtonProps={{ danger: true, size: 'small', className: '!text-xs !font-bold !rounded-lg' }}
+          cancelButtonProps={{ size: 'small', className: '!text-xs !rounded-lg' }}
         >
-          <Button
-            type="text"
-            danger
-            size="small"
-            icon={<DeleteOutlined />}
-            className="hover:!bg-rose-50 rounded-lg"
-          />
+          <button
+            type="button"
+            className="p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition cursor-pointer"
+          >
+            <DeleteOutlined className="text-xs" />
+          </button>
         </Popconfirm>
       ),
     },
@@ -276,108 +268,112 @@ export default function AdminOrdersPage() {
         onSearch={setSearchTerm}
         searchPlaceholder="Search by Order ID, Customer Name, or Phone..."
       >
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Select
-            className="w-full"
-            placeholder="Filter by Kitchen Outlet"
-            allowClear
-            value={branchFilter || undefined}
-            onChange={(val) => setBranchFilter(val || '')}
-            options={branches.map((b) => ({ value: b._id, label: `${b.name} (${b.city})` }))}
-          />
-          <Select
-            className="w-full"
-            placeholder="Filter by Order Status"
-            allowClear
-            value={statusFilter || undefined}
-            onChange={(val) => setStatusFilter(val || '')}
-            options={STATUS_OPTIONS.filter((s) => s.value !== 'CANCELLED').concat({
-              value: 'CANCELLED',
-              label: 'Cancelled',
-            })}
-          />
+        <div className="space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+          {/* Quick Filters Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select
+              className="w-full h-10 staff-modern-select"
+              placeholder="All Kitchen Outlets"
+              allowClear
+              value={branchFilter || undefined}
+              onChange={(val) => setBranchFilter(val || '')}
+              options={branches.map((b) => ({ value: b._id, label: `${b.name} (${b.city})` }))}
+            />
+            <Select
+              className="w-full h-10 staff-modern-select"
+              placeholder="All Order Stages"
+              allowClear
+              value={statusFilter || undefined}
+              onChange={(val) => setStatusFilter(val || '')}
+              options={STATUS_OPTIONS.map((st) => ({
+                value: st.value,
+                label: st.label,
+              }))}
+            />
+          </div>
+
+          {/* Orders Feed Table */}
+          <div className="overflow-hidden">
+            <Table
+              columns={columns}
+              dataSource={orders}
+              rowKey="_id"
+              loading={isLoading}
+              pagination={{
+                pageSize: 10,
+                showTotal: (total, range) => (
+                  <span className="text-xs text-neutral-400 font-normal">
+                    Showing {range[0]}-{range[1]} of {total} live orders
+                  </span>
+                ),
+              }}
+              size="middle"
+            />
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm font-['Plus_Jakarta_Sans',sans-serif]">
-          <Table
-            columns={columns}
-            dataSource={orders}
-            rowKey="_id"
-            loading={isLoading}
-            pagination={{ pageSize: 10 }}
-            size="middle"
-          />
-        </div>
-
-        {/* Cancellation Reason Modal */}
-        <Modal
-          open={!!cancelModalOrder}
+        {/* Cancellation Modal */}
+        <CustomModal
+          open={Boolean(cancelModalOrder)}
           onCancel={() => setCancelModalOrder(null)}
-          footer={null}
-          title={null}
-          centered
+          title={`Cancel Order #${cancelModalOrder?.orderNumber || ''}`}
           width={480}
-          className="font-['Plus_Jakarta_Sans',sans-serif]"
         >
           {cancelModalOrder && (
-            <div className="pt-2 pb-1">
-              <div className="flex items-center gap-2 text-rose-600 mb-2">
-                <StopOutlined className="text-xl" />
-                <h3 className="text-base font-bold text-neutral-900 m-0">
-                  Cancel Order {cancelModalOrder.orderNumber}
-                </h3>
-              </div>
-              <p className="text-xs text-neutral-500 mb-4">
-                Cancelling will restore the ingredient inventory to the kitchen and update the customer&apos;s live tracking screen.
-              </p>
-
-              <div className="space-y-3 mb-6">
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                    Select Standard Reason
-                  </label>
-                  <Select
-                    className="w-full"
-                    value={selectedReason}
-                    onChange={(val) => {
-                      setSelectedReason(val);
-                      setCustomReasonText('');
-                    }}
-                    options={PRESET_CANCEL_REASONS.map((r) => ({ value: r, label: r }))}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                    Or Enter Custom Message for Customer
-                  </label>
-                  <Input.TextArea
-                    rows={2}
-                    placeholder="e.g. Extreme rain in your area; delivery paused for rider safety."
-                    value={customReasonText}
-                    onChange={(e) => setCustomReasonText(e.target.value)}
-                    className="text-xs rounded-xl"
-                  />
-                </div>
+            <div className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+              <div className="p-3 bg-rose-50/70 rounded-2xl border border-rose-100 flex items-start gap-2.5">
+                <StopOutlined className="text-rose-500 text-sm mt-0.5 shrink-0" />
+                <p className="text-xs text-rose-800 m-0 leading-relaxed font-normal">
+                  Cancelling will restore recipe ingredient inventory to the branch kitchen and immediately update the customer&apos;s live tracking screen.
+                </p>
               </div>
 
-              <div className="flex gap-2 justify-end pt-2 border-t border-neutral-100">
-                <Button onClick={() => setCancelModalOrder(null)} className="text-xs font-semibold">
-                  Keep Order
-                </Button>
-                <Button
-                  danger
-                  type="primary"
-                  loading={isUpdating}
-                  onClick={handleConfirmCancellation}
-                  className="text-xs font-bold"
-                >
-                  Confirm & Cancel Order
-                </Button>
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Standard Cancellation Reason
+                </label>
+                <Select
+                  className="w-full h-10 staff-modern-select"
+                  value={selectedReason}
+                  onChange={(val) => {
+                    setSelectedReason(val);
+                    setCustomReasonText('');
+                  }}
+                  options={PRESET_CANCEL_REASONS.map((r) => ({ value: r, label: r }))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Custom Reason Message for Customer (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Severe downpour in your sector; rider dispatch temporarily suspended."
+                  value={customReasonText}
+                  onChange={(e) => setCustomReasonText(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-neutral-200 bg-white text-xs font-normal text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+                />
+              </div>
+
+              <div className="flex justify-end pt-3 mt-4 border-t border-neutral-100">
+                <Space size="middle">
+                  <CustomButton variant="secondary" type="button" onClick={() => setCancelModalOrder(null)}>
+                    Keep Order
+                  </CustomButton>
+                  <CustomButton
+                    variant="danger"
+                    type="button"
+                    loading={isUpdating}
+                    onClick={handleConfirmCancellation}
+                  >
+                    Confirm Cancellation
+                  </CustomButton>
+                </Space>
               </div>
             </div>
           )}
-        </Modal>
+        </CustomModal>
       </PageLayout>
     </>
   );

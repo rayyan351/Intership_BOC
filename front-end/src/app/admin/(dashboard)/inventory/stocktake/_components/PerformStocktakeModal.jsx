@@ -1,9 +1,11 @@
-// front-end/src/app/admin/(dashboard)/inventory/stocktake/_components/PerformStocktakeModal.jsx
+// src/app/admin/(dashboard)/inventory/stocktake/_components/PerformStocktakeModal.jsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Modal, Select, InputNumber, Alert } from 'antd';
+import { Select, Alert, Space } from 'antd';
+import { CheckCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
+import CustomModal from '@/app/admin/_components/modal/CustomModal';
 import { useToast } from '@/utils/toast';
 
 export default function PerformStocktakeModal({
@@ -29,7 +31,7 @@ export default function PerformStocktakeModal({
           )?.currentStock || 0;
 
         initial[item._id] = {
-          physicalCount: branchStock, // default to system stock
+          physicalCount: branchStock,
           systemStock: branchStock,
           unitCost: item.costPerRecipeUnit || 0,
           recipeUnit: item.recipeUnit || 'unit',
@@ -93,150 +95,155 @@ export default function PerformStocktakeModal({
   };
 
   return (
-    <Modal
+    <CustomModal
       open={open}
       onCancel={onClose}
-      footer={null}
-      title={null}
-      centered
+      title="Physical Stocktake Reconciliation"
       width={840}
-      className="font-['Plus_Jakarta_Sans',sans-serif]"
     >
-      <div className="pt-2 pb-1">
-        <h3 className="text-lg font-bold text-neutral-900 m-0">Physical Stocktake Reconciliation</h3>
-        <p className="text-xs text-neutral-500 mt-1 mb-4">
-          Enter verified kitchen scale counts to calculate shrinkage variances and align system inventory with physical reality.
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Audited Outlet / Kitchen <span className="text-red-500">*</span>
-              </label>
-              <Select
-                className="w-full h-10"
-                placeholder="Select Outlet to Audit"
-                value={selectedBranchId || undefined}
-                onChange={setSelectedBranchId}
-                options={branches.map((b) => ({
-                  value: b._id,
-                  label: `${b.name} (${b.city})`,
-                }))}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Audit Session Reference / Notes
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. End of Month Full Kitchen Audit"
-                value={auditNotes}
-                onChange={(e) => setAuditNotes(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-neutral-300 text-xs font-medium focus:outline-none focus:border-[#ffc400]"
-              />
-            </div>
+      <form onSubmit={handleSubmit} className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+        {/* Header Configuration */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+              Audited Outlet / Kitchen <span className="text-red-500">*</span>
+            </label>
+            <Select
+              className="w-full h-10 staff-modern-select"
+              placeholder="Select Outlet to Audit"
+              value={selectedBranchId || undefined}
+              onChange={setSelectedBranchId}
+              options={branches.map((b) => ({
+                value: b._id,
+                label: `${b.name} (${b.city})`,
+              }))}
+            />
           </div>
 
-          {selectedBranchId ? (
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
-                  Ingredient Counts & Variance Preview
+          <div>
+            <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+              Audit Session Reference / Notes
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. End of Month Full Kitchen Audit"
+              value={auditNotes}
+              onChange={(e) => setAuditNotes(e.target.value)}
+              className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-normal text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+            />
+          </div>
+        </div>
+
+        {selectedBranchId ? (
+          <div className="space-y-2 pt-1">
+            {/* Discrepancy & Variance Header Summary */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-50/80 rounded-2xl border border-slate-100 text-xs">
+              <span className="font-semibold text-neutral-800">
+                Ingredient Counts & Variance Preview
+              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-neutral-500">
+                  Discrepancies: <strong className="text-rose-600 font-mono">{totalDiscrepancies} items</strong>
                 </span>
-                <span className="text-xs font-mono font-bold">
-                  Discrepancies: <strong className="text-rose-600">{totalDiscrepancies} items</strong> • Net Impact:{' '}
-                  <strong className={netFinancialImpact < 0 ? 'text-rose-600' : 'text-emerald-600'}>
+                <span className="text-[11px] text-neutral-500">
+                  Net Impact:{' '}
+                  <strong className={`font-mono ${netFinancialImpact < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                     Rs. {netFinancialImpact.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </strong>
                 </span>
               </div>
-
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {inventoryItems.map((item) => {
-                  const data = counts[item._id] || {
-                    physicalCount: 0,
-                    systemStock: 0,
-                    unitCost: item.costPerRecipeUnit || 0,
-                    recipeUnit: item.recipeUnit || 'unit',
-                    reason: '',
-                  };
-                  const diff = Number((data.physicalCount - data.systemStock).toFixed(2));
-                  const costImpact = Number((diff * data.unitCost).toFixed(2));
-
-                  return (
-                    <div
-                      key={item._id}
-                      className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 grid grid-cols-12 gap-2 items-center text-xs"
-                    >
-                      <div className="col-span-4">
-                        <span className="font-bold text-neutral-900 block">{item.name}</span>
-                        <span className="text-[11px] font-mono text-neutral-400">
-                          Theoretical: <strong>{data.systemStock} {item.recipeUnit}</strong> • Rate: Rs. {data.unitCost}/{item.recipeUnit}
-                        </span>
-                      </div>
-
-                      <div className="col-span-3">
-                        <label className="text-[10px] text-neutral-500 font-bold block mb-0.5">
-                          Physical Count ({item.recipeUnit})
-                        </label>
-                        <InputNumber
-                          min={0}
-                          step={1}
-                          value={data.physicalCount}
-                          onChange={(val) => handleCountChange(item._id, val)}
-                          className="w-full font-mono font-bold text-xs"
-                        />
-                      </div>
-
-                      <div className="col-span-2 text-right">
-                        <span className="text-[10px] text-neutral-500 font-bold block mb-0.5">Variance</span>
-                        <span
-                          className={`font-mono font-bold text-xs ${
-                            diff < 0 ? 'text-rose-600' : diff > 0 ? 'text-emerald-600' : 'text-neutral-400'
-                          }`}
-                        >
-                          {diff > 0 ? `+${diff}` : diff} {item.recipeUnit}
-                        </span>
-                        <span className="text-[10px] text-neutral-400 block">
-                          Rs. {Math.abs(costImpact).toLocaleString()}
-                        </span>
-                      </div>
-
-                      <div className="col-span-3">
-                        <label className="text-[10px] text-neutral-500 font-bold block mb-0.5">
-                          Discrepancy Reason
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Spoilage / Trimming loss"
-                          value={data.reason}
-                          onChange={(e) => handleReasonChange(item._id, e.target.value)}
-                          className="w-full h-7 px-2 rounded border border-neutral-300 text-[11px] bg-white"
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
-          ) : (
-            <Alert
-              title="Select an outlet above to populate current theoretical stock levels for physical count entry."
-              type="info"
-              showIcon
-              className="text-xs"
-            />
-          )}
 
-          <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900">
-            <strong className="block font-bold mb-0.5">Immutable Double-Entry Ledger Impact:</strong>
-            Reconciling will instantly overwrite the branch current stock balances and create <code className="font-mono font-bold">PHYSICAL_AUDIT_ADJUSTMENT</code> transaction rows for every non-zero variance.
+            {/* Scrollable Items Count List */}
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              {inventoryItems.map((item) => {
+                const data = counts[item._id] || {
+                  physicalCount: 0,
+                  systemStock: 0,
+                  unitCost: item.costPerRecipeUnit || 0,
+                  recipeUnit: item.recipeUnit || 'unit',
+                  reason: '',
+                };
+                const diff = Number((data.physicalCount - data.systemStock).toFixed(2));
+                const costImpact = Number((diff * data.unitCost).toFixed(2));
+
+                return (
+                  <div
+                    key={item._id}
+                    className="p-3 bg-slate-50/70 rounded-2xl border border-slate-100 grid grid-cols-12 gap-3 items-center text-xs"
+                  >
+                    <div className="col-span-4">
+                      <span className="font-semibold text-neutral-900 block text-xs">{item.name}</span>
+                      <span className="text-[11px] text-neutral-400 block font-normal">
+                        Theoretical: <strong className="font-mono text-neutral-700">{data.systemStock} {item.recipeUnit}</strong> • Rate: Rs. {data.unitCost}/{item.recipeUnit}
+                      </span>
+                    </div>
+
+                    <div className="col-span-3">
+                      <label className="text-[10px] text-neutral-500 font-semibold block mb-1">
+                        Physical Count ({item.recipeUnit})
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={data.physicalCount}
+                        onChange={(e) => handleCountChange(item._id, e.target.value)}
+                        className="w-full h-9 px-2.5 rounded-xl border border-neutral-200 bg-white font-mono font-bold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
+                      />
+                    </div>
+
+                    <div className="col-span-2 text-right">
+                      <span className="text-[10px] text-neutral-500 font-semibold block mb-1">Variance</span>
+                      <span
+                        className={`font-mono font-bold text-xs ${
+                          diff < 0 ? 'text-rose-600' : diff > 0 ? 'text-emerald-600' : 'text-neutral-400'
+                        }`}
+                      >
+                        {diff > 0 ? `+${diff}` : diff} {item.recipeUnit}
+                      </span>
+                      <span className="text-[10px] text-neutral-400 font-mono block">
+                        Rs. {Math.abs(costImpact).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="col-span-3">
+                      <label className="text-[10px] text-neutral-500 font-semibold block mb-1">
+                        Discrepancy Reason
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Spoilage / Trimming loss"
+                        value={data.reason}
+                        onChange={(e) => handleReasonChange(item._id, e.target.value)}
+                        className="w-full h-9 px-2.5 rounded-xl border border-neutral-200 bg-white text-[11px] text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
+        ) : (
+          <Alert
+            message="Select an outlet above to populate current theoretical stock levels for physical count entry."
+            type="info"
+            showIcon
+            className="rounded-2xl text-xs"
+          />
+        )}
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-200">
+        {/* Ledger Advisory Notice */}
+        <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200/60 flex items-start gap-2.5 text-xs">
+          <InfoCircleOutlined className="text-amber-600 mt-0.5 shrink-0" />
+          <div className="text-[11px] text-amber-900 leading-relaxed font-normal">
+            <strong className="font-semibold">Immutable Ledger Impact:</strong> Reconciling overwrites outlet stock balances and logs permanent <code className="font-mono font-semibold">PHYSICAL_AUDIT_ADJUSTMENT</code> transaction rows for non-zero variances.
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end pt-3 mt-4 border-t border-neutral-100">
+          <Space size="middle">
             <CustomButton variant="secondary" type="button" onClick={onClose}>
               Cancel
             </CustomButton>
@@ -245,12 +252,13 @@ export default function PerformStocktakeModal({
               htmlType="submit"
               loading={loading}
               disabled={!selectedBranchId}
+              icon={<CheckCircleOutlined />}
             >
-              Reconcile & Apply Audit Adjustments
+              Reconcile & Apply Adjustments
             </CustomButton>
-          </div>
-        </form>
-      </div>
-    </Modal>
+          </Space>
+        </div>
+      </form>
+    </CustomModal>
   );
 }

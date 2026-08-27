@@ -4,46 +4,71 @@
 import React from 'react';
 import { Switch } from 'antd';
 
-export default function CustomSwitch({ checked, onChange, loading = false, disabled = false }) {
+export default function CustomSwitch({
+  checked = false,
+  onChange,
+  loading = false,
+  disabled = false,
+}) {
   return (
     <>
       <style jsx global>{`
-        /* Slim, sleek capsule track */
+        /* Slim, modern micro-switch */
         .sleek-brand-switch.ant-switch {
-          min-width: 34px !important;
+          min-width: 30px !important;
+          width: 30px !important;
           height: 16px !important;
-          background-color: #27272a !important; /* Muted zinc track */
+          background-color: #e4e4e7 !important; /* Soft zinc track when OFF */
           border: none !important;
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          padding: 0 !important;
+          box-shadow: none !important;
         }
+
+        .sleek-brand-switch.ant-switch:hover:not(.ant-switch-disabled) {
+          background-color: #d4d4d8 !important;
+        }
+
         .sleek-brand-switch.ant-switch-checked {
-          background-color: #ffc400 !important; /* Signature Brand Yellow */
+          background-color: #F4C61A !important; /* Signature Brand Yellow when ON */
         }
+
+        /* Thumb slider */
         .sleek-brand-switch .ant-switch-handle {
           width: 12px !important;
           height: 12px !important;
           top: 2px !important;
           left: 2px !important;
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), left 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
+
         .sleek-brand-switch.ant-switch-checked .ant-switch-handle {
           left: calc(100% - 14px) !important;
         }
+
         .sleek-brand-switch .ant-switch-handle::before {
           border-radius: 9999px !important;
           background-color: #ffffff !important;
-          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important;
         }
+
         .sleek-brand-switch.ant-switch-checked .ant-switch-handle::before {
-          background-color: #000000 !important; /* Crisp black thumb on yellow */
+          background-color: #ffffff !important; /* white thumb on Yellow track */
+        }
+
+        /* Disabled state */
+        .sleek-brand-switch.ant-switch-disabled {
+          opacity: 0.45 !important;
+          cursor: not-allowed !important;
         }
       `}</style>
+
       <Switch
         checked={Boolean(checked)}
         onChange={onChange}
         loading={loading}
         disabled={disabled || loading}
-        className="sleek-brand-switch"
+        className="sleek-brand-switch cursor-pointer"
       />
     </>
   );

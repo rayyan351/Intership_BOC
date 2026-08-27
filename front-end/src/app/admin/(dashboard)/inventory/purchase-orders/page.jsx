@@ -1,7 +1,8 @@
+// src/app/admin/(dashboard)/inventory/purchase-orders/page.jsx
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Button, Tag, Space, Select } from 'antd';
+import { Table, Select, Space } from 'antd';
 import {
   CheckCircleOutlined,
   InboxOutlined,
@@ -11,9 +12,11 @@ import {
 import { usePermission } from '@/hooks/usePermission';
 import { exportPurchaseOrderPDF } from '@/utils/exportPurchaseOrderPdf';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
+import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
 import ReceivePOModal from './_components/ReceivePOModal';
 import CreatePOModal from './_components/CreatePOModal';
 import { useToast } from '@/utils/toast';
+import { formatPrice } from '@/lib/currency';
 
 import {
   useGetPurchaseOrdersQuery,
@@ -53,7 +56,7 @@ export default function PurchaseOrdersPage() {
   const handleCreatePOSubmit = async (formData) => {
     try {
       await createPO(formData).unwrap();
-      showSuccess('Purchase Order generated successfully!');
+      showSuccess('Purchase order generated successfully!');
       setCreateModalOpen(false);
     } catch (err) {
       showError(err?.data?.message || 'Failed to create purchase order');
@@ -89,6 +92,47 @@ export default function PurchaseOrdersPage() {
     );
   });
 
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'DRAFT':
+        return (
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
+            Draft
+          </span>
+        );
+      case 'ORDERED':
+        return (
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700">
+            In transit
+          </span>
+        );
+      case 'PARTIALLY_RECEIVED':
+        return (
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700">
+            Partial
+          </span>
+        );
+      case 'RECEIVED':
+        return (
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+            Received
+          </span>
+        );
+      case 'CANCELLED':
+        return (
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-600">
+            Cancelled
+          </span>
+        );
+      default:
+        return (
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
+            {status}
+          </span>
+        );
+    }
+  };
+
   const columns = [
     {
       title: 'PO Number',
@@ -97,11 +141,11 @@ export default function PurchaseOrdersPage() {
       width: '18%',
       render: (poNumber, record) => (
         <div>
-          <span className="font-mono font-bold text-neutral-900 text-sm block">
+          <span className="font-mono font-bold text-neutral-900 text-xs block">
             {poNumber}
           </span>
-          <span className="text-[11px] text-neutral-400">
-            Created: {record.createdAt ? new Date(record.createdAt).toLocaleDateString() : 'N/A'}
+          <span className="text-[11px] text-neutral-400 font-normal">
+            {record.createdAt ? new Date(record.createdAt).toLocaleDateString() : 'N/A'}
           </span>
         </div>
       ),
@@ -113,11 +157,11 @@ export default function PurchaseOrdersPage() {
       width: '20%',
       render: (supplier) => (
         <div>
-          <span className="font-bold text-neutral-800 text-xs block">
+          <span className="font-semibold text-neutral-900 text-xs block">
             {supplier?.name || 'Unassigned'}
           </span>
-          <span className="text-[11px] text-neutral-500">
-            {supplier?.phone || supplier?.paymentTerms || ''}
+          <span className="text-[11px] text-neutral-400 font-normal">
+            {supplier?.phone || supplier?.paymentTerms || 'Standard vendor'}
           </span>
         </div>
       ),
@@ -128,7 +172,7 @@ export default function PurchaseOrdersPage() {
       key: 'branch',
       width: '18%',
       render: (branch) => (
-        <span className="text-xs font-semibold text-neutral-700">
+        <span className="text-xs font-semibold text-neutral-800">
           {branch?.name ? `${branch.name} (${branch.city || ''})` : 'N/A'}
         </span>
       ),
@@ -140,10 +184,10 @@ export default function PurchaseOrdersPage() {
       width: '16%',
       render: (totalAmount, record) => (
         <div>
-          <span className="font-mono font-bold text-sm text-neutral-900 block">
-            Rs. {Number(totalAmount || 0).toLocaleString()}
+          <span className="font-mono font-bold text-xs text-neutral-900 block">
+            {formatPrice(totalAmount || 0)}
           </span>
-          <span className="text-[11px] text-neutral-500">
+          <span className="text-[11px] text-neutral-400 font-normal">
             {record.items?.length || 0} line items
           </span>
         </div>
@@ -154,21 +198,7 @@ export default function PurchaseOrdersPage() {
       dataIndex: 'status',
       key: 'status',
       width: '12%',
-      render: (status) => {
-        const badges = {
-          DRAFT: { color: 'default', label: 'DRAFT' },
-          ORDERED: { color: 'processing', label: 'ORDERED' },
-          PARTIALLY_RECEIVED: { color: 'warning', label: 'PARTIAL' },
-          RECEIVED: { color: 'success', label: 'RECEIVED' },
-          CANCELLED: { color: 'error', label: 'CANCELLED' },
-        };
-        const badge = badges[status] || { color: 'default', label: status };
-        return (
-          <Tag color={badge.color} className="font-bold text-[10px] border-none">
-            {badge.label}
-          </Tag>
-        );
-      },
+      render: (status) => getStatusBadge(status),
     },
     {
       title: 'Actions',
@@ -177,51 +207,44 @@ export default function PurchaseOrdersPage() {
       width: '16%',
       render: (_, record) => {
         return (
-          <Space size="small">
-            {/* Always-accessible Print/PDF button */}
-            <Button
-              size="small"
-              icon={<PrinterOutlined />}
+          <div className="flex items-center justify-end gap-1.5 font-['Plus_Jakarta_Sans',sans-serif]">
+            {/* Print/PDF button */}
+            <button
               onClick={() => exportPurchaseOrderPDF(record)}
-              className="!text-xs font-semibold"
+              className="p-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition cursor-pointer"
               title="Print Supplier Purchase Order PDF"
             >
-              PDF
-            </Button>
+              <PrinterOutlined className="text-xs" />
+            </button>
 
             {record?.status === 'DRAFT' && (
-              <Button
-                size="small"
-                icon={<SendOutlined />}
+              <button
                 onClick={() => handleStatusChange(record._id, 'ORDERED')}
-                className="!text-xs font-semibold"
+                className="px-2.5 py-1 text-xs font-semibold rounded-lg text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition cursor-pointer flex items-center gap-1"
               >
-                Mark Ordered
-              </Button>
+                <SendOutlined className="text-[10px]" /> Order
+              </button>
             )}
 
             {canReceive &&
               (record?.status === 'ORDERED' || record?.status === 'PARTIALLY_RECEIVED') && (
-                <Button
-                  size="small"
-                  type="primary"
-                  icon={<InboxOutlined />}
+                <button
                   onClick={() => {
                     setSelectedPO(record);
                     setReceiveModalOpen(true);
                   }}
-                  className="!text-xs font-bold !bg-neutral-900 hover:!bg-neutral-800"
+                  className="px-2.5 py-1 text-xs font-bold rounded-lg text-neutral-900 bg-[#F4C61A] hover:bg-[#e5b713] transition cursor-pointer flex items-center gap-1 shadow-2xs"
                 >
-                  Receive Stock
-                </Button>
+                  <InboxOutlined className="text-xs" /> Receive
+                </button>
               )}
 
             {record?.status === 'RECEIVED' && (
-              <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+              <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
                 <CheckCircleOutlined /> Inward Logged
               </span>
             )}
-          </Space>
+          </div>
         );
       },
     },
@@ -239,19 +262,20 @@ export default function PurchaseOrdersPage() {
         onSearch={setSearchTerm}
         searchPlaceholder="Search by PO number, supplier, or branch..."
       >
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm font-['Plus_Jakarta_Sans',sans-serif]">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        <div className="space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+          {/* Filters Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select
-              className="w-full"
-              placeholder="Filter by Destination Branch"
+              className="w-full h-10 staff-modern-select"
+              placeholder="All Destination Outlets"
               allowClear
               value={branchFilter || undefined}
               onChange={(val) => setBranchFilter(val || '')}
               options={branches.map((b) => ({ value: b._id, label: `${b.name} (${b.city})` }))}
             />
             <Select
-              className="w-full"
-              placeholder="Filter by PO Status"
+              className="w-full h-10 staff-modern-select"
+              placeholder="All PO Statuses"
               allowClear
               value={statusFilter || undefined}
               onChange={(val) => setStatusFilter(val || '')}
@@ -265,14 +289,24 @@ export default function PurchaseOrdersPage() {
             />
           </div>
 
-          <Table
-            columns={columns}
-            dataSource={filteredOrders}
-            rowKey="_id"
-            loading={isLoading}
-            pagination={{ pageSize: 8 }}
-            size="middle"
-          />
+          {/* Table */}
+          <div className="overflow-hidden">
+            <Table
+              columns={columns}
+              dataSource={filteredOrders}
+              rowKey="_id"
+              loading={isLoading}
+              pagination={{
+                pageSize: 8,
+                showTotal: (total, range) => (
+                  <span className="text-xs text-neutral-400 font-normal">
+                    Showing {range[0]}-{range[1]} of {total} purchase orders
+                  </span>
+                ),
+              }}
+              size="middle"
+            />
+          </div>
         </div>
 
         {/* Modal 1: Create Purchase Order */}

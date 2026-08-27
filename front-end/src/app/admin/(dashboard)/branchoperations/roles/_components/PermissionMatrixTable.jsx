@@ -12,13 +12,10 @@ const ACTION_TYPES = [
   { type: 'create', label: 'Add', width: 'w-[12%]' },
   { type: 'edit', label: 'Update', width: 'w-[12%]' },
   { type: 'delete', label: 'Delete', width: 'w-[12%]' },
-  { type: 'special', label: 'Status / Stock', width: 'w-[16%]' },
+  { type: 'special', label: 'Status / Stock', width: 'w-[14%]' },
 ];
 
-export default function PermissionMatrixTable({
-  value = [],
-  onChange,
-}) {
+export default function PermissionMatrixTable({ value = [], onChange }) {
   const { data, isLoading } = useGetRolesAndModulesQuery();
   const modules = data?.modules || [];
   const [collapsedSections, setCollapsedSections] = useState({});
@@ -30,7 +27,6 @@ export default function PermissionMatrixTable({
     }));
   };
 
-  // Map all global action keys across all modules by action type
   const globalColumnKeys = useMemo(() => {
     const mapping = {};
     ACTION_TYPES.forEach((act) => {
@@ -43,7 +39,6 @@ export default function PermissionMatrixTable({
     return mapping;
   }, [modules]);
 
-  // Handle Global Column Toggle (Turns ON/OFF the entire column for ALL modules)
   const handleGlobalColumnToggle = (actionType, enable) => {
     if (!onChange) return;
     const targetKeys = globalColumnKeys[actionType] || [];
@@ -56,7 +51,6 @@ export default function PermissionMatrixTable({
     onChange(updated);
   };
 
-  // Handle Module Row Toggle (Turns ON/OFF the action for a specific parent module)
   const handleModuleRowToggle = (columnKeys, enable) => {
     if (!onChange) return;
     let updated;
@@ -68,7 +62,6 @@ export default function PermissionMatrixTable({
     onChange(updated);
   };
 
-  // Handle Single Action Toggle
   const handleToggleSingle = (key) => {
     if (!onChange) return;
     const exists = value.includes(key);
@@ -78,47 +71,27 @@ export default function PermissionMatrixTable({
 
   if (isLoading) {
     return (
-      <div className="w-full py-12 flex justify-center items-center rounded-xl border border-neutral-200 bg-white">
-        <Spin tip="Loading permission matrix..." />
+      <div className="w-full py-16 flex justify-center items-center">
+        <Spin tip="Loading matrix..." />
       </div>
     );
   }
 
   return (
-    <div className="w-full overflow-hidden rounded-xl border border-neutral-200 bg-white font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="w-full overflow-hidden font-['Plus_Jakarta_Sans',sans-serif]">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
-          {/* Dual-Tier Header with Column Master Toggles */}
-          {/* Dual-Tier Balanced Header */}
-          {/* Dual-Tier Balanced Header */}
           <thead>
-            {/* Tier 1: Main Category Titles */}
-            <tr className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 text-[11px] font-bold uppercase tracking-wider">
-              <th className="py-2.5 px-6 w-[36%] text-center align-middle border-r border-neutral-200">
-                Resource Name
-              </th>
-              <th
-                colSpan={5}
-                className="py-2.5 px-3 text-center bg-neutral-100/60 text-neutral-800 text-[11px] font-bold uppercase tracking-wider"
-              >
-                Permissions
-              </th>
-            </tr>
-
-            {/* Tier 2: Column Action Labels & Master Switches */}
-            <tr className="bg-neutral-50/70 border-b border-neutral-200 text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
-              {/* Empty spacer under Resource Name */}
-              <th className="py-2 px-6 border-r border-neutral-200 bg-neutral-50/40"></th>
-
-              {/* Master Switches directly aligned under each action column */}
+            <tr className="border-b border-neutral-200 text-neutral-400 text-[11px] font-semibold">
+              <th className="py-2.5 px-4 w-[38%] font-semibold">Module / Resource</th>
               {ACTION_TYPES.map((act) => {
                 const colKeys = globalColumnKeys[act.type] || [];
                 const isGlobalChecked = colKeys.length > 0 && colKeys.every((k) => value.includes(k));
 
                 return (
-                  <th key={act.type} className={`py-2 px-3 text-center ${act.width}`}>
-                    <div className="flex flex-col items-center justify-center gap-1">
-                      <span className="text-[10px] tracking-wider text-neutral-500 font-bold">{act.label}</span>
+                  <th key={act.type} className={`py-2.5 px-2 text-center ${act.width}`}>
+                    <div className="flex flex-col items-center justify-center gap-1.5">
+                      <span className="font-semibold text-neutral-500 text-[11px]">{act.label}</span>
                       {colKeys.length > 0 && (
                         <CustomSwitch
                           checked={isGlobalChecked}
@@ -138,23 +111,22 @@ export default function PermissionMatrixTable({
 
               return (
                 <React.Fragment key={mod.key}>
-                  {/* Collapsible Parent Category Row */}
+                  {/* Category Header Row */}
                   <tr
                     onClick={() => toggleSection(mod.key)}
-                    className="bg-neutral-50/80 hover:bg-neutral-100/70 cursor-pointer transition select-none border-t border-b border-neutral-200/90"
+                    className="bg-neutral-50/70 hover:bg-neutral-100/60 cursor-pointer transition select-none"
                   >
-                    <td className="py-2.5 px-6 font-bold text-neutral-900 border-r border-neutral-200/70">
-                      <div className="flex items-center gap-2.5">
+                    <td className="py-2 px-4 font-semibold text-neutral-900">
+                      <div className="flex items-center gap-2">
                         <span className="text-[9px] text-neutral-400">
                           {isCollapsed ? <RightOutlined /> : <DownOutlined />}
                         </span>
-                        <span className="text-xs uppercase tracking-wide">
+                        <span className="text-xs font-semibold text-neutral-900">
                           {mod.title}
                         </span>
                       </div>
                     </td>
 
-                    {/* Module-Level Category Switches */}
                     {ACTION_TYPES.map((act) => {
                       const columnKeys = mod.resources
                         .flatMap((r) => r.actions)
@@ -163,8 +135,8 @@ export default function PermissionMatrixTable({
 
                       if (!columnKeys.length) {
                         return (
-                          <td key={act.type} className="py-2.5 px-3 text-center">
-                            <span className="text-neutral-300 text-xs select-none">—</span>
+                          <td key={act.type} className="py-2 px-2 text-center">
+                            <span className="text-neutral-200 text-xs select-none">—</span>
                           </td>
                         );
                       }
@@ -174,7 +146,7 @@ export default function PermissionMatrixTable({
                       return (
                         <td
                           key={act.type}
-                          className="py-2.5 px-3 text-center"
+                          className="py-2 px-2 text-center"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <CustomSwitch
@@ -186,16 +158,16 @@ export default function PermissionMatrixTable({
                     })}
                   </tr>
 
-                  {/* Child Feature Rows */}
+                  {/* Child Items */}
                   {!isCollapsed &&
                     mod.resources.map((res) => (
-                      <tr key={res.resource} className="hover:bg-neutral-50/40 transition">
-                        <td className="py-3 px-6 pl-11 border-r border-neutral-100">
-                          <span className="font-semibold text-neutral-800 block text-xs">
+                      <tr key={res.resource} className="hover:bg-amber-50/20 transition">
+                        <td className="py-2.5 px-4 pl-9">
+                          <span className="font-medium text-neutral-700 block text-xs">
                             {res.resource}
                           </span>
                           {res.description && (
-                            <span className="text-[11px] text-neutral-400 block font-normal mt-0.5">
+                            <span className="text-[11px] text-neutral-400 block font-normal">
                               {res.description}
                             </span>
                           )}
@@ -205,14 +177,14 @@ export default function PermissionMatrixTable({
                           const targetAction = res.actions.find((a) => a.type === act.type);
 
                           return (
-                            <td key={act.type} className="py-3 px-3 text-center">
+                            <td key={act.type} className="py-2.5 px-2 text-center">
                               {targetAction ? (
                                 <CustomSwitch
                                   checked={value.includes(targetAction.key)}
                                   onChange={() => handleToggleSingle(targetAction.key)}
                                 />
                               ) : (
-                                <span className="text-neutral-300 select-none text-xs">—</span>
+                                <span className="text-neutral-200 select-none text-xs">—</span>
                               )}
                             </td>
                           );

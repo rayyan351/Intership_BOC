@@ -2,26 +2,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  Table,
-  Tag,
-  Button,
-  InputNumber,
-  Select,
-  Row,
-  Col,
-  Tabs,
-  Input,
-  Modal,
-} from 'antd';
+import { Table, Select, Space } from 'antd';
 import {
   AuditOutlined,
   CheckCircleOutlined,
   HistoryOutlined,
-  DollarCircleOutlined,
-  WarningOutlined,
 } from '@ant-design/icons';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
+import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
+import CustomModal from '@/app/admin/_components/modal/CustomModal';
 import {
   useGetInventoryItemsQuery,
   useGetStocktakesQuery,
@@ -142,11 +131,11 @@ export default function StocktakePage() {
       title: 'Raw Material',
       dataIndex: 'name',
       key: 'name',
-      width: '26%',
+      width: '28%',
       render: (name, r) => (
         <div>
-          <strong className="text-xs text-neutral-900 block">{name}</strong>
-          <span className="text-[10px] text-neutral-400 font-mono">
+          <span className="font-semibold text-neutral-900 text-xs block">{name}</span>
+          <span className="text-[11px] text-neutral-400 font-mono">
             {r.sku} • {r.category}
           </span>
         </div>
@@ -155,14 +144,14 @@ export default function StocktakePage() {
     {
       title: 'Expected Stock',
       key: 'systemStock',
-      width: '18%',
+      width: '20%',
       render: (_, r) => {
         const bStock = r.branchStocks?.find(
           (bs) => bs.branch?._id?.toString() === selectedBranch || bs.branch?.toString() === selectedBranch
         );
         const sysStock = bStock ? bStock.currentStock : r.totalStock || 0;
         return (
-          <span className="text-xs font-mono font-bold text-neutral-700">
+          <span className="text-xs font-mono font-semibold text-neutral-700">
             {sysStock.toLocaleString()} {r.recipeUnit}
           </span>
         );
@@ -171,14 +160,16 @@ export default function StocktakePage() {
     {
       title: 'Actual Physical Count',
       key: 'physicalCount',
-      width: '26%',
+      width: '28%',
       render: (_, r) => (
         <div className="flex items-center gap-2">
-          <InputNumber
-            className="w-32 h-10 flex items-center font-mono font-bold text-xs"
+          <input
+            type="number"
             min={0}
+            step="any"
             value={auditCounts[r._id]}
-            onChange={(val) => handlePhysicalCountChange(r._id, val)}
+            onChange={(e) => handlePhysicalCountChange(r._id, e.target.value)}
+            className="w-28 h-9 px-2.5 rounded-xl border border-neutral-200 bg-white font-mono font-bold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
           />
           <span className="text-xs font-semibold text-neutral-500">{r.recipeUnit}</span>
         </div>
@@ -197,16 +188,24 @@ export default function StocktakePage() {
         const costDiff = variance * (r.costPerRecipeUnit || 0);
 
         if (variance === 0) {
-          return <Tag color="green" className="border-none font-extrabold text-[10px]">MATCH (0)</Tag>;
+          return (
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+              Match (0)
+            </span>
+          );
         }
 
         const isGain = variance > 0;
         return (
           <div>
-            <Tag color={isGain ? 'blue' : 'red'} className="border-none font-mono font-extrabold text-[10px]">
+            <span
+              className={`inline-block text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md ${
+                isGain ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-600'
+              }`}
+            >
               {isGain ? `+${variance.toLocaleString()}` : variance.toLocaleString()} {r.recipeUnit}
-            </Tag>
-            <span className={`text-[10px] font-mono block font-bold ${isGain ? 'text-blue-600' : 'text-rose-600'}`}>
+            </span>
+            <span className={`text-[11px] font-mono block font-semibold mt-0.5 ${isGain ? 'text-blue-600' : 'text-rose-600'}`}>
               ({isGain ? '+' : ''}{formatPrice(costDiff)})
             </span>
           </div>
@@ -221,10 +220,11 @@ export default function StocktakePage() {
       title: 'Audit Ref #',
       dataIndex: 'stocktakeNumber',
       key: 'stocktakeNumber',
+      width: '22%',
       render: (num, r) => (
         <div>
-          <strong className="text-xs font-mono text-neutral-900 block">{num}</strong>
-          <span className="text-[10px] text-neutral-400">
+          <span className="font-mono font-bold text-neutral-900 text-xs block">{num}</span>
+          <span className="text-[11px] text-neutral-400 font-normal">
             {new Date(r.createdAt).toLocaleString()}
           </span>
         </div>
@@ -234,21 +234,24 @@ export default function StocktakePage() {
       title: 'Branch Outlet',
       dataIndex: 'branch',
       key: 'branch',
-      render: (b) => <span className="text-xs font-semibold text-neutral-800">📍 {b?.name}</span>,
+      width: '20%',
+      render: (b) => <span className="text-xs font-semibold text-neutral-800">{b?.name}</span>,
     },
     {
       title: 'Conducted By',
       dataIndex: 'conductedBy',
       key: 'conductedBy',
+      width: '20%',
       render: (u) => <span className="text-xs text-neutral-700">{u?.name || 'Staff Member'}</span>,
     },
     {
       title: 'Shrinkage Loss',
       dataIndex: 'totalShrinkageLoss',
       key: 'totalShrinkageLoss',
+      width: '18%',
       render: (loss) => (
         <span className="text-xs font-mono font-bold text-rose-600">
-          {loss > 0 ? `-${formatPrice(loss)}` : 'Rs 0'}
+          {loss > 0 ? `-${formatPrice(loss)}` : 'Rs. 0'}
         </span>
       ),
     },
@@ -256,8 +259,13 @@ export default function StocktakePage() {
       title: 'Net Financial Adj.',
       dataIndex: 'totalNetVarianceValue',
       key: 'totalNetVarianceValue',
+      width: '20%',
       render: (val) => (
-        <span className={`text-xs font-mono font-bold ${val < 0 ? 'text-rose-600' : val > 0 ? 'text-blue-600' : 'text-neutral-700'}`}>
+        <span
+          className={`text-xs font-mono font-bold ${
+            val < 0 ? 'text-rose-600' : val > 0 ? 'text-blue-600' : 'text-neutral-700'
+          }`}
+        >
           {val > 0 ? `+${formatPrice(val)}` : formatPrice(val)}
         </span>
       ),
@@ -266,10 +274,14 @@ export default function StocktakePage() {
       title: 'Action',
       key: 'action',
       align: 'right',
+      width: '10%',
       render: (_, r) => (
-        <Button size="small" type="link" onClick={() => setSelectedAuditHistory(r)} className="text-xs font-bold">
+        <button
+          onClick={() => setSelectedAuditHistory(r)}
+          className="text-xs font-semibold text-neutral-700 hover:text-black cursor-pointer"
+        >
           View Sheet
-        </Button>
+        </button>
       ),
     },
   ];
@@ -284,132 +296,153 @@ export default function StocktakePage() {
         subTitle="Conduct physical closing stock counts and resolve variance ledgers"
         showSearch={false}
       >
-        {/* Top Control Bar */}
-        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-5 pb-4 border-b border-neutral-100">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
-              Select Outlet:
-            </span>
-            <Select
-              className="w-56 h-10"
-              value={selectedBranch || undefined}
-              onChange={(val) => setSelectedBranch(val)}
-              options={branches.map((b) => ({ value: b._id, label: `${b.name} (${b.city})` }))}
-            />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="bg-neutral-50 px-4 py-2 rounded-xl border border-neutral-200 text-right">
-              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
-                Net Count Variance Impact
+        <div className="space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+          {/* Top Control Bar */}
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 pb-4 border-b border-neutral-100">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-neutral-700">
+                Audited Outlet:
               </span>
-              <strong className={`text-sm font-mono font-black ${netDiff < 0 ? 'text-rose-600' : netDiff > 0 ? 'text-blue-600' : 'text-neutral-900'}`}>
-                {netDiff > 0 ? `+${formatPrice(netDiff)}` : formatPrice(netDiff)}
-              </strong>
+              <Select
+                className="w-56 h-10 staff-modern-select"
+                value={selectedBranch || undefined}
+                onChange={(val) => setSelectedBranch(val)}
+                options={branches.map((b) => ({ value: b._id, label: `${b.name} (${b.city})` }))}
+              />
             </div>
 
-            {activeTab === 'COUNT_SHEET' && (
-              <Button
-                type="primary"
-                icon={<CheckCircleOutlined />}
-                loading={isSubmitting}
-                onClick={handleSubmitAudit}
-                className="!bg-[#ffc400] !text-black hover:!bg-[#e6b000] font-bold h-10 px-5 rounded-xl border-none"
-              >
-                Reconcile & Update Balances
-              </Button>
-            )}
+            <div className="flex items-center gap-3">
+              <div className="bg-slate-50/70 px-4 py-2 rounded-xl border border-slate-200/70 text-right">
+                <span className="text-[10px] font-semibold text-neutral-400 block tracking-tight">
+                  Net Count Variance Impact
+                </span>
+                <span
+                  className={`text-sm font-mono font-bold ${
+                    netDiff < 0 ? 'text-rose-600' : netDiff > 0 ? 'text-blue-600' : 'text-neutral-900'
+                  }`}
+                >
+                  {netDiff > 0 ? `+${formatPrice(netDiff)}` : formatPrice(netDiff)}
+                </span>
+              </div>
+
+              {activeTab === 'COUNT_SHEET' && (
+                <CustomButton
+                  variant="primary"
+                  icon={<CheckCircleOutlined />}
+                  loading={isSubmitting}
+                  onClick={handleSubmitAudit}
+                >
+                  Reconcile & Update Balances
+                </CustomButton>
+              )}
+            </div>
           </div>
-        </div>
 
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={[
-            {
-              key: 'COUNT_SHEET',
-              label: (
-                <span className="flex items-center gap-2 font-bold text-xs">
-                  <AuditOutlined /> Physical Count Sheet ({rawItems.length} items)
-                </span>
-              ),
-              children: (
-                <div className="space-y-4">
-                  <Table
-                    columns={countSheetColumns}
-                    dataSource={rawItems}
-                    rowKey="_id"
-                    loading={loadingInventory}
-                    pagination={false}
-                    size="middle"
-                  />
+          {/* Navigation Tabs */}
+          <div className="flex gap-1.5 p-1 bg-neutral-100/80 rounded-xl w-fit">
+            <button
+              onClick={() => setActiveTab('COUNT_SHEET')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                activeTab === 'COUNT_SHEET'
+                  ? 'bg-white text-neutral-900 shadow-xs font-bold'
+                  : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+            >
+              <AuditOutlined className={activeTab === 'COUNT_SHEET' ? 'text-amber-500' : ''} />
+              <span>Physical Count Sheet ({rawItems.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('HISTORY')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                activeTab === 'HISTORY'
+                  ? 'bg-white text-neutral-900 shadow-xs font-bold'
+                  : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+            >
+              <HistoryOutlined className={activeTab === 'HISTORY' ? 'text-amber-500' : ''} />
+              <span>Past Audits ({stocktakes.length})</span>
+            </button>
+          </div>
 
-                  <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
-                    <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                      Audit Notes / Closing Summary
-                    </label>
-                    <Input.TextArea
-                      rows={2}
-                      placeholder="e.g. Midnight physical closing stock count by kitchen lead"
-                      value={auditNotes}
-                      onChange={(e) => setAuditNotes(e.target.value)}
-                      className="rounded-xl text-xs"
-                    />
-                  </div>
-                </div>
-              ),
-            },
-            {
-              key: 'HISTORY',
-              label: (
-                <span className="flex items-center gap-2 font-bold text-xs">
-                  <HistoryOutlined /> Past Audits ({stocktakes.length})
-                </span>
-              ),
-              children: (
+          {/* Tab Views */}
+          {activeTab === 'COUNT_SHEET' ? (
+            <div className="space-y-4">
+              <div className="overflow-hidden">
                 <Table
-                  columns={historyColumns}
-                  dataSource={stocktakes}
+                  columns={countSheetColumns}
+                  dataSource={rawItems}
                   rowKey="_id"
-                  loading={loadingHistory}
-                  pagination={{ pageSize: 8 }}
+                  loading={loadingInventory}
+                  pagination={false}
                   size="middle"
                 />
-              ),
-            },
-          ]}
-        />
+              </div>
 
-        {/* Modal: View Historical Stocktake Sheet */}
-        <Modal
+              <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-100">
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Audit Notes / Closing Summary
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Midnight physical closing count verified by kitchen lead"
+                  value={auditNotes}
+                  onChange={(e) => setAuditNotes(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-neutral-200 bg-white text-xs font-normal text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-hidden">
+              <Table
+                columns={historyColumns}
+                dataSource={stocktakes}
+                rowKey="_id"
+                loading={loadingHistory}
+                pagination={{ pageSize: 8 }}
+                size="middle"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Modal: View Historical Stocktake Record */}
+        <CustomModal
           open={!!selectedAuditHistory}
           onCancel={() => setSelectedAuditHistory(null)}
-          footer={null}
-          title={null}
-          centered
+          title={`Audit Record: ${selectedAuditHistory?.stocktakeNumber || ''}`}
           width={620}
-          className="font-['Plus_Jakarta_Sans',sans-serif]"
         >
           {selectedAuditHistory && (
-            <div className="pt-2">
-              <h3 className="text-base font-black text-neutral-900 uppercase tracking-wide mb-1">
-                Audit Record: {selectedAuditHistory.stocktakeNumber}
-              </h3>
-              <p className="text-xs text-neutral-500 mb-4">
-                {selectedAuditHistory.branch?.name} • {new Date(selectedAuditHistory.createdAt).toLocaleString()}
-              </p>
+            <div className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+              <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between text-xs">
+                <span className="font-semibold text-neutral-800">{selectedAuditHistory.branch?.name}</span>
+                <span className="text-[11px] text-neutral-400">
+                  {new Date(selectedAuditHistory.createdAt).toLocaleString()}
+                </span>
+              </div>
 
-              <div className="max-h-80 overflow-y-auto space-y-2 mb-4">
+              <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
                 {selectedAuditHistory.items?.map((itm, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-xl border border-neutral-200 text-xs">
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-3 bg-slate-50/70 rounded-2xl border border-slate-100 text-xs"
+                  >
                     <div>
                       <strong className="block text-neutral-900">{itm.item?.name || 'Raw Item'}</strong>
-                      <span className="text-[10px] text-neutral-400">
+                      <span className="text-[11px] text-neutral-400 font-normal">
                         System: {itm.systemStock} ➔ Counted: {itm.physicalCount}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className={`font-mono font-bold block ${itm.varianceQuantity < 0 ? 'text-rose-600' : itm.varianceQuantity > 0 ? 'text-blue-600' : 'text-neutral-600'}`}>
+                      <span
+                        className={`font-mono font-bold block ${
+                          itm.varianceQuantity < 0
+                            ? 'text-rose-600'
+                            : itm.varianceQuantity > 0
+                            ? 'text-blue-600'
+                            : 'text-neutral-600'
+                        }`}
+                      >
                         {itm.varianceQuantity > 0 ? `+${itm.varianceQuantity}` : itm.varianceQuantity}
                       </span>
                       <span className="text-[10px] font-mono text-neutral-400">
@@ -422,18 +455,26 @@ export default function StocktakePage() {
 
               <div className="pt-3 border-t border-neutral-100 flex justify-between items-center text-xs">
                 <div>
-                  <span className="text-neutral-500 block">Total Shrinkage: <strong className="text-rose-600">{formatPrice(selectedAuditHistory.totalShrinkageLoss)}</strong></span>
+                  <span className="text-neutral-400 font-normal block">
+                    Shrinkage Loss: <strong className="text-rose-600 font-mono">{formatPrice(selectedAuditHistory.totalShrinkageLoss)}</strong>
+                  </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-neutral-500 block">Net Financial Adjustment:</span>
-                  <span className="text-sm font-black font-mono text-neutral-900">
+                  <span className="text-neutral-400 font-normal block">Net Adjustment</span>
+                  <span className="text-sm font-bold font-mono text-neutral-900">
                     {formatPrice(selectedAuditHistory.totalNetVarianceValue)}
                   </span>
                 </div>
               </div>
+
+              <div className="flex justify-end pt-2 border-t border-neutral-100">
+                <CustomButton variant="secondary" onClick={() => setSelectedAuditHistory(null)}>
+                  Close
+                </CustomButton>
+              </div>
             </div>
           )}
-        </Modal>
+        </CustomModal>
       </PageLayout>
     </>
   );
