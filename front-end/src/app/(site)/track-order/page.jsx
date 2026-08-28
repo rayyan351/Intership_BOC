@@ -7,6 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useTrackOrderQuery, useCancelCustomerOrderMutation } from '@/services/orderApi';
 import { formatPrice } from '@/lib/currency';
+import { getImageUrl } from '@/config/site';
 
 const STAGES = [
   { key: 'PENDING', label: 'Order Received', icon: '📝', desc: 'Sent to kitchen display' },
@@ -349,28 +350,31 @@ function TrackOrderContent() {
                   Meal Items
                 </h3>
                 <div className="divide-y divide-neutral-100 max-h-72 overflow-y-auto pr-1">
-                  {order.items?.map((item, idx) => (
-                    <div key={idx} className="py-3 flex items-start gap-3">
-                      <div className="relative w-12 h-12 rounded-xl bg-neutral-50 border border-neutral-200 overflow-hidden shrink-0">
-                        <Image
-                          src={item.image || "/images/brand/BurgerO'clock logo.webp"}
-                          alt={item.name}
-                          fill
-                          sizes="48px"
-                          className="object-contain p-1"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h5 className="text-xs font-bold text-neutral-900 truncate">{item.name}</h5>
-                        <span className="text-[11px] text-neutral-500 font-semibold">
-                          Qty: {item.quantity} × {formatPrice(item.price)}
+                  {order.items?.map((item, idx) => {
+                    const itemImage = getImageUrl(item.image);
+                    return (
+                      <div key={idx} className="py-3 flex items-start gap-3">
+                        <div className="relative w-12 h-12 rounded-xl bg-neutral-50 border border-neutral-200 overflow-hidden shrink-0">
+                          <Image
+                            src={itemImage}
+                            alt={item.name}
+                            fill
+                            sizes="48px"
+                            className="object-contain p-1"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h5 className="text-xs font-bold text-neutral-900 truncate">{item.name}</h5>
+                          <span className="text-[11px] text-neutral-500 font-semibold">
+                            Qty: {item.quantity} × {formatPrice(item.price)}
+                          </span>
+                        </div>
+                        <span className="text-xs font-extrabold text-neutral-900 font-mono">
+                          {formatPrice(item.itemTotal || item.price * item.quantity)}
                         </span>
                       </div>
-                      <span className="text-xs font-extrabold text-neutral-900 font-mono">
-                        {formatPrice(item.itemTotal || item.price * item.quantity)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -403,7 +407,7 @@ function TrackOrderContent() {
                   </div>
                 </div>
 
-<div className="border-t border-neutral-100 pt-4 space-y-2 text-xs font-mono">
+                <div className="border-t border-neutral-100 pt-4 space-y-2 text-xs font-mono">
                   <div className="flex justify-between text-neutral-500">
                     <span>Subtotal:</span>
                     <span>{formatPrice(order.subtotal)}</span>

@@ -11,6 +11,7 @@ import TableActions from '@/app/admin/_components/table/TableActions';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
 import { useToast } from '@/utils/toast';
 import { formatRelativeTime } from '@/utils/formatDate';
+import { getImageUrl } from '@/config/site';
 import {
   useGetBannersQuery,
   useCreateBannerMutation,
@@ -110,17 +111,20 @@ export default function AdminBannersPage() {
       dataIndex: 'desktopImage',
       key: 'desktopImage',
       width: '14%',
-      render: (imgSrc, record) => (
-        <Image
-          src={imgSrc || record.image || '/placeholder.png'}
-          alt="banner preview"
-          width={84}
-          height={42}
-          className="rounded-xl object-cover border border-neutral-100 shrink-0"
-          fallback="/placeholder.png"
-          preview={false}
-        />
-      ),
+      render: (imgSrc, record) => {
+        const bannerImg = getImageUrl(imgSrc || record.image || '');
+        return (
+          <Image
+            src={bannerImg}
+            alt="banner preview"
+            width={84}
+            height={42}
+            className="rounded-xl object-cover border border-neutral-100 shrink-0"
+            fallback="/placeholder.png"
+            preview={false}
+          />
+        );
+      },
     },
     {
       title: 'Banner Headline',

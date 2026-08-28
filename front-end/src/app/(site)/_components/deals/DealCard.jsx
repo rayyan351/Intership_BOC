@@ -6,6 +6,7 @@ import { useState } from "react";
 import { formatPrice } from "@/lib/currency";
 import { AddToCartButton } from "@/components/ui/AddToCartButton";
 import { DealCustomizerModal } from "./DealCustomizerModal";
+import { getImageUrl } from "@/config/site";
 
 export function DealCard({ deal }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -27,7 +28,7 @@ export function DealCard({ deal }) {
   const dealTitle = deal.title || deal.name || "Special Deal";
   const dealPrice = deal.dealPrice || deal.price || 0;
   const originalPrice = deal.originalPrice || 0;
-  const dealImg = deal.image || deal.banner || deal.imageUrl || deal.dealImage || "";
+  const dealImg = getImageUrl(deal.image || deal.banner || deal.imageUrl || deal.dealImage || "");
 
   const discountPercent =
     originalPrice && dealPrice && originalPrice > dealPrice

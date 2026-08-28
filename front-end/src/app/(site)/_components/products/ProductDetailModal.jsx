@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/Icons";
 import { formatPrice } from "@/lib/currency";
 import { ModalActionButtons } from "@/components/ui/ModalActionsButton";
 import { QuantitySelector } from "@/components/ui/QuantitySelector";
+import { getImageUrl } from "@/config/site";
 
 export function ProductDetailModal({ product, open, onClose }) {
   const dispatch = useDispatch();
@@ -31,7 +32,7 @@ export function ProductDetailModal({ product, open, onClose }) {
   if (!open || !product) return null;
 
   const totalPrice = (product.price || 0) * quantity;
-  const productImg = product.image || "";
+  const productImg = getImageUrl(product.image || "");
 
   const handleAddToCart = () => {
     dispatch(

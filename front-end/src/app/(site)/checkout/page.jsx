@@ -12,6 +12,7 @@ import { useLocation } from '@/context/LocationContext';
 import { useCreateOrderMutation, useCreatePaymentIntentMutation } from '@/services/orderApi';
 import { useGetDeliveryAreasQuery, useGetSystemSettingsQuery } from '@/services/deliveryAreaApi';
 import { formatPrice } from '@/lib/currency';
+import { getImageUrl } from '@/config/site';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -609,11 +610,12 @@ export default function CheckoutPage() {
               <div className="max-h-56 overflow-y-auto divide-y divide-neutral-100 mb-4 pr-1">
                 {items.map((item) => {
                   const itemKey = item.cartItemId || item._id || item.id;
+                  const itemImage = getImageUrl(item.image);
                   return (
                     <div key={itemKey} className="py-2.5 flex items-start gap-3">
                       <div className="relative w-10 h-10 min-w-[40px] rounded-xl overflow-hidden bg-neutral-50 border border-neutral-200 shrink-0">
                         <Image
-                          src={item.image || "/images/brand/BurgerO'clock logo.webp"}
+                          src={itemImage}
                           alt={item.name}
                           fill
                           sizes="40px"

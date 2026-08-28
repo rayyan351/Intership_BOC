@@ -6,6 +6,7 @@ import { useEffect, useState, useMemo } from "react";
 import { heroSlides as staticFallbackSlides } from "@/data/heroSlides";
 import { Icon } from "@/components/ui/Icons";
 import { BannerCTAButton } from "@/components/ui/BannerCTAButton";
+import { getImageUrl } from "@/config/site";
 
 const AUTOPLAY_DELAY = 6500;
 
@@ -18,7 +19,7 @@ export function HeroCarousel({ banners = [] }) {
       return banners.map((b, idx) => ({
         id: b._id?.toString() || b.id || `banner_${idx}`,
         title: b.title || "Featured Campaign",
-        image: b.desktopImage || b.image || "/placeholder.png",
+        image: getImageUrl(b.desktopImage || b.image || "/placeholder.png"),
         link: b.link || "",
         ctaText: b.ctaText || "",
       }));
@@ -26,7 +27,7 @@ export function HeroCarousel({ banners = [] }) {
     return (staticFallbackSlides || []).map((s) => ({
       id: s.id,
       title: s.title,
-      image: s.image,
+      image: getImageUrl(s.image),
       link: s.categoryId ? `#${s.categoryId}` : "#deals",
       ctaText: s.ctaText || "",
     }));
@@ -142,6 +143,7 @@ export function HeroCarousel({ banners = [] }) {
                   alt={slide.title}
                   fill
                   priority={index === 0}
+                  unoptimized
                   sizes="(max-width: 768px) 100vw, 1680px"
                   src={slide.image}
                   className="object-cover object-center pointer-events-none"

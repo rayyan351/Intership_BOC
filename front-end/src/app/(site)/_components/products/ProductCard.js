@@ -6,6 +6,7 @@ import { useState } from "react";
 import { formatPrice } from "@/lib/currency";
 import { AddToCartButton } from "@/components/ui/AddToCartButton";
 import { ProductDetailModal } from "./ProductDetailModal";
+import { getImageUrl } from "@/config/site";
 
 export function ProductCard({ product }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -26,7 +27,7 @@ export function ProductCard({ product }) {
 
   const price = product.price || 0;
   const comparePrice = product.compareAtPrice || 0;
-  const productImg = product.image || "";
+  const productImg = getImageUrl(product.image || "");
 
   return (
     <>

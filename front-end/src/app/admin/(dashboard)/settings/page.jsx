@@ -13,6 +13,7 @@ import FormInput from '@/app/admin/_components/formElements/inputfield/Forminput
 import FormImageUpload from '@/app/admin/_components/formElements/imageUpload/FormImageUpload';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
 import { useToast } from '@/utils/toast';
+import { getImageUrl } from '@/config/site';
 import { useGetSettingsQuery, useUpdateSettingsMutation } from '@/services/settingApi';
 
 const schema = yup.object().shape({
@@ -84,12 +85,6 @@ export default function SettingsPage() {
     }
   };
 
-  const getFullUrl = (url) => {
-    if (!url) return '';
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    return `http://localhost:5000${url.startsWith('/') ? '' : '/'}${url}`;
-  };
-
   return (
     <>
       {contextHolder}
@@ -139,7 +134,7 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-neutral-200">
                     <div className="h-10 w-10 relative bg-neutral-100 rounded-lg flex items-center justify-center border border-neutral-200">
                       <img
-                        src={getFullUrl(settings.favicon)}
+                        src={getImageUrl(settings.favicon)}
                         alt="Current Favicon"
                         className="max-h-6 max-w-6 object-contain"
                       />
@@ -181,7 +176,7 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-neutral-200">
                     <div className="h-12 w-36 relative bg-neutral-900 rounded-lg p-1.5 flex items-center justify-center">
                       <img
-                        src={getFullUrl(settings.storeLogo)}
+                        src={getImageUrl(settings.storeLogo)}
                         alt="Current Store Logo"
                         className="max-h-full max-w-full object-contain"
                       />
@@ -223,7 +218,7 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-neutral-200">
                     <div className="h-12 w-36 relative bg-black rounded-lg p-1.5 flex items-center justify-center">
                       <img
-                        src={getFullUrl(settings.adminLogo)}
+                        src={getImageUrl(settings.adminLogo)}
                         alt="Current Admin Logo"
                         className="max-h-full max-w-full object-contain"
                       />

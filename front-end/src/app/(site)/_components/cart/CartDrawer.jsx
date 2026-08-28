@@ -13,6 +13,7 @@ import {
 } from '@/redux/cart/cartSlice';
 import { Icon } from '@/components/ui/Icons';
 import { formatPrice } from '@/lib/currency';
+import { getImageUrl } from '@/config/site';
 
 export function CartDrawer() {
   const dispatch = useDispatch();
@@ -60,6 +61,7 @@ export function CartDrawer() {
           ) : (
             items.map((item) => {
               const itemKey = item.cartItemId || item._id || item.id;
+              const itemImage = getImageUrl(item.image);
               
               return (
                 <div 
@@ -69,7 +71,7 @@ export function CartDrawer() {
                   {/* Thumbnail Image */}
                   <div className="relative w-16 h-16 min-w-16 rounded-xl overflow-hidden bg-neutral-50 border border-neutral-200 shrink-0">
                     <Image 
-                      src={item.image || "/images/brand/BurgerO'clock logo.webp"} 
+                      src={itemImage} 
                       alt={item.name} 
                       fill
                       sizes="64px"

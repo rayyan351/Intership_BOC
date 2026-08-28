@@ -11,6 +11,7 @@ import TableActions from '@/app/admin/_components/table/TableActions';
 import { useToast } from '@/utils/toast';
 import { formatRelativeTime } from '@/utils/formatDate';
 import { formatPrice } from '@/lib/currency';
+import { getImageUrl } from '@/config/site';
 import {
   useGetProductsQuery,
   useCreateProductMutation,
@@ -31,11 +32,7 @@ function ItemAvatar({ src, name }) {
     const trimmed = src.trim();
     if (!trimmed || trimmed.includes('placeholder.png')) return '';
 
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
-      return trimmed;
-    }
-
-    return `http://localhost:5000${trimmed.startsWith('/') ? '' : '/'}${trimmed}`;
+    return getImageUrl(trimmed);
   }, [src]);
 
   if (!cleanSrc || hasError) {

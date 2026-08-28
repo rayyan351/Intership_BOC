@@ -9,6 +9,7 @@ import FormInput from '@/app/admin/_components/formElements/inputfield/Forminput
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
 import NotificationDropdown from '@/app/admin/_components/notifications/NotificationDropdown';
 import { useGetSettingsQuery } from '@/services/settingApi';
+import { getImageUrl } from '@/config/site';
 
 const { Header: AntHeader } = Layout;
 
@@ -63,8 +64,12 @@ export default function AdminHeader() {
     const token = localStorage.getItem('adminToken');
 
     try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL 
+        ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') 
+        : 'http://localhost:5000';
+
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/profile`,
+        `${apiBaseUrl}/api/auth/profile`,
         {
           method: 'PUT',
           headers: {
@@ -121,11 +126,7 @@ export default function AdminHeader() {
     },
   ];
 
-  const adminLogoUrl = settings?.adminLogo
-    ? settings.adminLogo.startsWith('http')
-      ? settings.adminLogo
-      : `http://localhost:5000${settings.adminLogo.startsWith('/') ? '' : '/'}${settings.adminLogo}`
-    : "/images/brand/BurgerO'clock logo.webp";
+  const adminLogoUrl = getImageUrl(settings?.adminLogo);
 
   return (
     <>

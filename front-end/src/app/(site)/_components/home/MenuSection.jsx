@@ -4,6 +4,7 @@
 import Image from "next/image";
 import { ProductCard } from "../products/ProductCard";
 import { DealCard } from "../deals/DealCard";
+import { getImageUrl } from "@/config/site";
 
 export function MenuSection({ category, categoryIndex = 0 }) {
   const sectionTitle = category.name || category.label || "";
@@ -13,14 +14,7 @@ export function MenuSection({ category, categoryIndex = 0 }) {
   const mongoId = String(category._id || "");
   const slug = String(category.slug || "");
 
-  // Safe resolver for Express backend asset URLs
-  const resolveBannerUrl = (url) => {
-    if (!url) return "";
-    if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    return `http://localhost:5000${url.startsWith("/") ? "" : "/"}${url}`;
-  };
-
-  const bannerSrc = resolveBannerUrl(category.banner);
+  const bannerSrc = getImageUrl(category.banner);
 
   return (
     <section

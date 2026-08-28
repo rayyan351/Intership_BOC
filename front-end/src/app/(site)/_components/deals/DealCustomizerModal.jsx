@@ -11,6 +11,7 @@ import { ModalActionButtons } from "@/components/ui/ModalActionsButton";
 import { QuantitySelector } from "@/components/ui/QuantitySelector";
 import { ChoiceOptionCard } from "../home/ChoiceOptionCard";
 import { isItemCurrentlyAvailable } from "@/utils/availability";
+import { getImageUrl } from "@/config/site";
 
 export function DealCustomizerModal({ deal, open, onClose }) {
   const dispatch = useDispatch();
@@ -48,7 +49,7 @@ export function DealCustomizerModal({ deal, open, onClose }) {
   const dealTitle = deal.title || deal.name || "Special Deal";
   const dealPrice = deal.dealPrice || deal.price || 0;
   const originalPrice = deal.originalPrice || 0;
-  const dealImg = deal.image || deal.banner || deal.imageUrl || deal.dealImage || "";
+  const dealImg = getImageUrl(deal.image || deal.banner || deal.imageUrl || deal.dealImage || "");
 
   const extraOptionsPrice = Object.values(selectedChoices)
     .flat()

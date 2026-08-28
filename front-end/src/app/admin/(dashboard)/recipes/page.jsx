@@ -25,6 +25,7 @@ import { useGetProductsQuery } from '@/services/productApi';
 import { useGetBranchesQuery } from '@/services/branchApi';
 import { useToast } from '@/utils/toast';
 import { formatPrice } from '@/lib/currency';
+import { getImageUrl } from '@/config/site';
 
 const PREP_CATEGORIES = [
   'Sauces & Dressings',

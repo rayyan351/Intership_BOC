@@ -10,6 +10,7 @@ import DealModal from './DealModal';
 import { useToast } from '@/utils/toast';
 import { formatRelativeTime } from '@/utils/formatDate';
 import { formatPrice } from '@/lib/currency';
+import { getImageUrl } from '@/config/site';
 import {
   useGetDealsQuery,
   useCreateDealMutation,
@@ -101,23 +102,26 @@ export default function DealsBundlesView({ searchTerm = '', createTrigger }) {
       title: 'Deal / Bundle',
       key: 'deal',
       width: 240,
-      render: (_, record) => (
-        <div className="flex items-center gap-3">
-          <Image
-            src={record.image?.startsWith('http') ? record.image : `http://localhost:5000${record.image}`}
-            alt={record.title}
-            width={46}
-            height={46}
-            className="rounded-xl object-cover border border-neutral-100 min-w-[46px] shrink-0"
-            fallback="/placeholder.png"
-            preview={false}
-          />
-          <div className="min-w-0">
-            <span className="font-semibold text-neutral-900 text-xs block truncate">{record.title}</span>
-            <span className="text-[11px] text-neutral-400 line-clamp-1 font-normal">{record.description || 'No description'}</span>
+      render: (_, record) => {
+        const dealImg = getImageUrl(record.image || record.banner || record.imageUrl || record.dealImage || '');
+        return (
+          <div className="flex items-center gap-3">
+            <Image
+              src={dealImg}
+              alt={record.title}
+              width={46}
+              height={46}
+              className="rounded-xl object-cover border border-neutral-100 min-w-[46px] shrink-0"
+              fallback="/placeholder.png"
+              preview={false}
+            />
+            <div className="min-w-0">
+              <span className="font-semibold text-neutral-900 text-xs block truncate">{record.title}</span>
+              <span className="text-[11px] text-neutral-400 line-clamp-1 font-normal">{record.description || 'No description'}</span>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: 'Type',

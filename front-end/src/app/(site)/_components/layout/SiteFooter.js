@@ -7,10 +7,10 @@ export function SiteFooter({
   storeLogo,
   storeName = "Burger O'Clock",
 }) {
-  const resolvedLogo = storeLogo
+const resolvedLogo = storeLogo
     ? storeLogo.startsWith("http")
       ? storeLogo
-      : `http://localhost:5000${storeLogo.startsWith("/") ? "" : "/"}${storeLogo}`
+      : `${process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : 'http://localhost:5000'}${storeLogo.startsWith("/") ? "" : "/"}${storeLogo}`
     : "/images/brand/BurgerO'clock logo.webp";
 
   return (
