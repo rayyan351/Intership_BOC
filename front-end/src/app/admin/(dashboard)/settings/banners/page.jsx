@@ -1,13 +1,13 @@
+// src/app/admin/banners/page.jsx
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Button, Space, Image, Tag } from 'antd';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Tag, Image } from 'antd';
 import { usePermission } from '@/hooks/usePermission';
 
 import BannerModal from './_components/bannerModal';
-import ConfirmModal from '@/app/admin/_components/modal/ConfirmModal';
 import CustomSwitch from '@/app/admin/_components/formElements/switch/CustomSwitch';
+import TableActions from '@/app/admin/_components/table/TableActions';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
 import { useToast } from '@/utils/toast';
 import { formatRelativeTime } from '@/utils/formatDate';
@@ -24,10 +24,6 @@ export default function AdminBannersPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBanner, setSelectedBanner] = useState(null);
-
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [bannerToDelete, setBannerToDelete] = useState(null);
-
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
 
@@ -40,7 +36,7 @@ export default function AdminBannersPage() {
   const { data: banners = [], isLoading: loading } = useGetBannersQuery();
   const [createBanner, { isLoading: isCreating }] = useCreateBannerMutation();
   const [updateBanner, { isLoading: isUpdating }] = useUpdateBannerMutation();
-  const [deleteBanner, { isLoading: isDeleting }] = useDeleteBannerMutation();
+  const [deleteBanner] = useDeleteBannerMutation();
   const [toggleStatus] = useToggleBannerStatusMutation();
 
   const handleSaveBanner = async (formData) => {
@@ -59,13 +55,10 @@ export default function AdminBannersPage() {
     }
   };
 
-  const handleDeleteBanner = async () => {
-    if (!bannerToDelete) return;
+  const handleDeleteBanner = async (id) => {
     try {
-      await deleteBanner(bannerToDelete._id).unwrap();
+      await deleteBanner(id).unwrap();
       showSuccess('Banner deleted successfully!');
-      setIsDeleteModalOpen(false);
-      setBannerToDelete(null);
     } catch (error) {
       showError(error?.data?.message || 'Failed to delete banner');
     }
@@ -97,11 +90,6 @@ export default function AdminBannersPage() {
     setIsModalOpen(true);
   };
 
-  const handleOpenDeleteModal = (record) => {
-    setBannerToDelete(record);
-    setIsDeleteModalOpen(true);
-  };
-
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedBanner(null);
@@ -121,14 +109,16 @@ export default function AdminBannersPage() {
       title: 'Preview',
       dataIndex: 'desktopImage',
       key: 'desktopImage',
+      width: '14%',
       render: (imgSrc, record) => (
         <Image
           src={imgSrc || record.image || '/placeholder.png'}
           alt="banner preview"
-          width={80}
-          height={45}
-          className="rounded-lg object-cover"
+          width={84}
+          height={42}
+          className="rounded-xl object-cover border border-neutral-100 shrink-0"
           fallback="/placeholder.png"
+          preview={false}
         />
       ),
     },
@@ -136,36 +126,43 @@ export default function AdminBannersPage() {
       title: 'Banner Headline',
       dataIndex: 'title',
       key: 'title',
+      width: '32%',
       render: (text, record) => (
         <div>
           {record.eyebrow && (
-            <span className="text-[10px] font-black text-amber-600 block uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-amber-700 block tracking-tight">
               {record.eyebrow}
             </span>
           )}
-          <span className="font-bold text-gray-900 text-sm">{text}</span>
+          <span className="font-semibold text-neutral-900 text-xs block">{text}</span>
         </div>
       ),
     },
     {
       title: 'Target Link & CTA',
       key: 'cta',
+      width: '24%',
       render: (_, record) =>
         record.link ? (
-          <Space orientation="vertical" size={2}>
-            <span className="text-xs font-semibold text-gray-800">{record.link}</span>
-            {record.ctaText && <Tag color="gold">{record.ctaText}</Tag>}
-          </Space>
+          <div>
+            <span className="text-xs font-semibold text-neutral-800 block">{record.link}</span>
+            {record.ctaText && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/60 inline-block mt-1">
+                {record.ctaText}
+              </span>
+            )}
+          </div>
         ) : (
-          <span className="text-gray-400 text-xs italic">No CTA attached</span>
+          <span className="text-neutral-400 text-xs font-normal">No CTA attached</span>
         ),
     },
     {
       title: 'Last Updated',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
+      width: '14%',
       render: (dateStr) => (
-        <span className="text-gray-600 text-xs font-medium bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">
+        <span className="text-neutral-500 text-xs font-normal whitespace-nowrap">
           {formatRelativeTime(dateStr)}
         </span>
       ),
@@ -174,50 +171,44 @@ export default function AdminBannersPage() {
       title: 'Status',
       dataIndex: 'isActive',
       key: 'isActive',
+      width: '12%',
       render: (isActive, record) => (
-        <Space size="small">
+        <div className="flex items-center gap-2">
           <CustomSwitch
             checked={record.isActive ?? true}
             disabled={!canToggleStatus}
             loading={updatingId === record._id}
             onChange={(checked) => handleStatusToggle(record, checked)}
           />
-          <span className="text-xs font-semibold text-gray-600">
+          <span className={`text-[11px] font-semibold ${record.isActive ? 'text-emerald-600' : 'text-neutral-400'}`}>
             {record.isActive ? 'Active' : 'Hidden'}
           </span>
-        </Space>
+        </div>
       ),
     },
     {
       title: 'Actions',
       key: 'actions',
+      align: 'right',
+      width: '8%',
       render: (_, record) => {
         if (!canEdit && !canDelete) {
           return (
-            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+            <Tag color="default" className="text-[10px] font-bold text-neutral-400 border-none">
               View Only
             </Tag>
           );
         }
 
         return (
-          <Space size="middle">
-            {canEdit && (
-              <Button
-                type="text"
-                icon={<EditOutlined className="text-gray-600" />}
-                onClick={() => handleOpenEditModal(record)}
-              />
-            )}
-            {canDelete && (
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => handleOpenDeleteModal(record)}
-              />
-            )}
-          </Space>
+          <TableActions
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onEdit={() => handleOpenEditModal(record)}
+            onDelete={() => handleDeleteBanner(record._id)}
+            deleteTitle="Delete Hero Banner?"
+            deleteDescription={`Are you sure you want to delete "${record.title}"? This slide will be permanently removed from the storefront hero carousel.`}
+          />
         );
       },
     },
@@ -242,39 +233,35 @@ export default function AdminBannersPage() {
         onSearch={setSearchTerm}
         searchPlaceholder="Search banners by title or link..."
       >
-        <Table
-          columns={columns}
-          dataSource={filteredBanners}
-          rowKey="_id"
-          loading={loading}
-          pagination={{ pageSize: 8, responsive: true }}
-          scroll={{ x: 'max-content' }}
-          bordered={false}
-        />
+        <div className="space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+          <div className="overflow-hidden">
+            <Table
+              columns={columns}
+              dataSource={filteredBanners}
+              rowKey="_id"
+              loading={loading}
+              pagination={{
+                pageSize: 8,
+                responsive: true,
+                showTotal: (total, range) => (
+                  <span className="text-xs text-neutral-400 font-normal">
+                    Showing {range[0]}-{range[1]} of {total} banners
+                  </span>
+                ),
+              }}
+              scroll={{ x: 'max-content' }}
+              size="middle"
+            />
+          </div>
 
-        <BannerModal
-          open={isModalOpen}
-          onClose={handleCloseModal}
-          onSubmit={handleSaveBanner}
-          loading={isCreating || isUpdating}
-          initialValues={selectedBanner}
-        />
-
-        <ConfirmModal
-          open={isDeleteModalOpen}
-          onCancel={() => {
-            setIsDeleteModalOpen(false);
-            setBannerToDelete(null);
-          }}
-          onConfirm={handleDeleteBanner}
-          title="Delete Hero Banner"
-          description={
-            bannerToDelete
-              ? `Are you sure you want to delete "${bannerToDelete.title}"? This slide will be permanently removed from the hero carousel.`
-              : 'Are you sure you want to delete this banner?'
-          }
-          loading={isDeleting}
-        />
+          <BannerModal
+            open={isModalOpen}
+            onClose={handleCloseModal}
+            onSubmit={handleSaveBanner}
+            loading={isCreating || isUpdating}
+            initialValues={selectedBanner}
+          />
+        </div>
       </PageLayout>
     </>
   );

@@ -1,13 +1,12 @@
 // src/app/admin/(dashboard)/categories/_components/DisplaySectionsView.jsx
 'use client';
 
-import React, { useState } from 'react';
-import { Table, Button, Tag, Space, Input } from 'antd';
-import { EditOutlined, DeleteOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Table, Tag, Image } from 'antd';
 import { usePermission } from '@/hooks/usePermission';
-import ConfirmModal from '@/app/admin/_components/modal/ConfirmModal';
 import CustomSwitch from '@/app/admin/_components/formElements/switch/CustomSwitch';
-import SectionModal from '@/app/admin/(dashboard)/products/categories/_components/SectionModal';
+import TableActions from '@/app/admin/_components/table/TableActions';
+import SectionModal from './SectionModal';
 import { useToast } from '@/utils/toast';
 import { formatRelativeTime } from '@/utils/formatDate';
 import {
@@ -17,17 +16,13 @@ import {
   useDeleteSectionMutation,
 } from '@/services/sectionApi';
 
-export default function DisplaySectionsView() {
+export default function DisplaySectionsView({ searchTerm = '', createTrigger }) {
   const { contextHolder, showSuccess, showError } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSection, setSelectedSection] = useState(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [sectionToDelete, setSectionToDelete] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
 
   const { hasPermission } = usePermission();
-  const canAdd = hasPermission('sections:create');
   const canEdit = hasPermission('sections:edit');
   const canDelete = hasPermission('sections:delete');
   const canToggleStatus = hasPermission('sections:status') || hasPermission('sections:toggle_stock');
@@ -36,6 +31,14 @@ export default function DisplaySectionsView() {
   const [createSection, { isLoading: isCreating }] = useCreateSectionMutation();
   const [updateSection, { isLoading: isUpdating }] = useUpdateSectionMutation();
   const [deleteSection, { isLoading: isDeleting }] = useDeleteSectionMutation();
+
+  // Listen for create button clicks from the top PageLayout
+  useEffect(() => {
+    if (createTrigger && createTrigger.startsWith('section-')) {
+      setSelectedSection(null);
+      setIsModalOpen(true);
+    }
+  }, [createTrigger]);
 
   const handleSaveSection = async (formData) => {
     try {
@@ -74,13 +77,10 @@ export default function DisplaySectionsView() {
     }
   };
 
-  const handleDeleteSection = async () => {
-    if (!sectionToDelete) return;
+  const handleDeleteSection = async (id) => {
     try {
-      await deleteSection(sectionToDelete._id).unwrap();
+      await deleteSection(id).unwrap();
       showSuccess('Section deleted successfully!');
-      setIsDeleteModalOpen(false);
-      setSectionToDelete(null);
     } catch (error) {
       showError(error?.data?.message || 'Failed to delete section');
     }
@@ -95,41 +95,59 @@ export default function DisplaySectionsView() {
       title: 'Order',
       dataIndex: 'displayOrder',
       key: 'displayOrder',
-      render: (num) => <Tag color="blue">#{num}</Tag>,
+      width: '8%',
+      render: (num) => (
+        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+          #{num}
+        </span>
+      ),
     },
     {
-      title: 'Section Title',
+      title: 'Section Details',
       dataIndex: 'title',
       key: 'title',
+      width: '26%',
       render: (text, record) => (
         <div>
-          <span className="font-bold text-gray-900 block">{text}</span>
-          <span className="text-xs text-gray-500">{record.subtitle}</span>
+          <span className="font-semibold text-neutral-900 text-xs block">{text}</span>
+          <span className="text-[11px] text-neutral-400 font-normal line-clamp-1">
+            {record.subtitle || 'No subtitle configured'}
+          </span>
         </div>
       ),
     },
     {
-      title: 'Banner Preview',
+      title: 'Banner Artwork',
       dataIndex: 'banner',
       key: 'banner',
+      width: '18%',
       render: (banner) =>
         banner ? (
-          <img
+          <Image
             src={banner.startsWith('http') ? banner : `http://localhost:5000${banner}`}
-            alt="Banner"
-            className="w-24 h-9 object-cover rounded border border-gray-200"
+            alt="Section Banner"
+            width={96}
+            height={36}
+            className="rounded-lg object-cover border border-neutral-100 shrink-0"
+            fallback="/placeholder.png"
+            preview={false}
           />
         ) : (
-          <span className="text-xs text-gray-400 italic">No Banner</span>
+          <span className="text-xs text-neutral-400 font-normal">No banner</span>
         ),
     },
     {
       title: 'Curated Items',
       key: 'items',
+      width: '20%',
       render: (_, record) => (
-        <div className="flex flex-wrap gap-1 max-w-xs">
-          <Tag color="cyan">{record.products?.length || 0} Products</Tag>
-          <Tag color="purple">{record.deals?.length || 0} Deals</Tag>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700">
+            {record.products?.length || 0} Products
+          </span>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700">
+            {record.deals?.length || 0} Deals
+          </span>
         </div>
       ),
     },
@@ -137,26 +155,28 @@ export default function DisplaySectionsView() {
       title: 'Status',
       dataIndex: 'isShown',
       key: 'isShown',
+      width: '14%',
       render: (isShown, record) => (
-        <Space size="small">
+        <div className="flex items-center gap-2">
           <CustomSwitch
             checked={record.isShown ?? true}
             disabled={!canToggleStatus}
             loading={updatingId === record._id}
             onChange={(checked) => handleStatusToggle(record, checked)}
           />
-          <span className="text-xs font-semibold text-gray-600">
-            {record.isShown ?? true ? 'Active' : 'Disabled'}
+          <span className={`text-[11px] font-semibold ${record.isShown ?? true ? 'text-emerald-600' : 'text-neutral-400'}`}>
+            {record.isShown ?? true ? 'Active' : 'Hidden'}
           </span>
-        </Space>
+        </div>
       ),
     },
     {
       title: 'Last Updated',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
+      width: '14%',
       render: (dateStr) => (
-        <span className="text-gray-600 text-xs font-medium bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">
+        <span className="text-neutral-500 text-xs font-normal whitespace-nowrap">
           {formatRelativeTime(dateStr)}
         </span>
       ),
@@ -164,38 +184,29 @@ export default function DisplaySectionsView() {
     {
       title: 'Actions',
       key: 'actions',
+      align: 'right',
+      width: '8%',
       render: (_, record) => {
         if (!canEdit && !canDelete) {
           return (
-            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+            <Tag color="default" className="text-[10px] font-bold text-neutral-400 border-none">
               View Only
             </Tag>
           );
         }
+
         return (
-          <Space size="middle">
-            {canEdit && (
-              <Button
-                type="text"
-                icon={<EditOutlined className="text-gray-600" />}
-                onClick={() => {
-                  setSelectedSection(record);
-                  setIsModalOpen(true);
-                }}
-              />
-            )}
-            {canDelete && (
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => {
-                  setSectionToDelete(record);
-                  setIsDeleteModalOpen(true);
-                }}
-              />
-            )}
-          </Space>
+          <TableActions
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onEdit={() => {
+              setSelectedSection(record);
+              setIsModalOpen(true);
+            }}
+            onDelete={() => handleDeleteSection(record._id)}
+            deleteTitle="Delete Display Section?"
+            deleteDescription={`Are you sure you want to delete "${record.title}"? Curated layout ordering on the storefront will update.`}
+          />
         );
       },
     },
@@ -204,39 +215,24 @@ export default function DisplaySectionsView() {
   return (
     <>
       {contextHolder}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-50 p-4 rounded-2xl border border-neutral-200">
-          <Input
-            placeholder="Search display sections..."
-            prefix={<SearchOutlined className="text-neutral-400" />}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-xs min-h-[40px] rounded-xl"
-            allowClear
+      <div className="space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+        <div className="overflow-hidden">
+          <Table
+            columns={columns}
+            dataSource={filteredSections}
+            rowKey="_id"
+            loading={isLoading}
+            pagination={{
+              pageSize: 8,
+              showTotal: (total, range) => (
+                <span className="text-xs text-neutral-400 font-normal">
+                  Showing {range[0]}-{range[1]} of {total} display sections
+                </span>
+              ),
+            }}
+            size="middle"
           />
-          {canAdd && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setSelectedSection(null);
-                setIsModalOpen(true);
-              }}
-              className="bg-[#ffc400] hover:bg-[#e0b210] text-black font-bold h-10 px-5 rounded-xl border-none shadow-sm"
-            >
-              Create Section
-            </Button>
-          )}
         </div>
-
-        <Table
-          columns={columns}
-          dataSource={filteredSections}
-          rowKey="_id"
-          loading={isLoading}
-          pagination={{ pageSize: 8 }}
-          bordered={false}
-        />
 
         <SectionModal
           open={isModalOpen}
@@ -247,15 +243,6 @@ export default function DisplaySectionsView() {
           onSubmit={handleSaveSection}
           loading={isCreating || isUpdating}
           initialValues={selectedSection}
-        />
-
-        <ConfirmModal
-          open={isDeleteModalOpen}
-          onCancel={() => setIsDeleteModalOpen(false)}
-          onConfirm={handleDeleteSection}
-          title="Delete Display Section"
-          description={`Are you sure you want to delete "${sectionToDelete?.title}"?`}
-          loading={isDeleting}
         />
       </div>
     </>

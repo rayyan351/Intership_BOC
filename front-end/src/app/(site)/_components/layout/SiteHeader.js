@@ -35,7 +35,6 @@ export function SiteHeader({
     setMounted(true);
   }, []);
 
-  // During SSR, render a stable baseline; once mounted on client, render the actual saved location
   const activeLocationName = mounted
     ? reduxLocation?.areaName ||
       reduxLocation?.name ||
@@ -113,7 +112,7 @@ export function SiteHeader({
           <div className="flex items-center min-w-0 gap-[7px] sm:gap-3">
             <Link
               aria-label={`${storeName} home`}
-              className="inline-flex shrink-0"
+              className="inline-flex shrink-0 no-underline"
               href="/"
             >
               <div className="relative w-[92px] min-[430px]:w-[100px] sm:w-[120px] h-[42px] sm:h-[52px]">
@@ -159,7 +158,7 @@ export function SiteHeader({
             {/* Phone Button */}
             <a
               aria-label={`Call ${storeName} at ${DISPLAY_PHONE}`}
-              className="hidden min-[680px]:inline-flex items-center gap-[7px] min-h-[40px] px-3 border border-[#F4C61A] rounded-full bg-transparent text-[#F4C61A] text-[0.7rem] font-extrabold whitespace-nowrap transition-all duration-200 hover:-translate-y-[1px] hover:bg-[#F4C61A] hover:text-black"
+              className="hidden min-[680px]:inline-flex items-center gap-[7px] min-h-[40px] px-3 border border-[#F4C61A] rounded-full bg-transparent text-[#F4C61A] text-[0.7rem] font-extrabold whitespace-nowrap transition-all duration-200 hover:-translate-y-[1px] hover:bg-[#F4C61A] hover:text-black no-underline"
               href={`tel:${ORDER_PHONE}`}
             >
               <Icon name="phone" size={16} strokeWidth={2.1} />
@@ -256,7 +255,7 @@ export function SiteHeader({
                 key={item.label}
                 onClick={() => closeMenu()}
                 tabIndex={menuOpen ? 0 : -1}
-                className="grid grid-cols-[24px_minmax(0,1fr)_20px] items-center gap-2 min-h-[44px] px-[11px] rounded-[11px] bg-[#f8f8f8] text-[#171717] transition-all duration-200 hover:-translate-x-[2px] hover:bg-[#f1f1f1]"
+                className="grid grid-cols-[24px_minmax(0,1fr)_20px] items-center gap-2 min-h-[44px] px-[11px] rounded-[11px] bg-[#f8f8f8] text-[#171717] transition-all duration-200 hover:-translate-x-[2px] hover:bg-[#f1f1f1] hover:text-[#171717] no-underline"
               >
                 <span className="grid place-items-center text-[#171717]">
                   <Icon name={item.icon} size={19} strokeWidth={1.8} />

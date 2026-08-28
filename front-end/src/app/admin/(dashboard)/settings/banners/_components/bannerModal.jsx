@@ -65,9 +65,9 @@ export default function BannerModal({
 
   const handleFinish = (values) => {
     const formData = new FormData();
-    formData.append('title', values.title);
+    formData.append('title', values.title.trim());
     formData.append('link', values.link);
-    formData.append('ctaText', values.ctaText || '');
+    formData.append('ctaText', values.ctaText ? values.ctaText.trim() : '');
 
     if (values.image) {
       formData.append('image', values.image);
@@ -81,9 +81,12 @@ export default function BannerModal({
       title={isEditMode ? 'Edit Hero Banner' : 'Add New Hero Banner'}
       open={open}
       onCancel={onClose}
-      width="50%"
+      width={600}
     >
-      <form onSubmit={handleSubmit(handleFinish)} className="mt-4 space-y-4">
+      <form
+        onSubmit={handleSubmit(handleFinish)}
+        className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]"
+      >
         <FormInput
           name="title"
           label="Internal Reference Title"
@@ -93,7 +96,7 @@ export default function BannerModal({
 
         <FormSelect
           name="link"
-          label="Target Menu Section (Clicking the slide glides here)"
+          label="Target Menu Destination Section"
           placeholder={fetchingOptions ? 'Loading sections...' : 'Select a menu section or category'}
           options={targetOptions}
           control={control}
@@ -109,17 +112,18 @@ export default function BannerModal({
 
         <FormImageUpload
           name="image"
-          label="Banner Graphic / Artwork"
+          label="Banner Graphic Artwork"
           control={control}
         />
 
-        <div className="flex justify-end pt-4 mt-6 border-t border-gray-100">
+        {/* Action Controls */}
+        <div className="flex justify-end pt-3 mt-5 border-t border-neutral-100">
           <Space size="middle">
             <CustomButton variant="secondary" onClick={onClose} type="button">
               Cancel
             </CustomButton>
             <CustomButton variant="primary" htmlType="submit" loading={loading}>
-              {isEditMode ? 'Update Banner' : 'Publish Banner'}
+              {isEditMode ? 'Save Changes' : 'Publish Banner'}
             </CustomButton>
           </Space>
         </div>

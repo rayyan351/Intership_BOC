@@ -1,22 +1,21 @@
-// front-end/src/app/admin/_components/layout/AdminHeader.jsx
+// src/app/admin/_components/layout/AdminHeader.jsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Layout, Dropdown, Avatar, Modal, Form, Space, message } from 'antd';
-import { UserOutlined, LogoutOutlined, ProfileOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, ProfileOutlined, DownOutlined } from '@ant-design/icons';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import FormInput from '@/app/admin/_components/formElements/inputfield/Forminput';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
+import NotificationDropdown from '@/app/admin/_components/notifications/NotificationDropdown';
 import { useGetSettingsQuery } from '@/services/settingApi';
 
 const { Header: AntHeader } = Layout;
 
 export default function AdminHeader() {
-  const router = useRouter();
   const { data: settings } = useGetSettingsQuery();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [user, setUser] = useState({ name: 'Admin', email: '' });
+  const [user, setUser] = useState({ name: 'Admin', email: '', role: 'Administrator' });
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
   
@@ -35,7 +34,6 @@ export default function AdminHeader() {
   }, []);
 
   const handleLogout = () => {
-    // 1. Wipe all local storage auth keys
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminUser');
     localStorage.removeItem('token');
@@ -43,7 +41,6 @@ export default function AdminHeader() {
     
     messageApi.success('Logged out successfully');
     
-    // 2. Full page redirect clears all Redux Query cache completely
     setTimeout(() => {
       window.location.href = '/admin/login';
     }, 300);
@@ -88,7 +85,7 @@ export default function AdminHeader() {
         _id: data._id,
         name: data.name,
         email: data.email,
-        role: data.role,
+        role: data.role || user.role,
       };
 
       setUser(updatedUser);
@@ -110,16 +107,16 @@ export default function AdminHeader() {
   const userMenuItems = [
     {
       key: 'profile',
-      label: 'View Profile',
-      icon: <ProfileOutlined />,
+      label: <span className="font-semibold text-xs py-0.5">Account Profile</span>,
+      icon: <ProfileOutlined className="text-xs" />,
     },
     {
       type: 'divider',
     },
     {
       key: 'logout',
-      label: 'Logout',
-      icon: <LogoutOutlined />,
+      label: <span className="font-semibold text-xs text-rose-600 py-0.5">Sign Out</span>,
+      icon: <LogoutOutlined className="text-xs text-rose-600" />,
       danger: true,
     },
   ];
@@ -136,10 +133,11 @@ export default function AdminHeader() {
 
       <AntHeader 
         style={{ backgroundColor: '#000000' }}
-        className="border-b border-zinc-800 px-6 flex items-center justify-between sticky top-0 z-50 h-16"
+        className="border-b border-neutral-900 px-6 sm:px-8 flex items-center justify-between sticky top-0 z-50 h-16 select-none"
       >
+        {/* Brand & Console Tag */}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="relative h-9 w-28 sm:w-32 shrink-0">
+          <div className="relative h-8 w-28 sm:w-32 shrink-0">
             <Image
               src={adminLogoUrl}
               alt="Admin Logo"
@@ -150,44 +148,59 @@ export default function AdminHeader() {
               className="object-contain object-left"
             />
           </div>
-          <span className="font-bold text-sm tracking-widest uppercase text-white/90 hidden sm:inline border-l border-zinc-800 pl-3">
-            Admin Panel
+          <span className="font-semibold text-[11px] tracking-wider uppercase text-neutral-400 hidden sm:inline">
+            Console
           </span>
         </div>
 
-        {/* Removed faulty getPopupContainer that blocked click listener */}
-        <Dropdown 
-          menu={{ 
-            items: userMenuItems,
-            onClick: handleMenuClick 
-          }} 
-          placement="bottomRight" 
-          trigger={['click']}
-        >
-          <div className="flex items-center gap-3 cursor-pointer hover:bg-zinc-900 p-1.5 rounded-lg transition select-none">
-            <Avatar size="large" icon={<UserOutlined />} className="bg-[#ffc400] text-black font-bold" />
-            <span className="text-sm font-semibold text-white hidden md:inline">{user.name}</span>
-          </div>
-        </Dropdown>
+        {/* Action Elements: Bell Dropdown + User Avatar */}
+        <div className="flex items-center gap-4">
+          <NotificationDropdown />
+
+          <Dropdown 
+            menu={{ 
+              items: userMenuItems,
+              onClick: handleMenuClick 
+            }} 
+            placement="bottomRight" 
+            trigger={['click']}
+          >
+            <div className="flex items-center gap-3 cursor-pointer hover:bg-neutral-900/90 px-3 py-1.5 rounded-xl border border-transparent hover:border-neutral-800 transition">
+              <Avatar 
+                size={34} 
+                icon={<UserOutlined />} 
+                className="bg-[#F4C61A] text-neutral-950 font-bold shrink-0 shadow-2xs" 
+              />
+              <div className="hidden md:flex flex-col text-left">
+                <span className="text-xs font-bold text-neutral-100 leading-tight block">{user.name}</span>
+                <span className="text-[10px] text-neutral-400 capitalize font-medium leading-tight mt-0.5">
+                  {user.role || 'Staff'}
+                </span>
+              </div>
+              <DownOutlined className="text-[9px] text-neutral-500 ml-1 hidden md:inline" />
+            </div>
+          </Dropdown>
+        </div>
       </AntHeader>
 
-      {/* View / Edit Profile Modal */}
+      {/* Modal: Account Settings */}
       <Modal
         title={
-          <span className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <UserOutlined className="text-[#ffc400]" /> Admin Profile
+          <span className="text-base font-bold text-neutral-900 flex items-center gap-2">
+            <UserOutlined className="text-[#F4C61A]" /> Admin Profile
           </span>
         }
         open={isProfileModalOpen}
         onCancel={() => setIsProfileModalOpen(false)}
         footer={null}
         centered
+        width={440}
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={handleProfileUpdate}
-          className="pt-4"
+          className="pt-3 font-['Plus_Jakarta_Sans',sans-serif]"
         >
           <FormInput
             name="name"
@@ -204,7 +217,7 @@ export default function AdminHeader() {
             rules={[{ required: true, message: 'Email is required' }]}
           />
 
-          <Space style={{ width: '100%', justifyContent: 'flex-end' }} className="pt-4">
+          <Space style={{ width: '100%', justifyContent: 'flex-end' }} className="pt-3 border-t border-neutral-100 mt-4">
             <CustomButton variant="secondary" onClick={() => setIsProfileModalOpen(false)}>
               Cancel
             </CustomButton>

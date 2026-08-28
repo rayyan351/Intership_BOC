@@ -40,16 +40,16 @@ export function SiteFooter({
           <h2 className="m-0 mb-2 text-[1.05rem] font-bold text-white tracking-tight">
             Information
           </h2>
-          <a href="#menu" className="text-[#ececec] text-sm hover:text-[#F4C61A] transition-colors">
+          <a href="#menu" className="text-[#ececec] text-sm hover:text-[#F4C61A] transition-colors no-underline">
             Menu
           </a>
-          <a href="#super-savor-deals" className="text-[#ececec] text-sm hover:text-[#F4C61A] transition-colors">
+          <a href="#super-savor-deals" className="text-[#ececec] text-sm hover:text-[#F4C61A] transition-colors no-underline">
             Deals
           </a>
-          <Link href="/admin" className="text-[#ececec] text-sm hover:text-[#F4C61A] transition-colors">
+          <Link href="/admin" className="text-[#ececec] text-sm hover:text-[#F4C61A] transition-colors no-underline">
             Admin UI
           </Link>
-          <a href="#seo-heading" className="text-[#ececec] text-sm hover:text-[#F4C61A] transition-colors">
+          <a href="#seo-heading" className="text-[#ececec] text-sm hover:text-[#F4C61A] transition-colors no-underline">
             About
           </a>
         </div>
@@ -61,13 +61,13 @@ export function SiteFooter({
           </h2>
           <a
             href={`tel:${ORDER_PHONE}`}
-            className="text-[#ececec] text-sm hover:text-[#F4C61A] transition-colors"
+            className="text-[#ececec] text-sm hover:text-[#F4C61A] transition-colors no-underline"
           >
             {DISPLAY_PHONE}
           </a>
           <a
             href={`mailto:${FEEDBACK_EMAIL}`}
-            className="text-[#ececec] text-sm hover:text-[#F4C61A] transition-colors"
+            className="text-[#ececec] text-sm hover:text-[#F4C61A] transition-colors no-underline"
           >
             {FEEDBACK_EMAIL}
           </a>
@@ -89,13 +89,13 @@ export function SiteFooter({
       </div>
 
       {/* Bottom Yellow Strip */}
-      <div className="min-h-[58px] flex flex-col min-[621px]:flex-row items-center justify-center gap-[7px] min-[621px]:gap-[50px] px-5 py-2.5 bg-[#F4C61A] text-black text-[0.78rem] font-bold text-center">
+      <div className="min-h-[58px] flex flex-col min-[621px]:flex-row items-center justify-center gap-[7px] min-[621px]:gap-[50px] px-5 py-2.5 bg-[#F4C61A] text-neutral-950 text-[0.78rem] font-bold text-center">
         <span>© {new Date().getFullYear()} {storeName}. All rights reserved.</span>
         <div className="flex items-center gap-[18px]">
-          <a href="#" className="hover:underline">
+          <a href="#" className="hover:underline text-neutral-950 no-underline">
             FAQs
           </a>
-          <a href="#" className="hover:underline">
+          <a href="#" className="hover:underline text-neutral-950 no-underline">
             Privacy Policy
           </a>
         </div>

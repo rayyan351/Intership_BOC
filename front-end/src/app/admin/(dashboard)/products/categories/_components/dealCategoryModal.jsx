@@ -1,3 +1,4 @@
+// src/app/admin/(dashboard)/products/categories/_components/dealCategoryModal.jsx
 'use client';
 
 import React, { useEffect } from 'react';
@@ -26,6 +27,16 @@ export default function DealCategoryModal({ open, onClose, onSubmit, loading, in
     }
   }, [open, initialValues, reset]);
 
+  const handleFormSubmit = (data) => {
+    const trimmedLabel = data.label.trim();
+    const payload = {
+      label: trimmedLabel,
+      name: trimmedLabel.toLowerCase().replace(/[\s_-]+/g, ''),
+    };
+
+    onSubmit(payload);
+  };
+
   return (
     <CustomModal
       title={initialValues ? 'Edit Deal Category' : 'Create Deal Category'}
@@ -33,21 +44,25 @@ export default function DealCategoryModal({ open, onClose, onSubmit, loading, in
       onCancel={onClose}
       width={480}
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-4">
+      <form
+        onSubmit={handleSubmit(handleFormSubmit)}
+        className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]"
+      >
         <FormInput
           name="label"
           label="Deal Category Name"
-          placeholder="e.g. Super Savor Deal, Share Box"
+          placeholder="e.g. Super Saver Deals, Family Share Box"
           control={control}
         />
 
-        <div className="flex justify-end pt-4 mt-6">
+        {/* Action Controls */}
+        <div className="flex justify-end pt-3 mt-5 border-t border-neutral-100">
           <Space size="middle">
             <CustomButton variant="secondary" onClick={onClose} type="button">
               Cancel
             </CustomButton>
             <CustomButton variant="primary" htmlType="submit" loading={loading}>
-              {initialValues ? 'Update Category' : 'Create Category'}
+              {initialValues ? 'Save Changes' : 'Create Category'}
             </CustomButton>
           </Space>
         </div>

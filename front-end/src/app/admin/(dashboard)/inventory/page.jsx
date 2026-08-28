@@ -2,18 +2,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Tag, Dropdown, Popconfirm, Select } from 'antd';
+import { Table, Select } from 'antd';
 import {
   AlertOutlined,
   DollarCircleOutlined,
   InboxOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  MoreOutlined,
   SwapOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
+import TableActions from '@/app/admin/_components/table/TableActions';
 import InventoryItemModal from './_components/InventoryItemModal';
 import StockAdjustmentModal from './_components/StockAdjustModal';
 import {
@@ -174,13 +172,12 @@ export default function StockAndItemsPage() {
                 {r.totalStock.toLocaleString()} {r.recipeUnit}
               </span>
               <span
-                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-                  isOutOfStock
+                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isOutOfStock
                     ? 'bg-rose-50 text-rose-600 border border-rose-200'
                     : isLowStock
-                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                }`}
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  }`}
               >
                 {isOutOfStock ? 'Out of stock' : isLowStock ? 'Low stock' : 'Healthy'}
               </span>
@@ -210,55 +207,29 @@ export default function StockAndItemsPage() {
     {
       title: 'Actions',
       key: 'action',
-      width: '14%',
-      align: 'right',
-      render: (_, r) => {
-        const actionMenuItems = [
-          {
-            key: 'edit',
-            label: <span className="text-xs font-medium">Edit Item Details</span>,
-            icon: <EditOutlined className="text-xs" />,
-            onClick: () => handleOpenEditModal(r),
-          },
-          {
-            key: 'adjust',
-            label: <span className="text-xs font-medium">Adjust / Reconcile Stock</span>,
-            icon: <SwapOutlined className="text-xs" />,
-            onClick: () => setAdjustModalItem(r),
-          },
-        ];
+      align: 'center',
+      width: 140,
+      render: (_, r) => (
+        <div className="flex items-center justify-center gap-1.5">
+          {/* Quick Adjust Stock Button */}
+          <button
+            type="button"
+            onClick={() => setAdjustModalItem(r)}
+            title="Adjust Stock / Record Spoilage"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-500 hover:text-neutral-900 hover:bg-slate-100 border border-slate-200/70 transition cursor-pointer shadow-2xs shrink-0"
+          >
+            <SwapOutlined className="text-xs" />
+          </button>
 
-        return (
-          <div className="flex items-center justify-end gap-1.5">
-            <button
-              onClick={() => handleOpenEditModal(r)}
-              className="px-2.5 py-1 text-xs font-semibold rounded-lg text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition cursor-pointer"
-            >
-              Edit
-            </button>
-
-            <Dropdown menu={{ items: actionMenuItems }} trigger={['click']}>
-              <button className="p-1.5 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition cursor-pointer">
-                <MoreOutlined className="text-sm" />
-              </button>
-            </Dropdown>
-
-            <Popconfirm
-              title={<span className="font-bold text-xs text-neutral-900">Delete Raw Material?</span>}
-              description={<span className="text-[11px] text-neutral-500 max-w-[200px] block">Soft-deleting retains historical order ledger integrity.</span>}
-              onConfirm={() => handleDeleteItem(r._id)}
-              okText="Yes, Delete"
-              cancelText="Cancel"
-              okButtonProps={{ danger: true, size: 'small', className: '!text-xs !font-bold !rounded-lg' }}
-              cancelButtonProps={{ size: 'small', className: '!text-xs !rounded-lg' }}
-            >
-              <button className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer">
-                <DeleteOutlined className="text-xs" />
-              </button>
-            </Popconfirm>
-          </div>
-        );
-      },
+          {/* Standard Edit & Delete Actions */}
+          <TableActions
+            onEdit={() => handleOpenEditModal(r)}
+            onDelete={() => handleDeleteItem(r._id)}
+            deleteTitle="Delete Raw Material?"
+            deleteDescription={`Are you sure you want to remove "${r.name}" from active inventory? Historical order logs will be preserved.`}
+          />
+        </div>
+      ),
     },
   ];
 
@@ -313,11 +284,10 @@ export default function StockAndItemsPage() {
 
           <div
             onClick={() => setActiveTab(activeTab === 'LOW_STOCK' ? 'ALL' : 'LOW_STOCK')}
-            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
-              activeTab === 'LOW_STOCK'
+            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${activeTab === 'LOW_STOCK'
                 ? 'border-rose-400 bg-rose-50/30 shadow-xs ring-1 ring-rose-400/20'
                 : 'border-slate-200/80 bg-slate-50/60 hover:bg-white hover:border-slate-300'
-            }`}
+              }`}
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center font-bold text-base">
@@ -333,11 +303,10 @@ export default function StockAndItemsPage() {
               </div>
             </div>
             <span
-              className={`text-xs font-bold px-2 py-0.5 rounded-full font-mono ${
-                activeTab === 'LOW_STOCK'
+              className={`text-xs font-bold px-2 py-0.5 rounded-full font-mono ${activeTab === 'LOW_STOCK'
                   ? 'bg-rose-500 text-white'
                   : 'bg-rose-100 text-rose-700'
-              }`}
+                }`}
             >
               {metrics.lowStockItemsCount + metrics.outOfStockCount}
             </span>
@@ -349,21 +318,19 @@ export default function StockAndItemsPage() {
           <div className="flex gap-1.5 p-1 bg-neutral-100/80 rounded-xl w-fit">
             <button
               onClick={() => setActiveTab('ALL')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                activeTab === 'ALL'
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${activeTab === 'ALL'
                   ? 'bg-white text-neutral-900 shadow-xs font-bold'
                   : 'text-neutral-500 hover:text-neutral-900'
-              }`}
+                }`}
             >
               All Items ({metrics.totalItemsCount})
             </button>
             <button
               onClick={() => setActiveTab('LOW_STOCK')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'LOW_STOCK'
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${activeTab === 'LOW_STOCK'
                   ? 'bg-white text-rose-600 shadow-xs font-bold'
                   : 'text-neutral-500 hover:text-neutral-900'
-              }`}
+                }`}
             >
               <WarningOutlined className="text-rose-500 text-xs" />
               <span>Low & Out of Stock ({metrics.lowStockItemsCount + metrics.outOfStockCount})</span>

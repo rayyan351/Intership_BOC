@@ -3,7 +3,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { notification } from 'antd';
-import { ShoppingCartOutlined, WarningOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { ShoppingCartOutlined, WarningOutlined } from '@ant-design/icons';
 import { useDispatch } from 'react-redux';
 import { addNotification } from '@/redux/notification/notificationSlice';
 import { useGetOrdersQuery } from '@/services/orderApi';
@@ -13,76 +13,98 @@ export default function AdminNotificationToastListener() {
   const [api, contextHolder] = notification.useNotification();
   const dispatch = useDispatch();
 
-  const prevOrdersCountRef = useRef(null);
-  const prevLowStockCountRef = useRef(null);
+  const isInitialOrdersLoad = useRef(true);
+  const isInitialStockLoad = useRef(true);
+  const knownOrderIds = useRef(new Set());
+  const knownLowStockIds = useRef(new Set());
 
-  // Poll for incoming live orders & stock warnings
-  const { data: orders = [] } = useGetOrdersQuery({}, { pollingInterval: 7000 });
+  // Polling intervals for live changes
+  const { data: ordersData } = useGetOrdersQuery({}, { pollingInterval: 7000 });
   const { data: lowStockAlerts = [] } = useGetLowStockAlertsQuery({}, { pollingInterval: 12000 });
 
-  // 1. Trigger when a new customer order lands
+  const orders = Array.isArray(ordersData) ? ordersData : ordersData?.orders || [];
+
+  // 1. Live Orders Toast Listener
   useEffect(() => {
-    if (prevOrdersCountRef.current === null) {
-      prevOrdersCountRef.current = orders.length;
+    if (!orders || orders.length === 0) return;
+
+    if (isInitialOrdersLoad.current) {
+      orders.forEach((o) => knownOrderIds.current.add(o._id || o.orderNumber));
+      isInitialOrdersLoad.current = false;
       return;
     }
 
-    if (orders.length > prevOrdersCountRef.current) {
-      const latestOrder = orders[0];
-      const payload = {
-        title: 'New Customer Order Placed!',
-        message: `Order #${latestOrder?.orderNumber || ''} assigned to ${latestOrder?.branch?.name || 'Main Kitchen'}.`,
-        type: 'ORDER',
-      };
+    const newOrders = orders.filter((o) => !knownOrderIds.current.has(o._id || o.orderNumber));
 
-      dispatch(addNotification(payload));
+    if (newOrders.length > 0) {
+      newOrders.forEach((latestOrder) => {
+        knownOrderIds.current.add(latestOrder._id || latestOrder.orderNumber);
 
-      api.open({
-        message: <span className="font-bold text-xs uppercase tracking-wide">New Order Received!</span>,
-        description: (
-          <div className="text-xs text-neutral-600 font-['Plus_Jakarta_Sans']">
-            <strong className="text-neutral-900 block font-mono">{latestOrder?.orderNumber}</strong>
-            <span>{payload.message}</span>
-          </div>
-        ),
-        icon: <ShoppingCartOutlined className="text-amber-500" />,
-        placement: 'bottomRight',
-        duration: 5,
-        className: 'rounded-2xl border border-neutral-100 shadow-xl',
+        const payload = {
+          id: latestOrder._id || Date.now().toString(),
+          title: 'New Order Received!',
+          message: `Order #${latestOrder.orderNumber || ''} assigned to ${latestOrder.branch?.name || 'Main Kitchen'}.`,
+          type: 'ORDER',
+          timestamp: new Date().toISOString(),
+        };
+
+        dispatch(addNotification(payload));
+
+        api.open({
+          title: <span className="font-bold text-xs uppercase tracking-wide">New Order Received!</span>,
+          description: (
+            <div className="text-xs text-neutral-600 font-['Plus_Jakarta_Sans',sans-serif]">
+              <strong className="text-neutral-900 block font-mono">{latestOrder.orderNumber}</strong>
+              <span>{payload.message}</span>
+            </div>
+          ),
+          icon: <ShoppingCartOutlined className="text-[#F4C61A]" />,
+          placement: 'bottomRight',
+          duration: 5,
+          className: 'rounded-2xl border border-neutral-100 shadow-xl',
+        });
       });
     }
-
-    prevOrdersCountRef.current = orders.length;
   }, [orders, api, dispatch]);
 
-  // 2. Trigger on low ingredient inventory alerts
+  // 2. Low Stock Alerts Toast Listener
   useEffect(() => {
-    if (prevLowStockCountRef.current === null) {
-      prevLowStockCountRef.current = lowStockAlerts.length;
+    if (!lowStockAlerts || lowStockAlerts.length === 0) return;
+
+    if (isInitialStockLoad.current) {
+      lowStockAlerts.forEach((item) => knownLowStockIds.current.add(item._id || item.item?._id));
+      isInitialStockLoad.current = false;
       return;
     }
 
-    if (lowStockAlerts.length > prevLowStockCountRef.current) {
-      const latestAlert = lowStockAlerts[0];
-      const payload = {
-        title: 'Low Ingredient Stock Alert',
-        message: `${latestAlert?.item?.name || 'Raw stock'} is running low at ${latestAlert?.branch?.name || 'Outlet'}.`,
-        type: 'STOCK',
-      };
+    const newStockAlerts = lowStockAlerts.filter(
+      (item) => !knownLowStockIds.current.has(item._id || item.item?._id)
+    );
 
-      dispatch(addNotification(payload));
+    if (newStockAlerts.length > 0) {
+      newStockAlerts.forEach((latestAlert) => {
+        knownLowStockIds.current.add(latestAlert._id || latestAlert.item?._id);
 
-      api.warning({
-        message: <span className="font-bold text-xs uppercase tracking-wide">Critical Stock Warning</span>,
-        description: <span className="text-xs text-neutral-600">{payload.message}</span>,
-        icon: <WarningOutlined className="text-rose-500" />,
-        placement: 'bottomRight',
-        duration: 6,
-        className: 'rounded-2xl border border-rose-100 shadow-xl',
+        const payload = {
+          id: latestAlert._id || Date.now().toString(),
+          title: 'Low Stock Alert',
+          message: `${latestAlert.item?.name || 'Raw material'} is running low at ${latestAlert.branch?.name || 'Outlet'}.`,
+          type: 'STOCK',
+          timestamp: new Date().toISOString(),
+        };
+
+        dispatch(addNotification(payload));
+
+        api.warning({
+          title: <span className="font-bold text-xs uppercase tracking-wide">Critical Stock Warning</span>,
+          description: <span className="text-xs text-neutral-600 font-['Plus_Jakarta_Sans',sans-serif]">{payload.message}</span>,
+          icon: <WarningOutlined className="text-rose-500" />,
+          placement: 'bottomRight',
+          duration: 6,
+          className: 'rounded-2xl border border-rose-100 shadow-xl',
+        });
       });
     }
-
-    prevLowStockCountRef.current = lowStockAlerts.length;
   }, [lowStockAlerts, api, dispatch]);
 
   return <>{contextHolder}</>;

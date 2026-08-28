@@ -1,7 +1,8 @@
+// src/app/admin/(dashboard)/settings/page.jsx
 'use client';
 
 import React, { useEffect } from 'react';
-import { Space, Tag } from 'antd';
+import { Space } from 'antd';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -66,8 +67,8 @@ export default function SettingsPage() {
     if (!canEdit) return;
     try {
       const formData = new FormData();
-      formData.append('storeName', values.storeName);
-      formData.append('siteTitle', values.siteTitle);
+      formData.append('storeName', values.storeName.trim());
+      formData.append('siteTitle', values.siteTitle.trim());
       formData.append('removeStoreLogo', values.removeStoreLogo ? 'true' : 'false');
       formData.append('removeAdminLogo', values.removeAdminLogo ? 'true' : 'false');
       formData.append('removeFavicon', values.removeFavicon ? 'true' : 'false');
@@ -94,17 +95,19 @@ export default function SettingsPage() {
       {contextHolder}
       <PageLayout
         title="Store & Brand Settings"
-        subTitle="Manage global store identity, browser tab title, favicon, and logos"
+        subTitle="Manage global store identity, browser tab title, favicon, and brand logos"
       >
-        <div className="max-w-3xl bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="max-w-3xl bg-white p-6 rounded-2xl border border-neutral-200/80 font-['Plus_Jakarta_Sans',sans-serif]">
           {isLoading ? (
-            <div className="py-12 text-center text-sm text-gray-400 font-medium">Loading settings...</div>
+            <div className="py-12 text-center text-xs text-neutral-400 font-normal">Loading brand settings...</div>
           ) : (
             <form onSubmit={handleSubmit(handleSaveSettings)} className="space-y-6">
               {!canEdit && (
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs font-semibold flex items-center justify-between">
+                <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200/60 text-amber-800 text-xs font-semibold flex items-center justify-between">
                   <span>You have view-only access to store branding and settings.</span>
-                  <Tag color="warning" className="m-0 border-none font-bold">READ ONLY</Tag>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
+                    READ ONLY
+                  </span>
                 </div>
               )}
 
@@ -112,7 +115,7 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormInput
                   name="storeName"
-                  label="Brand Name"
+                  label="Brand / Store Name"
                   placeholder="e.g. Burger O'Clock"
                   control={control}
                   disabled={!canEdit}
@@ -127,14 +130,14 @@ export default function SettingsPage() {
               </div>
 
               {/* Favicon Section */}
-              <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-3">
-                <span className="block text-sm font-semibold text-neutral-800">
+              <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/80 space-y-3">
+                <span className="block text-xs font-bold text-neutral-900 tracking-tight">
                   Browser Tab Favicon
                 </span>
 
                 {settings?.favicon && (
-                  <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-neutral-200">
-                    <div className="h-10 w-10 relative bg-neutral-100 rounded flex items-center justify-center border border-neutral-200">
+                  <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-neutral-200">
+                    <div className="h-10 w-10 relative bg-neutral-100 rounded-lg flex items-center justify-center border border-neutral-200">
                       <img
                         src={getFullUrl(settings.favicon)}
                         alt="Current Favicon"
@@ -142,11 +145,11 @@ export default function SettingsPage() {
                       />
                     </div>
                     {canEdit && (
-                      <label className="flex items-center gap-2 text-xs font-semibold text-red-600 cursor-pointer">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-rose-600 cursor-pointer">
                         <input
                           type="checkbox"
                           onChange={(e) => setValue('removeFavicon', e.target.checked)}
-                          className="rounded border-neutral-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                          className="rounded border-neutral-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
                         />
                         Remove Favicon
                       </label>
@@ -155,23 +158,28 @@ export default function SettingsPage() {
                 )}
 
                 {canEdit && (
-                  <FormImageUpload
-                    name="favicon"
-                    label="Upload New Favicon (.ico, .png, .svg)"
-                    control={control}
-                  />
+                  <div className="space-y-1">
+                    <FormImageUpload
+                      name="favicon"
+                      label="Upload New Favicon (.ico, .png, .svg)"
+                      control={control}
+                    />
+                    <span className="text-[11px] text-neutral-400 block pl-1 font-normal">
+                      Icon displayed inside browser tabs and bookmark bars.
+                    </span>
+                  </div>
                 )}
               </div>
 
               {/* Storefront Navigation Logo */}
-              <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-3">
-                <span className="block text-sm font-semibold text-neutral-800">
+              <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/80 space-y-3">
+                <span className="block text-xs font-bold text-neutral-900 tracking-tight">
                   Storefront Navigation Logo
                 </span>
-                
+
                 {settings?.storeLogo && (
-                  <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-neutral-200">
-                    <div className="h-12 w-36 relative bg-neutral-900 rounded p-1 flex items-center justify-center">
+                  <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-neutral-200">
+                    <div className="h-12 w-36 relative bg-neutral-900 rounded-lg p-1.5 flex items-center justify-center">
                       <img
                         src={getFullUrl(settings.storeLogo)}
                         alt="Current Store Logo"
@@ -179,11 +187,11 @@ export default function SettingsPage() {
                       />
                     </div>
                     {canEdit && (
-                      <label className="flex items-center gap-2 text-xs font-semibold text-red-600 cursor-pointer">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-rose-600 cursor-pointer">
                         <input
                           type="checkbox"
                           onChange={(e) => setValue('removeStoreLogo', e.target.checked)}
-                          className="rounded border-neutral-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                          className="rounded border-neutral-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
                         />
                         Remove Store Logo
                       </label>
@@ -192,23 +200,28 @@ export default function SettingsPage() {
                 )}
 
                 {canEdit && (
-                  <FormImageUpload
-                    name="storeLogo"
-                    label="Upload New Storefront Logo"
-                    control={control}
-                  />
+                  <div className="space-y-1">
+                    <FormImageUpload
+                      name="storeLogo"
+                      label="Upload New Storefront Logo"
+                      control={control}
+                    />
+                    <span className="text-[11px] text-neutral-400 block pl-1 font-normal">
+                      Primary brand logo shown in header navigation across customer storefronts.
+                    </span>
+                  </div>
                 )}
               </div>
 
               {/* Admin Panel Header Logo */}
-              <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-3">
-                <span className="block text-sm font-semibold text-neutral-800">
+              <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/80 space-y-3">
+                <span className="block text-xs font-bold text-neutral-900 tracking-tight">
                   Admin Panel Header Logo
                 </span>
 
                 {settings?.adminLogo && (
-                  <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-neutral-200">
-                    <div className="h-12 w-36 relative bg-black rounded p-1 flex items-center justify-center">
+                  <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-neutral-200">
+                    <div className="h-12 w-36 relative bg-black rounded-lg p-1.5 flex items-center justify-center">
                       <img
                         src={getFullUrl(settings.adminLogo)}
                         alt="Current Admin Logo"
@@ -216,11 +229,11 @@ export default function SettingsPage() {
                       />
                     </div>
                     {canEdit && (
-                      <label className="flex items-center gap-2 text-xs font-semibold text-red-600 cursor-pointer">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-rose-600 cursor-pointer">
                         <input
                           type="checkbox"
                           onChange={(e) => setValue('removeAdminLogo', e.target.checked)}
-                          className="rounded border-neutral-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                          className="rounded border-neutral-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
                         />
                         Remove Admin Logo
                       </label>
@@ -229,17 +242,22 @@ export default function SettingsPage() {
                 )}
 
                 {canEdit && (
-                  <FormImageUpload
-                    name="adminLogo"
-                    label="Upload New Admin Logo"
-                    control={control}
-                  />
+                  <div className="space-y-1">
+                    <FormImageUpload
+                      name="adminLogo"
+                      label="Upload New Admin Logo"
+                      control={control}
+                    />
+                    <span className="text-[11px] text-neutral-400 block pl-1 font-normal">
+                      Logo rendered in the top sidebar header of the admin portal.
+                    </span>
+                  </div>
                 )}
               </div>
 
               {/* Submit Button */}
               {canEdit && (
-                <div className="flex justify-end pt-4 border-t border-gray-100">
+                <div className="flex justify-end pt-3 border-t border-neutral-100">
                   <Space size="middle">
                     <CustomButton variant="primary" htmlType="submit" loading={isUpdating}>
                       Save Brand Settings

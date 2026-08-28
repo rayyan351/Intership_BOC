@@ -1,3 +1,4 @@
+// controllers/productController.js
 const Product = require('../models/Product');
 const path = require('path');
 
@@ -13,7 +14,6 @@ const parseCategories = (input) => {
   }
 };
 
-// Helper to safely parse booleans from FormData
 const parseBoolean = (val, defaultValue = false) => {
   if (val === undefined || val === null) return defaultValue;
   if (typeof val === 'boolean') return val;
@@ -27,7 +27,6 @@ const getProducts = async (req, res) => {
     const { publicOnly } = req.query;
     const filter = {};
 
-    // If public storefront requests products, exclude deal-only items
     if (publicOnly === 'true') {
       filter.isDealOnly = { $ne: true };
       filter.isShown = true;
@@ -48,10 +47,9 @@ const createProduct = async (req, res) => {
     const isDealOnlyBool = parseBoolean(isDealOnly, false);
     const parsedPrice = Number(price);
 
-    // Validate price: deal-only items can be 0, standard menu items must be > 0
     if (!isDealOnlyBool && (isNaN(parsedPrice) || parsedPrice <= 0)) {
       return res.status(400).json({
-        message: 'Regular menu products must have a price greater than 0. Enable "Deal-Only" if this item is free or exclusive to bundles.',
+        message: 'Regular menu products must have a price greater than 0.',
       });
     }
 
@@ -63,14 +61,14 @@ const createProduct = async (req, res) => {
 
     if (existingProduct) {
       return res.status(400).json({
-        message: 'An item with this name already exists. Please choose a different name.',
+        message: 'An item with this name already exists.',
       });
     }
 
-    let imagePath = '/placeholder.png';
+    // Save actual filename created by multer or relative path
+    let imagePath = '';
     if (req.file) {
-      const ext = path.extname(req.file.originalname);
-      imagePath = `http://localhost:5000/uploads/images/products/${generatedId}${ext}`;
+      imagePath = `/uploads/products/${req.file.filename}`;
     }
 
     const finalCategories = parseCategories(categories || category);
@@ -90,11 +88,8 @@ const createProduct = async (req, res) => {
     res.status(201).json(savedProduct);
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(400).json({
-        message: 'An item with this name already exists in the database.',
-      });
+      return res.status(400).json({ message: 'An item with this name already exists.' });
     }
-
     console.error('Server Error:', error);
     res.status(500).json({ message: 'Error creating product', error: error.message });
   }
@@ -118,9 +113,7 @@ const updateProduct = async (req, res) => {
     if (price !== undefined) {
       const parsedPrice = Number(price);
       if (!product.isDealOnly && parsedPrice <= 0) {
-        return res.status(400).json({
-          message: 'Regular menu products must have a price greater than 0.',
-        });
+        return res.status(400).json({ message: 'Regular menu products must have a price greater than 0.' });
       }
       product.price = parsedPrice;
     }
@@ -137,12 +130,9 @@ const updateProduct = async (req, res) => {
       product.isShown = parseBoolean(isShown, true);
     }
 
+    // Assign the actual multer disk filename
     if (req.file) {
-      const generatedId = name
-        ? name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
-        : product.id;
-      const ext = path.extname(req.file.originalname);
-      product.image = `http://localhost:5000/uploads/images/products/${generatedId}${ext}`;
+      product.image = `/uploads/products/${req.file.filename}`;
     }
 
     const updatedProduct = await product.save();

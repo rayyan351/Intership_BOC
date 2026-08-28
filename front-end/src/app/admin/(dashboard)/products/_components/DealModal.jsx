@@ -1,8 +1,15 @@
+// src/app/admin/(dashboard)/products/_components/DealModal.jsx
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { Space, Button, InputNumber, Select, Tag, Input, Radio, TimePicker, DatePicker } from 'antd';
-import { PlusOutlined, DeleteOutlined, AppstoreAddOutlined, ClockCircleOutlined, CalendarOutlined } from '@ant-design/icons';
+import { Space, Select, Tag, TimePicker, DatePicker, Radio } from 'antd';
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  AppstoreAddOutlined,
+  ClockCircleOutlined,
+  CalendarOutlined,
+} from '@ant-design/icons';
 import { useForm, useWatch, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -276,7 +283,7 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
     );
   };
 
-  // Add Custom Option (Box, Toy, Dip, etc.)
+  // Add Custom Option
   const handleAddCustomOption = (groupIndex, customName, customImage = null) => {
     if (!customName || !customName.trim()) return;
     setChoiceGroups((prev) =>
@@ -370,14 +377,14 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
     const display = label || prod?.name || value;
 
     return (
-      <Tag
-        closable={closable}
-        onClose={onClose}
-        style={{ marginRight: 4 }}
-        className="text-xs font-semibold text-gray-800 bg-gray-100 border-gray-200"
-      >
-        {display}
-      </Tag>
+      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-800 bg-slate-100 px-2 py-0.5 rounded-md mr-1 my-0.5">
+        <span>{display}</span>
+        {closable && (
+          <button type="button" onClick={onClose} className="text-neutral-400 hover:text-neutral-700 cursor-pointer ml-1">
+            ×
+          </button>
+        )}
+      </span>
     );
   };
 
@@ -388,8 +395,13 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
       onCancel={onClose}
       width={780}
     >
-      <form onSubmit={handleSubmit(handleFinish)} className="mt-4 space-y-5 max-h-[78vh] overflow-y-auto pr-1">
-        <FormInput name="title" label="Deal Title" placeholder="e.g. Sliders Party Box, Midnight Deals Box" control={control} />
+      <form onSubmit={handleSubmit(handleFinish)} className="mt-4 space-y-5 max-h-[78vh] overflow-y-auto pr-1 font-['Plus_Jakarta_Sans',sans-serif]">
+        <FormInput
+          name="title"
+          label="Deal Title"
+          placeholder="e.g. Sliders Party Box, Midnight Deal Box"
+          control={control}
+        />
 
         <FormSelect
           name="dealType"
@@ -401,10 +413,14 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
         />
 
         {/* TIME & SCHEDULE RESTRICTIONS */}
-        <div className="border border-amber-200 rounded-lg p-4 bg-amber-50/40 space-y-3">
+        <div className="border border-amber-200/80 rounded-2xl p-4 bg-amber-50/40 space-y-3">
           <div>
-            <span className="text-sm font-semibold text-amber-900 block">Deal Availability & Schedule</span>
-            <span className="text-xs text-amber-700">Choose when this deal appears and is orderable on the storefront.</span>
+            <span className="text-xs font-bold text-amber-900 block tracking-tight">
+              Deal Availability & Schedule
+            </span>
+            <span className="text-[11px] text-amber-700 font-normal">
+              Choose when this deal appears and is orderable on the storefront.
+            </span>
           </div>
 
           <Controller
@@ -412,15 +428,15 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
             control={control}
             render={({ field }) => (
               <Radio.Group {...field} className="flex flex-wrap gap-3">
-                <Radio value="always">Always Available (24/7)</Radio>
-                <Radio value="time_window">Daily Time Window (e.g. Midnight Deal)</Radio>
-                <Radio value="date_range">Seasonal / Date Range (e.g. Ramadan, Eid)</Radio>
+                <Radio value="always" className="text-xs font-semibold">Always Available (24/7)</Radio>
+                <Radio value="time_window" className="text-xs font-semibold">Daily Time Window (e.g. Midnight Deal)</Radio>
+                <Radio value="date_range" className="text-xs font-semibold">Seasonal / Date Range (e.g. Ramadan, Eid)</Radio>
               </Radio.Group>
             )}
           />
 
           {availabilityType === 'time_window' && (
-            <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-md border border-amber-200">
+            <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-amber-200">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-900 whitespace-nowrap">
                 <ClockCircleOutlined /> Active Daily Hours:
               </div>
@@ -434,16 +450,16 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                   setValue('startTime', timeStrings[0] || '');
                   setValue('endTime', timeStrings[1] || '');
                 }}
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto rounded-xl"
               />
-              <span className="text-[11px] text-gray-500 italic">
+              <span className="text-[11px] text-neutral-400 font-normal">
                 (Supports overnight windows like 23:30 to 04:00)
               </span>
             </div>
           )}
 
           {availabilityType === 'date_range' && (
-            <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-md border border-amber-200">
+            <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-amber-200">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-900 whitespace-nowrap">
                 <CalendarOutlined /> Active Date Range:
               </div>
@@ -457,38 +473,41 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                   setValue('startDate', dates ? dates[0] : null);
                   setValue('endDate', dates ? dates[1] : null);
                 }}
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto rounded-xl"
               />
             </div>
           )}
         </div>
 
         {/* 1. FIXED INCLUSIONS */}
-        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50/60">
-          <div className="flex justify-between items-center mb-3">
+        <div className="border border-slate-200/80 rounded-2xl p-4 bg-slate-50/60 space-y-3">
+          <div className="flex justify-between items-center">
             <div>
-              <span className="text-sm font-semibold text-gray-800 block">Fixed Items (Always Included)</span>
-              <span className="text-xs text-gray-500">Items that come automatically with this meal (e.g. Burger, Fries, Milk)</span>
+              <span className="text-xs font-bold text-neutral-900 block tracking-tight">
+                Fixed Items (Always Included)
+              </span>
+              <span className="text-[11px] text-neutral-400 font-normal">
+                Items that come automatically with this meal (e.g. Burger, Fries, Soft Drink)
+              </span>
             </div>
-            <Button
-              type="dashed"
-              size="small"
-              icon={<PlusOutlined />}
+            <button
+              type="button"
               onClick={handleAddFixedItem}
               disabled={products.length === 0}
+              className="text-xs font-semibold text-neutral-700 hover:text-black flex items-center gap-1 cursor-pointer"
             >
-              Add Fixed Item
-            </Button>
+              <PlusOutlined className="text-[10px]" /> Add Item
+            </button>
           </div>
 
           {fixedItems.length === 0 ? (
-            <p className="text-xs text-gray-400 italic py-2 text-center">No fixed items added.</p>
+            <p className="text-xs text-neutral-400 font-normal py-2 text-center">No fixed items added.</p>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {fixedItems.map((item, index) => (
-                <div key={index} className="flex items-center gap-2.5 bg-white p-2 rounded-md border border-gray-200">
+                <div key={index} className="flex items-center gap-2.5 bg-white p-2.5 rounded-xl border border-neutral-200">
                   <Select
-                    className="flex-1"
+                    className="flex-1 h-9 staff-modern-select"
                     showSearch
                     optionFilterProp="label"
                     value={item.productId}
@@ -498,22 +517,24 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                       label: `${p.name} ${p.price > 0 ? `(Rs. ${p.price})` : ''}`,
                     }))}
                   />
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-gray-500 font-medium">Qty:</span>
-                    <InputNumber
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-neutral-400 font-medium">Qty:</span>
+                    <input
+                      type="number"
                       min={1}
                       max={20}
                       value={item.quantity}
-                      onChange={(val) => handleFixedItemChange(index, 'quantity', val || 1)}
-                      style={{ width: 60 }}
+                      onChange={(e) => handleFixedItemChange(index, 'quantity', Number(e.target.value) || 1)}
+                      className="w-16 h-9 px-2 rounded-xl border border-neutral-200 bg-white font-mono font-bold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
                     />
                   </div>
-                  <Button
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
+                  <button
+                    type="button"
                     onClick={() => handleRemoveFixedItem(index)}
-                  />
+                    className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                  >
+                    <DeleteOutlined className="text-xs" />
+                  </button>
                 </div>
               ))}
             </div>
@@ -521,25 +542,27 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
         </div>
 
         {/* 2. CUSTOMER CHOICE GROUPS */}
-        <div className="border border-purple-200 rounded-lg p-4 bg-purple-50/30">
-          <div className="flex justify-between items-center mb-3">
+        <div className="border border-purple-200/70 rounded-2xl p-4 bg-purple-50/30 space-y-3">
+          <div className="flex justify-between items-center">
             <div>
-              <span className="text-sm font-semibold text-purple-900 block">Customer Choice Groups & Options</span>
-              <span className="text-xs text-purple-600">e.g. "Meal Box" (Pick 1), "Surprise" (Pick 1), "Choose 3 Dips"</span>
+              <span className="text-xs font-bold text-purple-900 block tracking-tight">
+                Customer Choice Groups & Options
+              </span>
+              <span className="text-[11px] text-purple-600 font-normal">
+                e.g. &quot;Pick 1 Slider&quot;, &quot;Choose 2 Dips&quot;, &quot;Select Soft Drink&quot;
+              </span>
             </div>
-            <Button
-              type="primary"
-              ghost
-              size="small"
-              icon={<AppstoreAddOutlined />}
+            <button
+              type="button"
               onClick={handleAddChoiceGroup}
+              className="text-xs font-semibold text-purple-700 hover:text-purple-900 flex items-center gap-1 cursor-pointer"
             >
-              Add Choice Group
-            </Button>
+              <AppstoreAddOutlined className="text-xs" /> Add Choice Group
+            </button>
           </div>
 
           {choiceGroups.length === 0 ? (
-            <p className="text-xs text-purple-400 italic py-2 text-center">No choice groups added.</p>
+            <p className="text-xs text-purple-400 font-normal py-2 text-center">No choice groups added.</p>
           ) : (
             <div className="space-y-4">
               {choiceGroups.map((cg, groupIndex) => {
@@ -550,42 +573,47 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                 const draftName = customInputDrafts[groupIndex] || '';
 
                 return (
-                  <div key={groupIndex} className="bg-white p-4 rounded-lg border border-purple-200 space-y-3 shadow-xs">
+                  <div key={groupIndex} className="bg-white p-4 rounded-2xl border border-purple-200 space-y-3 shadow-2xs">
                     {/* Header: Title & Pick Count */}
                     <div className="flex items-center gap-3">
-                      <Input
-                        placeholder="e.g. Meal Box OR Surprise OR Choose Fries"
+                      <input
+                        type="text"
+                        placeholder="e.g. Pick 1 Slider OR Select Dip"
                         value={cg.title}
                         onChange={(e) => handleChoiceGroupFieldChange(groupIndex, 'title', e.target.value)}
-                        className="font-medium text-gray-800"
+                        className="flex-1 h-9 px-3 rounded-xl border border-neutral-200 text-xs font-semibold text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
                       />
-                      <div className="flex items-center gap-1.5 whitespace-nowrap bg-purple-50 px-2.5 py-1 rounded-md border border-purple-100">
+                      <div className="flex items-center gap-1.5 whitespace-nowrap bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-100">
                         <span className="text-xs text-purple-700 font-semibold">Pick Count:</span>
-                        <InputNumber
+                        <input
+                          type="number"
                           min={1}
                           max={10}
                           value={cg.selectCount}
-                          onChange={(val) => handleChoiceGroupFieldChange(groupIndex, 'selectCount', val || 1)}
-                          style={{ width: 55 }}
+                          onChange={(e) => handleChoiceGroupFieldChange(groupIndex, 'selectCount', Number(e.target.value) || 1)}
+                          className="w-12 h-7 px-1.5 rounded-lg border border-purple-200 bg-white font-mono font-bold text-xs text-neutral-900 text-center focus:outline-none"
                         />
                       </div>
-                      <Button
-                        type="text"
-                        danger
-                        icon={<DeleteOutlined />}
+                      <button
+                        type="button"
                         onClick={() => handleRemoveChoiceGroup(groupIndex)}
-                      />
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                      >
+                        <DeleteOutlined className="text-xs" />
+                      </button>
                     </div>
 
                     {/* Multi-Select Menu Products */}
                     <div>
-                      <span className="text-xs text-gray-500 mb-1 block">Add Menu Products / Sliders to Pool:</span>
+                      <span className="text-[11px] font-medium text-neutral-500 mb-1 block">
+                        Add Menu Products to Selection Pool:
+                      </span>
                       <Select
                         mode="multiple"
                         showSearch
                         optionFilterProp="label"
                         maxTagCount="responsive"
-                        className="w-full"
+                        className="w-full staff-modern-select"
                         placeholder="Select products..."
                         value={selectedProductIds}
                         tagRender={renderProductTag}
@@ -597,54 +625,58 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                       />
                     </div>
 
-                    {/* Presets / Quick Add */}
+                    {/* Presets */}
                     <div>
-                      <span className="text-xs text-gray-500 mb-1 block">Quick Add Presets:</span>
+                      <span className="text-[11px] font-medium text-neutral-500 mb-1 block">Quick Add Presets:</span>
                       <div className="flex flex-wrap gap-1.5 items-center">
                         {[...KIDDY_BOX_PRESETS, ...DIP_PRESETS].map((preset) => (
-                          <Button
+                          <button
                             key={preset}
-                            size="small"
+                            type="button"
                             onClick={() => handleAddCustomOption(groupIndex, preset)}
-                            className="text-xs"
+                            className="px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-semibold rounded-lg transition cursor-pointer"
                           >
                             + {preset}
-                          </Button>
+                          </button>
                         ))}
                       </div>
                     </div>
 
-                    {/* Custom Text/Box/Toy Add Field */}
+                    {/* Custom Option Text Add */}
                     <div className="flex items-center gap-2 pt-1">
-                      <Input
-                        size="small"
+                      <input
+                        type="text"
                         placeholder="Add custom option (e.g. Robot Box, Glow Toy)..."
                         value={draftName}
                         onChange={(e) =>
                           setCustomInputDrafts((prev) => ({ ...prev, [groupIndex]: e.target.value }))
                         }
-                        onPressEnter={() => {
-                          handleAddCustomOption(groupIndex, draftName);
-                          setCustomInputDrafts((prev) => ({ ...prev, [groupIndex]: '' }));
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCustomOption(groupIndex, draftName);
+                            setCustomInputDrafts((prev) => ({ ...prev, [groupIndex]: '' }));
+                          }
                         }}
+                        className="flex-1 h-8 px-3 rounded-xl border border-neutral-200 text-xs font-normal focus:outline-none focus:border-[#F4C61A]"
                       />
-                      <Button
-                        size="small"
-                        type="primary"
+                      <button
+                        type="button"
                         onClick={() => {
                           handleAddCustomOption(groupIndex, draftName);
                           setCustomInputDrafts((prev) => ({ ...prev, [groupIndex]: '' }));
                         }}
                         disabled={!draftName.trim()}
+                        className="h-8 px-3 rounded-xl bg-neutral-900 hover:bg-black disabled:opacity-40 text-white text-xs font-semibold transition cursor-pointer"
                       >
                         Add Option
-                      </Button>
+                      </button>
                     </div>
 
                     {/* Configured Options List */}
                     {cg.options && cg.options.length > 0 && (
-                      <div className="pt-2 border-t border-gray-100">
-                        <span className="text-xs font-semibold text-gray-700 block mb-2">
+                      <div className="pt-2 border-t border-neutral-100">
+                        <span className="text-xs font-semibold text-neutral-700 block mb-2">
                           Configured Options & Upgrades:
                         </span>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -656,38 +688,39 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
                             return (
                               <div
                                 key={optIdx}
-                                className="flex items-center justify-between bg-gray-50 px-2.5 py-1.5 rounded-md border border-gray-200 text-xs"
+                                className="flex items-center justify-between bg-slate-50/70 px-2.5 py-1.5 rounded-xl border border-slate-100 text-xs"
                               >
                                 <div className="flex items-center gap-1.5 truncate max-w-[170px]">
-                                  <Tag
-                                    color={isProduct ? 'blue' : 'green'}
-                                    className="text-[10px] px-1 py-0 m-0"
+                                  <span
+                                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                                      isProduct ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+                                    }`}
                                   >
-                                    {isProduct ? 'Product' : 'Option'}
-                                  </Tag>
-                                  <span className="font-medium text-gray-800 truncate" title={optionDisplayName}>
+                                    {isProduct ? 'Product' : 'Custom'}
+                                  </span>
+                                  <span className="font-semibold text-neutral-800 truncate" title={optionDisplayName}>
                                     {optionDisplayName}
                                   </span>
                                 </div>
 
                                 <div className="flex items-center gap-1">
-                                  <span className="text-gray-500 text-[11px]">+Rs.</span>
-                                  <InputNumber
-                                    size="small"
+                                  <span className="text-neutral-400 text-[10px]">+Rs.</span>
+                                  <input
+                                    type="number"
                                     min={0}
                                     max={2000}
                                     placeholder="0"
                                     value={opt.extraPrice}
-                                    onChange={(val) => handleOptionExtraPriceChange(groupIndex, optIdx, val)}
-                                    style={{ width: 60 }}
+                                    onChange={(e) => handleOptionExtraPriceChange(groupIndex, optIdx, Number(e.target.value) || 0)}
+                                    className="w-16 h-7 px-1.5 rounded-lg border border-neutral-200 bg-white font-mono font-bold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
                                   />
-                                  <Button
-                                    type="text"
-                                    size="small"
-                                    danger
-                                    icon={<DeleteOutlined className="text-xs" />}
+                                  <button
+                                    type="button"
                                     onClick={() => handleRemoveOption(groupIndex, optIdx)}
-                                  />
+                                    className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                  >
+                                    <DeleteOutlined className="text-xs" />
+                                  </button>
                                 </div>
                               </div>
                             );
@@ -703,10 +736,10 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
         </div>
 
         {/* PRICING INPUTS */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
           <FormInput
             name="customOriginalPrice"
-            label="Original Value (Rs)"
+            label="Original Value (Rs.)"
             type="number"
             placeholder="e.g. 599"
             control={control}
@@ -716,31 +749,38 @@ export default function DealModal({ open, onClose, onSubmit, loading, initialVal
             name="discountPercentage"
             label="Discount (%)"
             type="number"
-            placeholder="e.g. 0"
+            placeholder="e.g. 10"
             control={control}
           />
 
-          <div className="flex flex-col justify-center bg-gray-50 p-3 rounded-md border border-gray-200">
-            <span className="text-xs text-gray-500 font-medium">Final Deal Price:</span>
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="text-base font-bold text-gray-900">Rs. {calculatedDealPrice}</span>
+          <div className="flex flex-col justify-center bg-slate-50/80 p-3 rounded-2xl border border-slate-200/70">
+            <span className="text-xs text-neutral-500 font-semibold tracking-tight">Final Deal Price:</span>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-base font-bold font-mono text-neutral-900">Rs. {calculatedDealPrice}</span>
               {Number(discountPercentage) > 0 && (
-                <Tag color="green" className="font-bold text-[10px] px-1 py-0">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-mono">
                   {discountPercentage}% OFF
-                </Tag>
+                </span>
               )}
             </div>
           </div>
         </div>
 
         <FormImageUpload name="image" label="Deal Banner / Image" control={control} />
-        <FormInput name="description" label="Description" placeholder="e.g. 1 fried chicken burger, 1 fries, 1 flavored milk, and 1 surprise cool toy." control={control} />
+        <FormInput
+          name="description"
+          label="Description"
+          placeholder="e.g. 1 fried chicken burger, 1 fries, 1 flavored milk, and 1 surprise cool toy."
+          control={control}
+        />
 
-        <div className="flex justify-end pt-4 mt-6 border-t border-gray-100">
+        <div className="flex justify-end pt-3 mt-4 border-t border-neutral-100">
           <Space size="middle">
-            <CustomButton variant="secondary" onClick={onClose} type="button">Cancel</CustomButton>
+            <CustomButton variant="secondary" onClick={onClose} type="button">
+              Cancel
+            </CustomButton>
             <CustomButton variant="primary" htmlType="submit" loading={loading}>
-              {initialValues ? 'Update Deal' : 'Create Deal'}
+              {initialValues ? 'Save Changes' : 'Create Deal'}
             </CustomButton>
           </Space>
         </div>

@@ -1,13 +1,12 @@
 // src/app/admin/(dashboard)/categories/_components/MenuCategoriesView.jsx
 'use client';
 
-import React, { useState } from 'react';
-import { Table, Button, Tag, Space, Input } from 'antd';
-import { EditOutlined, DeleteOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Table, Tag } from 'antd';
 import { usePermission } from '@/hooks/usePermission';
-import ConfirmModal from '@/app/admin/_components/modal/ConfirmModal';
-import CategoryModal from '@/app/admin/(dashboard)/products/categories/_components/categoryModal';
 import CustomSwitch from '@/app/admin/_components/formElements/switch/CustomSwitch';
+import TableActions from '@/app/admin/_components/table/TableActions';
+import CategoryModal from './categoryModal';
 import { useToast } from '@/utils/toast';
 import { formatRelativeTime } from '@/utils/formatDate';
 import {
@@ -17,17 +16,13 @@ import {
   useDeleteCategoryMutation,
 } from '@/services/categoryApi';
 
-export default function MenuCategoriesView() {
+export default function MenuCategoriesView({ searchTerm = '', createTrigger }) {
   const { contextHolder, showSuccess, showError } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
 
   const { hasPermission } = usePermission();
-  const canAdd = hasPermission('categories:create');
   const canEdit = hasPermission('categories:edit');
   const canDelete = hasPermission('categories:delete');
   const canToggleStatus = hasPermission('categories:status') || hasPermission('categories:toggle_stock');
@@ -35,16 +30,24 @@ export default function MenuCategoriesView() {
   const { data: categories = [], isLoading } = useGetCategoriesQuery();
   const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
   const [updateCategory, { isLoading: isUpdating }] = useUpdateCategoryMutation();
-  const [deleteCategory, { isLoading: isDeleting }] = useDeleteCategoryMutation();
+  const [deleteCategory] = useDeleteCategoryMutation();
+
+  // Listen for create button clicks from the top PageLayout
+  useEffect(() => {
+    if (createTrigger && createTrigger.startsWith('category-')) {
+      setSelectedCategory(null);
+      setIsModalOpen(true);
+    }
+  }, [createTrigger]);
 
   const handleSaveCategory = async (data) => {
     try {
       if (selectedCategory) {
-        await updateCategory({ id: selectedCategory._id, label: data.label }).unwrap();
+        await updateCategory({ id: selectedCategory._id, formData: data }).unwrap();
         showSuccess('Category updated successfully!');
       } else {
         await createCategory(data).unwrap();
-        showSuccess(`Category "${data.label}" created successfully!`);
+        showSuccess('Category created successfully!');
       }
       setIsModalOpen(false);
       setSelectedCategory(null);
@@ -71,13 +74,10 @@ export default function MenuCategoriesView() {
     }
   };
 
-  const handleDeleteCategory = async () => {
-    if (!categoryToDelete) return;
+  const handleDeleteCategory = async (id) => {
     try {
-      await deleteCategory(categoryToDelete._id).unwrap();
+      await deleteCategory(id).unwrap();
       showSuccess('Category deleted successfully!');
-      setIsDeleteModalOpen(false);
-      setCategoryToDelete(null);
     } catch (error) {
       showError(error?.data?.message || 'Failed to delete category');
     }
@@ -92,39 +92,49 @@ export default function MenuCategoriesView() {
       title: 'Category Name',
       dataIndex: 'label',
       key: 'label',
-      render: (text) => <span className="font-bold text-gray-900">{text}</span>,
+      width: '32%',
+      render: (text) => (
+        <span className="font-semibold text-neutral-900 text-xs block">{text}</span>
+      ),
     },
     {
-      title: 'Category ID',
-      dataIndex: 'id',
-      key: 'id',
-      render: (slug) => <Tag color="blue">{slug}</Tag>,
+      title: 'Category ID / Slug',
+      dataIndex: 'name',
+      key: 'name',
+      width: '24%',
+      render: (name, r) => (
+        <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700">
+          {name || r.id || r._id}
+        </span>
+      ),
     },
     {
       title: 'Status',
       dataIndex: 'isShown',
       key: 'isShown',
+      width: '18%',
       render: (isShown, record) => (
-        <Space size="small">
+        <div className="flex items-center gap-2">
           <CustomSwitch
             checked={record.isShown ?? true}
             disabled={!canToggleStatus}
             loading={updatingId === record._id}
             onChange={(checked) => handleStatusToggle(record, checked)}
           />
-          <span className="text-xs font-semibold text-gray-600">
+          <span className={`text-[11px] font-semibold ${record.isShown ?? true ? 'text-emerald-600' : 'text-neutral-400'}`}>
             {record.isShown ?? true ? 'Active' : 'Disabled'}
           </span>
-        </Space>
+        </div>
       ),
     },
     {
       title: 'Created Date',
       dataIndex: 'createdAt',
       key: 'createdAt',
+      width: '14%',
       render: (dateStr) => (
-        <span className="text-gray-500 text-xs font-medium">
-          {dateStr ? new Date(dateStr).toLocaleDateString() : 'N/A'}
+        <span className="text-neutral-400 text-xs font-normal">
+          {dateStr ? new Date(dateStr).toLocaleDateString() : '—'}
         </span>
       ),
     },
@@ -132,8 +142,9 @@ export default function MenuCategoriesView() {
       title: 'Last Updated',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
+      width: '14%',
       render: (dateStr) => (
-        <span className="text-gray-600 text-xs font-medium bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">
+        <span className="text-neutral-500 text-xs font-normal whitespace-nowrap">
           {formatRelativeTime(dateStr)}
         </span>
       ),
@@ -141,38 +152,29 @@ export default function MenuCategoriesView() {
     {
       title: 'Actions',
       key: 'actions',
+      align: 'right',
+      width: '8%',
       render: (_, record) => {
         if (!canEdit && !canDelete) {
           return (
-            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+            <Tag color="default" className="text-[10px] font-bold text-neutral-400 border-none">
               View Only
             </Tag>
           );
         }
+
         return (
-          <Space size="middle">
-            {canEdit && (
-              <Button
-                type="text"
-                icon={<EditOutlined className="text-gray-600" />}
-                onClick={() => {
-                  setSelectedCategory(record);
-                  setIsModalOpen(true);
-                }}
-              />
-            )}
-            {canDelete && (
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => {
-                  setCategoryToDelete(record);
-                  setIsDeleteModalOpen(true);
-                }}
-              />
-            )}
-          </Space>
+          <TableActions
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onEdit={() => {
+              setSelectedCategory(record);
+              setIsModalOpen(true);
+            }}
+            onDelete={() => handleDeleteCategory(record._id)}
+            deleteTitle="Delete Menu Category?"
+            deleteDescription={`Are you sure you want to delete "${record.label}"? Products linked to this category may need reassigning.`}
+          />
         );
       },
     },
@@ -181,38 +183,21 @@ export default function MenuCategoriesView() {
   return (
     <>
       {contextHolder}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-50 p-4 rounded-2xl border border-neutral-200">
-          <Input
-            placeholder="Search standard categories..."
-            prefix={<SearchOutlined className="text-neutral-400" />}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-xs min-h-[40px] rounded-xl"
-            allowClear
-          />
-          {canAdd && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setSelectedCategory(null);
-                setIsModalOpen(true);
-              }}
-              className="bg-[#ffc400] hover:bg-[#e0b210] text-black font-bold h-10 px-5 rounded-xl border-none shadow-sm"
-            >
-              Add Category
-            </Button>
-          )}
-        </div>
-
+      <div className="space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
         <Table
           columns={columns}
           dataSource={filteredCategories}
           rowKey="_id"
           loading={isLoading}
-          pagination={{ pageSize: 8 }}
-          bordered={false}
+          pagination={{
+            pageSize: 8,
+            showTotal: (total, range) => (
+              <span className="text-xs text-neutral-400 font-normal">
+                Showing {range[0]}-{range[1]} of {total} categories
+              </span>
+            ),
+          }}
+          size="middle"
         />
 
         <CategoryModal
@@ -224,15 +209,6 @@ export default function MenuCategoriesView() {
           onSubmit={handleSaveCategory}
           loading={isCreating || isUpdating}
           initialValues={selectedCategory}
-        />
-
-        <ConfirmModal
-          open={isDeleteModalOpen}
-          onCancel={() => setIsDeleteModalOpen(false)}
-          onConfirm={handleDeleteCategory}
-          title="Delete Category"
-          description={`Are you sure you want to delete "${categoryToDelete?.label}"?`}
-          loading={isDeleting}
         />
       </div>
     </>

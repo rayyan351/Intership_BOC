@@ -2,12 +2,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Table, Tag, Space, Switch, Row, Col, Popconfirm } from 'antd';
+import { Table, Space, Row, Col } from 'antd';
 import {
-  EnvironmentOutlined,
   PercentageOutlined,
-  DeleteOutlined,
-  EditOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useForm, Controller } from 'react-hook-form';
@@ -19,6 +16,8 @@ import CustomModal from '@/app/admin/_components/modal/CustomModal';
 import FormInput from '@/app/admin/_components/formElements/inputfield/Forminput';
 import FormSelect from '@/app/admin/_components/formElements/select/FormSelect';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
+import CustomSwitch from '@/app/admin/_components/formElements/switch/CustomSwitch';
+import TableActions from '@/app/admin/_components/table/TableActions';
 import LocationPickerModal from '@/app/admin/_components/formElements/map/LocationPickerModal';
 
 import {
@@ -168,10 +167,11 @@ export default function DeliveryAreasAndTaxPage() {
       title: 'Customer Delivery Zone',
       dataIndex: 'name',
       key: 'name',
+      width: '28%',
       render: (name, r) => (
         <div>
-          <strong className="text-xs text-neutral-900 block">{name}</strong>
-          <span className="text-[10px] text-neutral-400 font-mono">{r.city}</span>
+          <span className="font-semibold text-neutral-900 text-xs block">{name}</span>
+          <span className="text-[11px] text-neutral-400 font-normal">{r.city}</span>
         </div>
       ),
     },
@@ -179,10 +179,11 @@ export default function DeliveryAreasAndTaxPage() {
       title: 'Fulfilling Kitchen Outlet',
       dataIndex: 'assignedBranch',
       key: 'branch',
+      width: '32%',
       render: (b) => (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50/80 text-amber-900 border border-amber-200/60 rounded-xl text-xs font-semibold">
           <ThunderboltOutlined className="text-amber-500" />
-          {b?.name ? `${b.name} (${b.city})` : 'Auto-Resolved at Order Placement'}
+          {b?.name ? `${b.name} (${b.city})` : 'Auto-Resolved at Checkout'}
         </span>
       ),
     },
@@ -190,9 +191,16 @@ export default function DeliveryAreasAndTaxPage() {
       title: 'Delivery Fee',
       dataIndex: 'deliveryFee',
       key: 'fee',
+      width: '18%',
       render: (fee) => (
         <span className="text-xs font-mono font-bold">
-          {fee === 0 ? <Tag color="green">FREE</Tag> : formatPrice(fee)}
+          {fee === 0 ? (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+              FREE
+            </span>
+          ) : (
+            <span className="text-neutral-900">{formatPrice(fee)}</span>
+          )}
         </span>
       ),
     },
@@ -200,36 +208,29 @@ export default function DeliveryAreasAndTaxPage() {
       title: 'Status',
       dataIndex: 'isActive',
       key: 'status',
+      width: '12%',
       render: (active) => (
-        <Tag color={active !== false ? 'blue' : 'default'} className="border-none font-bold text-[10px]">
-          {active !== false ? 'ACTIVE' : 'DISABLED'}
-        </Tag>
+        <span
+          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+            active !== false ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'
+          }`}
+        >
+          {active !== false ? 'Active' : 'Disabled'}
+        </span>
       ),
     },
     {
-      title: 'Action',
+      title: 'Actions',
       key: 'action',
       align: 'right',
+      width: '10%',
       render: (_, r) => (
-        <Space size="small">
-          <button
-            onClick={() => handleOpenEditModal(r)}
-            className="p-1.5 text-neutral-600 hover:text-black transition cursor-pointer"
-          >
-            <EditOutlined />
-          </button>
-          <Popconfirm
-            title="Delete this delivery zone?"
-            onConfirm={() => handleDeleteArea(r._id)}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{ danger: true, size: 'small' }}
-          >
-            <button className="p-1.5 text-rose-500 hover:text-rose-700 transition cursor-pointer">
-              <DeleteOutlined />
-            </button>
-          </Popconfirm>
-        </Space>
+        <TableActions
+          onEdit={() => handleOpenEditModal(r)}
+          onDelete={() => handleDeleteArea(r._id)}
+          deleteTitle="Delete Delivery Zone?"
+          deleteDescription={`Are you sure you want to delete "${r.name}"? Deliveries to this address zone will be blocked.`}
+        />
       ),
     },
   ];
@@ -246,148 +247,175 @@ export default function DeliveryAreasAndTaxPage() {
         onSearch={setSearchTerm}
         searchPlaceholder="Search zones, cities, or fulfilling branches..."
       >
-        <Row gutter={[24, 24]}>
-          {/* Tax Engine */}
-          <Col xs={24} lg={8}>
-            <div className="bg-neutral-50/70 p-5 rounded-2xl border border-neutral-200 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
-              <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
-                <h3 className="text-xs font-black text-neutral-900 uppercase tracking-wider flex items-center gap-1.5 m-0">
-                  <PercentageOutlined className="text-amber-500" /> Government Tax (SST)
-                </h3>
-                <Switch
-                  checked={taxForm.isTaxEnabled}
-                  onChange={(val) => setTaxForm({ ...taxForm, isTaxEnabled: val })}
+        <div className="font-['Plus_Jakarta_Sans',sans-serif]">
+          <Row gutter={[20, 20]}>
+            {/* Government Tax (SST) Card */}
+            <Col xs={24} lg={8}>
+              <div className="bg-slate-50/70 p-5 rounded-2xl border border-slate-200/80 space-y-4 sticky top-6">
+                <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <PercentageOutlined className="text-amber-500 text-sm" />
+                    <span className="text-xs font-bold text-neutral-900 tracking-tight">
+                      Government Tax (SST)
+                    </span>
+                  </div>
+                  <CustomSwitch
+                    checked={taxForm.isTaxEnabled}
+                    onChange={(val) => setTaxForm({ ...taxForm, isTaxEnabled: val })}
+                  />
+                </div>
+
+                <p className="text-[11px] text-neutral-400 leading-relaxed m-0 font-normal">
+                  Sindh Sales Tax (SST) applied automatically at checkout. Digital card payments calculate against the subsidized card rate.
+                </p>
+
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                      Cash on Delivery (COD) Tax %
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={taxForm.codTaxPercentage}
+                      onChange={(e) => setTaxForm({ ...taxForm, codTaxPercentage: e.target.value })}
+                      className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-bold font-mono text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                      Card / Digital Payment Tax %
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={taxForm.cardTaxPercentage}
+                      onChange={(e) => setTaxForm({ ...taxForm, cardTaxPercentage: e.target.value })}
+                      className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-bold font-mono text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <CustomButton
+                    variant="primary"
+                    disabled={isSavingTax}
+                    loading={isSavingTax}
+                    onClick={handleSaveTaxSettings}
+                    className="w-full justify-center"
+                  >
+                    Save Tax Configuration
+                  </CustomButton>
+                </div>
+              </div>
+            </Col>
+
+            {/* Delivery Zones Table */}
+            <Col xs={24} lg={16}>
+              <div className="overflow-hidden">
+                <Table
+                  columns={columns}
+                  dataSource={filteredAreas}
+                  rowKey="_id"
+                  loading={loadingAreas}
+                  pagination={{
+                    pageSize: 7,
+                    showTotal: (total, range) => (
+                      <span className="text-xs text-neutral-400 font-normal">
+                        Showing {range[0]}-{range[1]} of {total} zones
+                      </span>
+                    ),
+                  }}
+                  size="middle"
+                />
+              </div>
+            </Col>
+          </Row>
+
+          {/* Add / Edit Delivery Zone Modal */}
+          <CustomModal
+            title={editingArea ? 'Edit Delivery Zone' : 'Add Serviceable Delivery Zone'}
+            open={isAreaModalOpen}
+            onCancel={() => setIsAreaModalOpen(false)}
+            width={580}
+          >
+            <form onSubmit={handleSubmit(handleSaveArea)} className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+              <FormInput
+                name="name"
+                label="Area / Neighborhood Name"
+                placeholder="e.g. Shah Faisal No 3, Ittehad Commercial, F-7/2"
+                control={control}
+              />
+
+              <FormSelect
+                name="city"
+                label="City"
+                control={control}
+                options={[
+                  { value: 'Karachi', label: 'Karachi' },
+                  { value: 'Lahore', label: 'Lahore' },
+                  { value: 'Islamabad', label: 'Islamabad' },
+                ]}
+              />
+
+              {/* Precision Pinpoint Map */}
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Pinpoint Zone Center on Map <span className="text-red-500">*</span>
+                </label>
+                <LocationPickerModal
+                  city={watchedCity}
+                  initialLat={watchedLat}
+                  initialLng={watchedLng}
+                  onLocationSelect={({ latitude, longitude }) => {
+                    setValue('latitude', latitude);
+                    setValue('longitude', longitude);
+                  }}
                 />
               </div>
 
-              <p className="text-[11px] text-neutral-500 m-0">
-                Sindh Sales Tax (SST) applied at checkout. Card payments calculate against the digital rate.
-              </p>
+              <FormInput
+                name="deliveryFee"
+                label="Delivery Fee (PKR)"
+                type="number"
+                placeholder="0"
+                control={control}
+              />
 
-              <div className="space-y-3">
+              <div className="flex items-center justify-between bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200/80">
                 <div>
-                  <label className="block text-[11px] font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                    Cash on Delivery (COD) Tax %
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={taxForm.codTaxPercentage}
-                    onChange={(e) => setTaxForm({ ...taxForm, codTaxPercentage: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-xs font-bold text-neutral-900 outline-none"
-                  />
+                  <span className="text-xs font-bold text-neutral-900 block tracking-tight">
+                    Zone Active Status
+                  </span>
+                  <span className="text-[11px] text-neutral-400 font-normal">
+                    Deliveries can be placed to addresses located within this zone.
+                  </span>
                 </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                    Card / Digital Payment Tax %
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={taxForm.cardTaxPercentage}
-                    onChange={(e) => setTaxForm({ ...taxForm, cardTaxPercentage: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-xs font-bold text-neutral-900 outline-none"
-                  />
-                </div>
+                <Controller
+                  name="isActive"
+                  control={control}
+                  render={({ field: { value, onChange } }) => (
+                    <CustomSwitch checked={value} onChange={onChange} />
+                  )}
+                />
               </div>
 
-              <button
-                disabled={isSavingTax}
-                onClick={handleSaveTaxSettings}
-                className="w-full bg-[#0f172a] hover:bg-neutral-800 text-white font-bold uppercase tracking-wider text-xs border-none rounded-xl h-10 mt-1 transition cursor-pointer"
-              >
-                {isSavingTax ? 'Saving...' : 'Save Tax Configuration'}
-              </button>
-            </div>
-          </Col>
-
-          {/* Delivery Zones Table */}
-          <Col xs={24} lg={16}>
-            <Table
-              columns={columns}
-              dataSource={filteredAreas}
-              rowKey="_id"
-              loading={loadingAreas}
-              pagination={{ pageSize: 7 }}
-              size="middle"
-            />
-          </Col>
-        </Row>
-
-        {/* Add / Edit Delivery Zone Modal */}
-        <CustomModal
-          title={editingArea ? 'Edit Delivery Zone' : 'Add Serviceable Delivery Zone'}
-          open={isAreaModalOpen}
-          onCancel={() => setIsAreaModalOpen(false)}
-          width={580}
-        >
-          <form onSubmit={handleSubmit(handleSaveArea)} className="mt-4 space-y-4">
-            <FormInput
-              name="name"
-              label="Area / Neighborhood Name"
-              placeholder="e.g. Shah Faisal No 3, Ittehad Commercial, F-7/2"
-              control={control}
-            />
-
-            <FormSelect
-              name="city"
-              label="City"
-              control={control}
-              options={[
-                { value: 'Karachi', label: 'Karachi' },
-                { value: 'Lahore', label: 'Lahore' },
-                { value: 'Islamabad', label: 'Islamabad' },
-              ]}
-            />
-
-            {/* Precision Pinpoint Map */}
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
-                Pinpoint Zone Center on Map *
-              </label>
-              <LocationPickerModal
-                city={watchedCity}
-                initialLat={watchedLat}
-                initialLng={watchedLng}
-                onLocationSelect={({ latitude, longitude }) => {
-                  setValue('latitude', latitude);
-                  setValue('longitude', longitude);
-                }}
-              />
-            </div>
-
-            <FormInput
-              name="deliveryFee"
-              label="Delivery Fee (PKR)"
-              type="number"
-              placeholder="0"
-              control={control}
-            />
-
-            <div className="flex items-center justify-between bg-neutral-50 p-3 rounded-xl border border-neutral-200">
-              <span className="text-xs font-bold text-neutral-800">Zone Active Status</span>
-              <Controller
-                name="isActive"
-                control={control}
-                render={({ field: { value, onChange } }) => (
-                  <Switch checked={value} onChange={onChange} />
-                )}
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
-              <CustomButton variant="secondary" onClick={() => setIsAreaModalOpen(false)} type="button">
-                Cancel
-              </CustomButton>
-              <CustomButton variant="primary" htmlType="submit" loading={isCreating || isUpdating}>
-                {editingArea ? 'Update Zone' : 'Save Delivery Zone'}
-              </CustomButton>
-            </div>
-          </form>
-        </CustomModal>
+              <div className="flex justify-end pt-3 mt-5 border-t border-neutral-100">
+                <Space size="middle">
+                  <CustomButton variant="secondary" onClick={() => setIsAreaModalOpen(false)} type="button">
+                    Cancel
+                  </CustomButton>
+                  <CustomButton variant="primary" htmlType="submit" loading={isCreating || isUpdating}>
+                    {editingArea ? 'Save Changes' : 'Save Delivery Zone'}
+                  </CustomButton>
+                </Space>
+              </div>
+            </form>
+          </CustomModal>
+        </div>
       </PageLayout>
     </>
   );

@@ -1,15 +1,15 @@
 // src/app/admin/(dashboard)/products/_components/DealsBundlesView.jsx
 'use client';
 
-import React, { useState } from 'react';
-import { Table, Button, Tag, Space, Image, Input } from 'antd';
-import { EditOutlined, DeleteOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Table, Tag, Image } from 'antd';
 import { usePermission } from '@/hooks/usePermission';
-import ConfirmModal from '@/app/admin/_components/modal/ConfirmModal';
 import CustomSwitch from '@/app/admin/_components/formElements/switch/CustomSwitch';
-import DealModal from '@/app/admin/(dashboard)/products/_components/DealModal';
+import TableActions from '@/app/admin/_components/table/TableActions';
+import DealModal from './DealModal';
 import { useToast } from '@/utils/toast';
 import { formatRelativeTime } from '@/utils/formatDate';
+import { formatPrice } from '@/lib/currency';
 import {
   useGetDealsQuery,
   useCreateDealMutation,
@@ -17,17 +17,13 @@ import {
   useDeleteDealMutation,
 } from '@/services/dealApi';
 
-export default function DealsBundlesView() {
+export default function DealsBundlesView({ searchTerm = '', createTrigger }) {
   const { contextHolder, showSuccess, showError } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [dealToDelete, setDealToDelete] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
 
   const { hasPermission } = usePermission();
-  const canAdd = hasPermission('deals:create');
   const canEdit = hasPermission('deals:edit');
   const canDelete = hasPermission('deals:delete');
   const canToggleStatus = hasPermission('deals:status') || hasPermission('deals:toggle_stock');
@@ -35,7 +31,15 @@ export default function DealsBundlesView() {
   const { data: deals = [], isLoading } = useGetDealsQuery();
   const [createDeal, { isLoading: isCreating }] = useCreateDealMutation();
   const [updateDeal, { isLoading: isUpdating }] = useUpdateDealMutation();
-  const [deleteDeal, { isLoading: isDeleting }] = useDeleteDealMutation();
+  const [deleteDeal] = useDeleteDealMutation();
+
+  // Listen for create button clicks from top PageLayout
+  useEffect(() => {
+    if (createTrigger && createTrigger.startsWith('deal-')) {
+      setSelectedDeal(null);
+      setIsModalOpen(true);
+    }
+  }, [createTrigger]);
 
   const handleSaveDeal = async (formData) => {
     try {
@@ -77,13 +81,10 @@ export default function DealsBundlesView() {
     }
   };
 
-  const handleDeleteDeal = async () => {
-    if (!dealToDelete) return;
+  const handleDeleteDeal = async (id) => {
     try {
-      await deleteDeal(dealToDelete._id).unwrap();
+      await deleteDeal(id).unwrap();
       showSuccess('Deal deleted successfully!');
-      setIsDeleteModalOpen(false);
-      setDealToDelete(null);
     } catch (error) {
       showError(error?.data?.message || 'Failed to delete deal');
     }
@@ -97,22 +98,23 @@ export default function DealsBundlesView() {
 
   const columns = [
     {
-      title: 'Deal',
+      title: 'Deal / Bundle',
       key: 'deal',
-      width: 220,
+      width: 240,
       render: (_, record) => (
         <div className="flex items-center gap-3">
           <Image
-            src={record.image}
+            src={record.image?.startsWith('http') ? record.image : `http://localhost:5000${record.image}`}
             alt={record.title}
-            width={48}
-            height={48}
-            className="rounded-lg object-cover border border-gray-100 min-w-[48px]"
+            width={46}
+            height={46}
+            className="rounded-xl object-cover border border-neutral-100 min-w-[46px] shrink-0"
             fallback="/placeholder.png"
+            preview={false}
           />
           <div className="min-w-0">
-            <span className="font-bold text-gray-900 block truncate">{record.title}</span>
-            <span className="text-xs text-gray-500 line-clamp-1">{record.description}</span>
+            <span className="font-semibold text-neutral-900 text-xs block truncate">{record.title}</span>
+            <span className="text-[11px] text-neutral-400 line-clamp-1 font-normal">{record.description || 'No description'}</span>
           </div>
         </div>
       ),
@@ -122,7 +124,11 @@ export default function DealsBundlesView() {
       dataIndex: 'dealType',
       key: 'dealType',
       width: 140,
-      render: (type) => <Tag color="purple">{type}</Tag>,
+      render: (type) => (
+        <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700">
+          {type}
+        </span>
+      ),
     },
     {
       title: 'Inclusions & Choices',
@@ -133,9 +139,12 @@ export default function DealsBundlesView() {
           {record.fixedItems?.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {record.fixedItems.map((item, idx) => (
-                <Tag key={idx} color="default" className="text-xs">
+                <span
+                  key={idx}
+                  className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700"
+                >
                   {item.quantity}x {item.product?.name || 'Item'}
-                </Tag>
+                </span>
               ))}
             </div>
           )}
@@ -143,15 +152,18 @@ export default function DealsBundlesView() {
           {record.choiceGroups?.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {record.choiceGroups.map((cg, idx) => (
-                <Tag key={idx} color="purple" className="text-xs">
-                  {cg.selectCount}x {cg.title} ({cg.options?.length || 0} options)
-                </Tag>
+                <span
+                  key={idx}
+                  className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700"
+                >
+                  {cg.selectCount}x {cg.title} ({cg.options?.length || 0} opts)
+                </span>
               ))}
             </div>
           )}
 
           {!record.fixedItems?.length && !record.choiceGroups?.length && (
-            <span className="text-xs text-gray-400 italic">No items linked</span>
+            <span className="text-xs text-neutral-400 font-normal">No items configured</span>
           )}
         </div>
       ),
@@ -159,7 +171,7 @@ export default function DealsBundlesView() {
     {
       title: 'Pricing',
       key: 'pricing',
-      width: 150,
+      width: 160,
       render: (_, record) => {
         const discount =
           record.originalPrice > 0
@@ -168,11 +180,19 @@ export default function DealsBundlesView() {
         return (
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-bold text-gray-900">Rs. {record.dealPrice}</span>
-              {discount > 0 && <Tag color="green" className="text-[10px] px-1 py-0">{discount}% OFF</Tag>}
+              <span className="font-mono font-bold text-xs text-neutral-900">
+                {formatPrice(record.dealPrice || 0)}
+              </span>
+              {discount > 0 && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-mono">
+                  {discount}% OFF
+                </span>
+              )}
             </div>
             {record.originalPrice > 0 && (
-              <span className="text-xs text-gray-400 line-through">Rs. {record.originalPrice}</span>
+              <span className="text-[11px] font-mono text-neutral-400 line-through block mt-0.5">
+                {formatPrice(record.originalPrice)}
+              </span>
             )}
           </div>
         );
@@ -184,26 +204,26 @@ export default function DealsBundlesView() {
       key: 'isShown',
       width: 120,
       render: (isShown, record) => (
-        <Space size="small">
+        <div className="flex items-center gap-2">
           <CustomSwitch
             checked={record.isShown ?? true}
             disabled={!canToggleStatus}
             loading={updatingId === record._id}
             onChange={(checked) => handleStatusToggle(record, checked)}
           />
-          <span className="text-xs font-semibold text-gray-600">
-            {record.isShown ?? true ? 'Active' : 'Disabled'}
+          <span className={`text-[11px] font-semibold ${record.isShown ?? true ? 'text-emerald-600' : 'text-neutral-400'}`}>
+            {record.isShown ?? true ? 'Active' : 'Hidden'}
           </span>
-        </Space>
+        </div>
       ),
     },
     {
       title: 'Last Updated',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
-      width: 120,
+      width: 130,
       render: (dateStr) => (
-        <span className="text-gray-600 text-xs font-medium bg-gray-50 px-2 py-1 rounded border border-gray-100 whitespace-nowrap">
+        <span className="text-neutral-500 text-xs font-normal whitespace-nowrap">
           {formatRelativeTime(dateStr)}
         </span>
       ),
@@ -212,40 +232,29 @@ export default function DealsBundlesView() {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 90,
+      align: 'right',
+      width: 100,
       render: (_, record) => {
         if (!canEdit && !canDelete) {
           return (
-            <Tag color="default" className="text-[10px] uppercase font-bold text-neutral-400 border-none">
+            <Tag color="default" className="text-[10px] font-bold text-neutral-400 border-none">
               View Only
             </Tag>
           );
         }
 
         return (
-          <Space size="small">
-            {canEdit && (
-              <Button
-                type="text"
-                icon={<EditOutlined className="text-gray-600" />}
-                onClick={() => {
-                  setSelectedDeal(record);
-                  setIsModalOpen(true);
-                }}
-              />
-            )}
-            {canDelete && (
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => {
-                  setDealToDelete(record);
-                  setIsDeleteModalOpen(true);
-                }}
-              />
-            )}
-          </Space>
+          <TableActions
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onEdit={() => {
+              setSelectedDeal(record);
+              setIsModalOpen(true);
+            }}
+            onDelete={() => handleDeleteDeal(record._id)}
+            deleteTitle="Delete Deal / Bundle?"
+            deleteDescription={`Are you sure you want to delete "${record.title}"?`}
+          />
         );
       },
     },
@@ -254,42 +263,23 @@ export default function DealsBundlesView() {
   return (
     <>
       {contextHolder}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-50 p-4 rounded-2xl border border-neutral-200">
-          <Input
-            placeholder="Search deals & bundles..."
-            prefix={<SearchOutlined className="text-neutral-400" />}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-xs min-h-[40px] rounded-xl"
-            allowClear
-          />
-          {canAdd && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setSelectedDeal(null);
-                setIsModalOpen(true);
-              }}
-              className="bg-[#ffc400] hover:bg-[#e0b210] text-black font-bold h-10 px-5 rounded-xl border-none shadow-sm"
-            >
-              Create Deal
-            </Button>
-          )}
-        </div>
-
-        <div className="w-full overflow-hidden">
-          <Table
-            columns={columns}
-            dataSource={filteredDeals}
-            rowKey="_id"
-            loading={isLoading}
-            pagination={{ pageSize: 8 }}
-            scroll={{ x: 1100 }}
-            bordered={false}
-          />
-        </div>
+      <div className="space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+        <Table
+          columns={columns}
+          dataSource={filteredDeals}
+          rowKey="_id"
+          loading={isLoading}
+          pagination={{
+            pageSize: 8,
+            showTotal: (total, range) => (
+              <span className="text-xs text-neutral-400 font-normal">
+                Showing {range[0]}-{range[1]} of {total} deals
+              </span>
+            ),
+          }}
+          scroll={{ x: 1100 }}
+          size="middle"
+        />
 
         <DealModal
           open={isModalOpen}
@@ -300,15 +290,6 @@ export default function DealsBundlesView() {
           onSubmit={handleSaveDeal}
           loading={isCreating || isUpdating}
           initialValues={selectedDeal}
-        />
-
-        <ConfirmModal
-          open={isDeleteModalOpen}
-          onCancel={() => setIsDeleteModalOpen(false)}
-          onConfirm={handleDeleteDeal}
-          title="Delete Deal"
-          description={`Are you sure you want to delete "${dealToDelete?.title}"?`}
-          loading={isDeleting}
         />
       </div>
     </>

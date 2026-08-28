@@ -5,7 +5,7 @@ import { siteConfig } from '@/config/site';
 export const deliveryAreaApi = createApi({
   reducerPath: 'deliveryAreaApi',
   baseQuery: fetchBaseQuery({
-    baseUrl: siteConfig?.baseUrl,
+    baseUrl: siteConfig?.baseUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
     prepareHeaders: (headers) => {
       const token =
         typeof window !== 'undefined'
@@ -25,6 +25,13 @@ export const deliveryAreaApi = createApi({
         url: '/delivery-areas',
         params,
       }),
+      transformResponse: (response) => {
+        if (Array.isArray(response)) return response;
+        if (Array.isArray(response?.data)) return response.data;
+        if (Array.isArray(response?.deliveryAreas)) return response.deliveryAreas;
+        if (Array.isArray(response?.areas)) return response.areas;
+        return [];
+      },
       providesTags: ['DeliveryAreas'],
     }),
     createDeliveryArea: builder.mutation({

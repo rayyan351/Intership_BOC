@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Space, Button, InputNumber, Input, Tag, Switch } from 'antd';
+import { Space } from 'antd';
 import { PlusOutlined, DeleteOutlined, AppstoreAddOutlined } from '@ant-design/icons';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -12,6 +12,7 @@ import FormInput from '@/app/admin/_components/formElements/inputfield/Forminput
 import FormSelect from '@/app/admin/_components/formElements/select/FormSelect';
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
 import CustomModal from '@/app/admin/_components/modal/CustomModal';
+import CustomSwitch from '@/app/admin/_components/formElements/switch/CustomSwitch';
 import FormImageUpload from '@/app/admin/_components/formElements/imageUpload/FormImageUpload';
 import { useGetCategoriesQuery } from '@/services/categoryApi';
 
@@ -47,7 +48,7 @@ export default function MenuItemModal({
   const [customizations, setCustomizations] = useState([]);
   const [customOptionDrafts, setCustomOptionDrafts] = useState({});
 
-  const { control, handleSubmit, reset, setValue } = useForm({
+  const { control, handleSubmit, reset } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
       name: '',
@@ -169,36 +170,43 @@ export default function MenuItemModal({
     );
   };
 
-  const handleFinish = (values) => {
-    const formData = new FormData();
-    formData.append('name', values.name);
-    formData.append('price', Number(values.price));
-    formData.append('description', values.description || '');
-    formData.append('isShown', values.isShown);
+const handleFinish = (values) => {
+  const formData = new FormData();
+  formData.append('name', values.name.trim());
+  formData.append('price', Number(values.price));
+  formData.append('description', values.description || '');
+  formData.append('isShown', values.isShown);
 
-    if (values.categories && Array.isArray(values.categories)) {
-      values.categories.forEach((cat) => {
-        formData.append('categories', cat);
-      });
-    }
+  if (values.categories && Array.isArray(values.categories)) {
+    values.categories.forEach((cat) => {
+      formData.append('categories', cat);
+    });
+  }
 
-    if (values.image) {
+  // Extract raw File / Blob safely
+  if (values.image) {
+    if (values.image instanceof File || values.image instanceof Blob) {
       formData.append('image', values.image);
+    } else if (values.image?.originFileObj instanceof File) {
+      formData.append('image', values.image.originFileObj);
+    } else if (values.image?.file instanceof File) {
+      formData.append('image', values.image.file);
     }
+  }
 
-    const formattedCustomizations = customizations.map((cg) => ({
-      title: cg.title,
-      required: cg.required,
-      maxSelect: cg.maxSelect,
-      options: (cg.options || []).map((opt) => ({
-        name: opt.name,
-        extraPrice: Number(opt.extraPrice) || 0,
-      })),
-    }));
-    formData.append('customizations', JSON.stringify(formattedCustomizations));
+  const formattedCustomizations = customizations.map((cg) => ({
+    title: cg.title,
+    required: cg.required,
+    maxSelect: cg.maxSelect,
+    options: (cg.options || []).map((opt) => ({
+      name: opt.name,
+      extraPrice: Number(opt.extraPrice) || 0,
+    })),
+  }));
+  formData.append('customizations', JSON.stringify(formattedCustomizations));
 
-    onSubmit(formData);
-  };
+  onSubmit(formData);
+};
 
   return (
     <CustomModal
@@ -207,7 +215,7 @@ export default function MenuItemModal({
       onCancel={onClose}
       width={780}
     >
-      <form onSubmit={handleSubmit(handleFinish)} className="mt-4 space-y-5 max-h-[78vh] overflow-y-auto pr-1">
+      <form onSubmit={handleSubmit(handleFinish)} className="mt-4 space-y-5 max-h-[78vh] overflow-y-auto pr-1 font-['Plus_Jakarta_Sans',sans-serif]">
         <FormInput
           name="name"
           label="Item Name"
@@ -215,7 +223,7 @@ export default function MenuItemModal({
           control={control}
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <FormSelect
             name="categories"
             label="Categories"
@@ -236,29 +244,27 @@ export default function MenuItemModal({
         </div>
 
         {/* CUSTOMIZATION GROUPS (Add-ons, Sauces, Patty Upgrades) */}
-        <div className="border border-amber-200 rounded-lg p-4 bg-amber-50/30">
-          <div className="flex justify-between items-center mb-3">
+        <div className="border border-amber-200/80 rounded-2xl p-4 bg-amber-50/40 space-y-3">
+          <div className="flex justify-between items-center">
             <div>
-              <span className="text-sm font-semibold text-amber-900 block">
+              <span className="text-xs font-bold text-amber-900 block tracking-tight">
                 Customizations & Add-on Groups
               </span>
-              <span className="text-xs text-amber-700">
+              <span className="text-[11px] text-amber-700 font-normal">
                 Optional or required item modifiers (e.g. Extra Cheese Slice, Double Patty, Sauce Options).
               </span>
             </div>
-            <Button
-              type="primary"
-              ghost
-              size="small"
-              icon={<AppstoreAddOutlined />}
+            <button
+              type="button"
               onClick={handleAddCustomizationGroup}
+              className="text-xs font-semibold text-amber-800 hover:text-amber-950 flex items-center gap-1 cursor-pointer"
             >
-              Add Group
-            </Button>
+              <AppstoreAddOutlined className="text-xs" /> Add Group
+            </button>
           </div>
 
           {customizations.length === 0 ? (
-            <p className="text-xs text-amber-600/70 italic py-2 text-center">
+            <p className="text-xs text-amber-700/80 font-normal py-2 text-center">
               No customization options added for this item.
             </p>
           ) : (
@@ -269,36 +275,38 @@ export default function MenuItemModal({
                 return (
                   <div
                     key={groupIndex}
-                    className="bg-white p-4 rounded-lg border border-amber-200 space-y-3 shadow-xs"
+                    className="bg-white p-4 rounded-2xl border border-amber-200 space-y-3 shadow-2xs"
                   >
                     {/* Header: Title, Required Flag, Max Select */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                      <Input
+                      <input
+                        type="text"
                         placeholder="e.g. Add Extra Toppings OR Choose Bun Style"
                         value={group.title}
                         onChange={(e) =>
                           handleGroupFieldChange(groupIndex, 'title', e.target.value)
                         }
-                        className="font-medium text-gray-800 flex-1"
+                        className="flex-1 h-9 px-3 rounded-xl border border-neutral-200 text-xs font-semibold text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
                       />
 
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100">
                           <span className="text-xs text-amber-800 font-semibold">Max Pick:</span>
-                          <InputNumber
+                          <input
+                            type="number"
                             min={1}
                             max={10}
                             value={group.maxSelect}
-                            onChange={(val) =>
-                              handleGroupFieldChange(groupIndex, 'maxSelect', val || 1)
+                            onChange={(e) =>
+                              handleGroupFieldChange(groupIndex, 'maxSelect', Number(e.target.value) || 1)
                             }
-                            style={{ width: 55 }}
+                            className="w-12 h-7 px-1.5 rounded-lg border border-amber-200 bg-white font-mono font-bold text-xs text-neutral-900 text-center focus:outline-none"
                           />
                         </div>
 
-                        <div className="flex items-center gap-1.5 bg-neutral-50 px-2.5 py-1 rounded-md border border-neutral-200">
+                        <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80">
                           <span className="text-xs text-neutral-600 font-semibold">Required:</span>
-                          <Switch
+                          <CustomSwitch
                             size="small"
                             checked={group.required}
                             onChange={(checked) =>
@@ -307,19 +315,20 @@ export default function MenuItemModal({
                           />
                         </div>
 
-                        <Button
-                          type="text"
-                          danger
-                          icon={<DeleteOutlined />}
+                        <button
+                          type="button"
                           onClick={() => handleRemoveCustomizationGroup(groupIndex)}
-                        />
+                          className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                        >
+                          <DeleteOutlined className="text-xs" />
+                        </button>
                       </div>
                     </div>
 
                     {/* Quick Input for modifier options */}
                     <div className="flex items-center gap-2 pt-1">
-                      <Input
-                        size="small"
+                      <input
+                        type="text"
                         placeholder="Add option (e.g. Extra Cheddar Cheese, Jalapeno Dip)..."
                         value={draftName}
                         onChange={(e) =>
@@ -328,60 +337,64 @@ export default function MenuItemModal({
                             [groupIndex]: e.target.value,
                           }))
                         }
-                        onPressEnter={() => {
-                          handleAddOptionToGroup(groupIndex, draftName);
-                          setCustomOptionDrafts((prev) => ({ ...prev, [groupIndex]: '' }));
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddOptionToGroup(groupIndex, draftName);
+                            setCustomOptionDrafts((prev) => ({ ...prev, [groupIndex]: '' }));
+                          }
                         }}
+                        className="flex-1 h-8 px-3 rounded-xl border border-neutral-200 text-xs font-normal focus:outline-none focus:border-[#F4C61A]"
                       />
-                      <Button
-                        size="small"
-                        type="primary"
+                      <button
+                        type="button"
                         onClick={() => {
                           handleAddOptionToGroup(groupIndex, draftName);
                           setCustomOptionDrafts((prev) => ({ ...prev, [groupIndex]: '' }));
                         }}
                         disabled={!draftName.trim()}
+                        className="h-8 px-3 rounded-xl bg-neutral-900 hover:bg-black disabled:opacity-40 text-white text-xs font-semibold transition cursor-pointer"
                       >
-                        Add
-                      </Button>
+                        Add Option
+                      </button>
                     </div>
 
                     {/* Options List */}
                     {group.options && group.options.length > 0 && (
-                      <div className="pt-2 border-t border-gray-100">
-                        <span className="text-xs font-semibold text-gray-700 block mb-2">
+                      <div className="pt-2 border-t border-neutral-100">
+                        <span className="text-xs font-semibold text-neutral-700 block mb-2">
                           Options & Upgrade Charges:
                         </span>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                           {group.options.map((opt, optIdx) => (
                             <div
                               key={optIdx}
-                              className="flex items-center justify-between bg-gray-50 px-2.5 py-1.5 rounded-md border border-gray-200 text-xs"
+                              className="flex items-center justify-between bg-slate-50/70 px-2.5 py-1.5 rounded-xl border border-slate-100 text-xs"
                             >
-                              <span className="font-medium text-gray-800 truncate max-w-[170px]">
+                              <span className="font-semibold text-neutral-800 truncate max-w-[170px]" title={opt.name}>
                                 {opt.name}
                               </span>
 
                               <div className="flex items-center gap-1">
-                                <span className="text-gray-500 text-[11px]">+Rs.</span>
-                                <InputNumber
-                                  size="small"
+                                <span className="text-neutral-400 text-[10px]">+Rs.</span>
+                                <input
+                                  type="number"
                                   min={0}
                                   max={2000}
                                   placeholder="0"
                                   value={opt.extraPrice}
-                                  onChange={(val) =>
-                                    handleOptionExtraPriceChange(groupIndex, optIdx, val)
+                                  onChange={(e) =>
+                                    handleOptionExtraPriceChange(groupIndex, optIdx, Number(e.target.value) || 0)
                                   }
-                                  style={{ width: 65 }}
+                                  className="w-16 h-7 px-1.5 rounded-lg border border-neutral-200 bg-white font-mono font-bold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
                                 />
-                                <Button
-                                  type="text"
-                                  size="small"
-                                  danger
-                                  icon={<DeleteOutlined className="text-xs" />}
+                                <button
+                                  type="button"
                                   onClick={() => handleRemoveOption(groupIndex, optIdx)}
-                                />
+                                  className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                >
+                                  <DeleteOutlined className="text-xs" />
+                                </button>
                               </div>
                             </div>
                           ))}
@@ -404,10 +417,13 @@ export default function MenuItemModal({
           control={control}
         />
 
-        <div className="flex items-center justify-between bg-neutral-50 p-3 rounded-lg border border-neutral-200">
+        {/* Live Menu Visibility Banner */}
+        <div className="flex items-center justify-between bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200/80">
           <div>
-            <span className="text-xs font-bold text-gray-800 block">Live Menu Visibility</span>
-            <span className="text-[11px] text-gray-500">
+            <span className="text-xs font-bold text-neutral-900 block tracking-tight">
+              Live Menu Visibility
+            </span>
+            <span className="text-[11px] text-neutral-400 font-normal">
               When enabled, this item appears across the live storefront menu.
             </span>
           </div>
@@ -415,18 +431,19 @@ export default function MenuItemModal({
             name="isShown"
             control={control}
             render={({ field: { value, onChange } }) => (
-              <Switch checked={value} onChange={onChange} />
+              <CustomSwitch checked={value} onChange={onChange} />
             )}
           />
         </div>
 
-        <div className="flex justify-end pt-4 mt-6 border-t border-gray-100">
+        {/* Modal Action Controls */}
+        <div className="flex justify-end pt-3 mt-4 border-t border-neutral-100">
           <Space size="middle">
             <CustomButton variant="secondary" onClick={onClose} type="button">
               Cancel
             </CustomButton>
             <CustomButton variant="primary" htmlType="submit" loading={loading}>
-              {initialValues ? 'Update Item' : 'Create Item'}
+              {initialValues ? 'Save Changes' : 'Create Item'}
             </CustomButton>
           </Space>
         </div>

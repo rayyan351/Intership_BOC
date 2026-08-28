@@ -1,8 +1,8 @@
-// front-end/src/app/admin/products/sections/_components/SectionModal.jsx
+// src/app/admin/(dashboard)/products/categories/_components/SectionModal.jsx
 'use client';
 
 import React, { useEffect } from 'react';
-import { Space } from 'antd';
+import { Space, Image } from 'antd';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -80,8 +80,8 @@ export default function SectionModal({ open, onClose, onSubmit, loading, initial
 
   const handleFinish = (values) => {
     const formData = new FormData();
-    formData.append('title', values.title);
-    formData.append('subtitle', values.subtitle || '');
+    formData.append('title', values.title.trim());
+    formData.append('subtitle', (values.subtitle || '').trim());
     formData.append('displayOrder', values.displayOrder || 1);
     formData.append('products', JSON.stringify(values.products || []));
     formData.append('deals', JSON.stringify(values.deals || []));
@@ -107,7 +107,7 @@ export default function SectionModal({ open, onClose, onSubmit, loading, initial
       onCancel={onClose}
       width={640}
     >
-      <form onSubmit={handleSubmit(handleFinish)} className="mt-4 space-y-5 max-h-[75vh] overflow-y-auto pr-1">
+      <form onSubmit={handleSubmit(handleFinish)} className="mt-4 space-y-4 max-h-[75vh] overflow-y-auto pr-1 font-['Plus_Jakarta_Sans',sans-serif]">
         <FormInput
           name="title"
           label="Section Title"
@@ -118,37 +118,42 @@ export default function SectionModal({ open, onClose, onSubmit, loading, initial
         <FormInput
           name="subtitle"
           label="Subtitle / Description"
-          placeholder="e.g. Crispy fries loaded with cheese and chicken"
+          placeholder="e.g. Crispy fries loaded with cheese and shredded chicken"
           control={control}
         />
 
         {/* Existing Banner Preview */}
         {initialValues?.banner && (
-          <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200">
+          <div className="p-3.5 bg-slate-50/70 rounded-2xl border border-slate-200/80">
             <span className="text-xs text-neutral-500 font-semibold block mb-2">Current Active Banner:</span>
-            <div className="relative w-full h-24 overflow-hidden rounded-lg border border-neutral-300 bg-black">
+            <div className="relative w-full h-24 overflow-hidden rounded-xl border border-neutral-200 bg-black">
               <img
                 src={getPreviewUrl(initialValues.banner)}
                 alt="Current Section Banner"
                 className="w-full h-full object-cover object-center"
               />
             </div>
-            <label className="flex items-center gap-2 mt-2.5 text-xs font-bold text-red-600 cursor-pointer">
+            <label className="flex items-center gap-2 mt-2.5 text-xs font-semibold text-rose-600 cursor-pointer">
               <input
                 type="checkbox"
                 onChange={(e) => setValue('removeBanner', e.target.checked)}
-                className="rounded border-neutral-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                className="rounded border-neutral-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
               />
               Remove current banner graphic
             </label>
           </div>
         )}
 
-        <FormImageUpload
-          name="banner"
-          label="Section Divider Banner (Upload Artwork)"
-          control={control}
-        />
+        <div className="space-y-1">
+          <FormImageUpload
+            name="banner"
+            label="Section Divider Banner (Upload Artwork)"
+            control={control}
+          />
+          <span className="text-[11px] text-neutral-400 block pl-1 font-normal">
+            Banner artwork rendered prominently above this section on the storefront.
+          </span>
+        </div>
 
         <div className="space-y-1">
           <FormSelect
@@ -184,13 +189,14 @@ export default function SectionModal({ open, onClose, onSubmit, loading, initial
           control={control}
         />
 
-        <div className="flex justify-end pt-4 mt-6 border-t border-gray-100">
+        {/* Action Controls */}
+        <div className="flex justify-end pt-3 mt-5 border-t border-neutral-100">
           <Space size="middle">
             <CustomButton variant="secondary" onClick={onClose} type="button">
               Cancel
             </CustomButton>
             <CustomButton variant="primary" htmlType="submit" loading={loading}>
-              {initialValues ? 'Update Section' : 'Create Section'}
+              {initialValues ? 'Save Changes' : 'Create Section'}
             </CustomButton>
           </Space>
         </div>

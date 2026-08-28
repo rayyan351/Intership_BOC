@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { setLocation } from "@/redux/location/locationSlice";
+import { setLocation, closeLocationModal } from "@/redux/location/locationSlice";
 import { useLocation } from "@/context/LocationContext";
 import { Icon } from "@/components/ui/Icons";
 import { useGetDeliveryAreasQuery } from "@/services/deliveryAreaApi";
@@ -11,6 +11,7 @@ import { useGetDeliveryAreasQuery } from "@/services/deliveryAreaApi";
 export function LocationDialog() {
   const dispatch = useDispatch();
   const reduxLocation = useSelector((state) => state.location?.selectedLocation);
+  const isReduxModalOpen = useSelector((state) => state.location?.isLocationModalOpen);
 
   const locationContext = useLocation ? useLocation() : {};
   const {
@@ -28,17 +29,25 @@ export function LocationDialog() {
   const [locationError, setLocationError] = useState("");
   const [gpsSuccessMessage, setGpsSuccessMessage] = useState("");
 
-  const { data: deliveryAreas = [], isLoading } = useGetDeliveryAreasQuery({ activeOnly: "true" });
+  const { data: rawDeliveryAreas, isLoading } = useGetDeliveryAreasQuery();
+
+  const deliveryAreas = useMemo(() => {
+    if (Array.isArray(rawDeliveryAreas)) return rawDeliveryAreas;
+    if (Array.isArray(rawDeliveryAreas?.data)) return rawDeliveryAreas.data;
+    if (Array.isArray(rawDeliveryAreas?.deliveryAreas)) return rawDeliveryAreas.deliveryAreas;
+    return [];
+  }, [rawDeliveryAreas]);
 
   const activeSavedLocation = reduxLocation || selectedBranch;
 
   const cityAreas = useMemo(() => {
-    return deliveryAreas.filter(
-      (a) => a.city?.toLowerCase() === activeCity.toLowerCase() && a.isActive !== false
-    );
+    return deliveryAreas.filter((a) => {
+      const cityMatches = a.city?.toLowerCase() === activeCity.toLowerCase();
+      const isActive = a.isActive !== false;
+      return cityMatches && isActive;
+    });
   }, [deliveryAreas, activeCity]);
 
-  // Sync initial state if a location is already stored
   useEffect(() => {
     if (activeSavedLocation?.city) {
       setActiveCity(activeSavedLocation.city);
@@ -46,9 +55,8 @@ export function LocationDialog() {
     if (activeSavedLocation?.areaId || activeSavedLocation?._id) {
       setChosenAreaId(activeSavedLocation.areaId || activeSavedLocation._id);
     }
-  }, [activeSavedLocation, isLocationOpen]);
+  }, [activeSavedLocation]);
 
-  // Auto-select first area when changing city if current selection isn't in that city
   useEffect(() => {
     if (cityAreas.length > 0) {
       const exists = cityAreas.some((a) => a._id === chosenAreaId);
@@ -60,7 +68,6 @@ export function LocationDialog() {
     }
   }, [activeCity, cityAreas, chosenAreaId]);
 
-  // Haversine distance calculator
   const getDistanceKm = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -72,6 +79,13 @@ export function LocationDialog() {
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2);
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  const handleClose = () => {
+    if (typeof setIsLocationOpen === "function") {
+      setIsLocationOpen(false);
+    }
+    dispatch(closeLocationModal());
   };
 
   const saveLocationState = (payload) => {
@@ -90,9 +104,7 @@ export function LocationDialog() {
       localStorage.setItem("boc_selected_location", JSON.stringify(payload));
     }
 
-    if (typeof setIsLocationOpen === "function") {
-      setIsLocationOpen(false);
-    }
+    handleClose();
   };
 
   const handleUseCurrentLocation = () => {
@@ -115,7 +127,7 @@ export function LocationDialog() {
 
         deliveryAreas.forEach((area) => {
           if (area.latitude && area.longitude) {
-            const dist = getDistanceKm(userLat, userLng, area.latitude, area.longitude);
+            const dist = getDistanceKm(userLat, userLng, Number(area.latitude), Number(area.longitude));
             if (dist < minDistance) {
               minDistance = dist;
               nearestZone = area;
@@ -123,19 +135,18 @@ export function LocationDialog() {
           }
         });
 
-        if (!nearestZone || minDistance > 15) {
+        if (!nearestZone || minDistance > 20) {
           setIsLocatingGPS(false);
           setLocationError("Sorry! We do not deliver to your current location yet.");
           return;
         }
 
-        // Set city and area in the modal so the customer can review and confirm
         setActiveCity(nearestZone.city);
         setChosenAreaId(nearestZone._id);
         setGpsSuccessMessage(`Detected Nearest Area: ${nearestZone.name}`);
         setIsLocatingGPS(false);
       },
-      (error) => {
+      () => {
         setIsLocatingGPS(false);
         setLocationError("Unable to retrieve your GPS location. Please select your sector manually.");
       },
@@ -155,7 +166,7 @@ export function LocationDialog() {
       estimatedMinutes: selectedArea.dynamicETA || selectedArea.estimatedDeliveryMinutes || 35,
       assignedBranch: selectedArea.assignedBranch,
       _id: selectedArea.assignedBranch?._id || selectedArea.assignedBranch,
-      name: selectedArea.name, // Display area name prominently
+      name: selectedArea.name,
       branchName: selectedArea.assignedBranch?.name || "Kitchen Outlet",
     };
 
@@ -163,7 +174,7 @@ export function LocationDialog() {
   };
 
   const isMandatory = !activeSavedLocation;
-  const isVisible = isLocationOpen || isMandatory;
+  const isVisible = isLocationOpen || isReduxModalOpen || isMandatory;
 
   if (!isVisible) return null;
 
@@ -171,44 +182,42 @@ export function LocationDialog() {
     <div className="fixed inset-0 z-[600] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity"
+        className="absolute inset-0 bg-neutral-950/60 backdrop-blur-sm transition-opacity"
         onClick={() => {
-          if (!isMandatory && typeof setIsLocationOpen === "function") {
-            setIsLocationOpen(false);
-          }
+          if (!isMandatory) handleClose();
         }}
       />
 
       {/* Modal Box */}
-      <div className="relative w-full max-w-[460px] bg-neutral-900 border border-neutral-800 text-white rounded-[24px] p-6 sm:p-7 shadow-2xl z-10 font-['Plus_Jakarta_Sans',sans-serif]">
-        <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
+      <div className="relative w-full max-w-[460px] bg-white border border-neutral-200/90 text-neutral-900 rounded-[28px] p-6 sm:p-7 shadow-2xl z-10 font-['Plus_Jakarta_Sans',sans-serif]">
+        <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
           <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-full bg-[#F4C61A] text-black grid place-items-center font-bold">
+            <span className="w-8 h-8 rounded-xl bg-[#F4C61A] text-neutral-950 grid place-items-center font-bold shadow-2xs">
               <Icon name="location" size={17} strokeWidth={2.4} />
             </span>
-            <h3 className="text-lg font-black tracking-tight text-white m-0 uppercase">
+            <h3 className="text-base sm:text-lg font-black tracking-tight text-neutral-900 m-0 uppercase">
               Select Delivery Location
             </h3>
           </div>
 
-          {!isMandatory && typeof setIsLocationOpen === "function" && (
+          {!isMandatory && (
             <button
-              onClick={() => setIsLocationOpen(false)}
-              className="w-8 h-8 rounded-full bg-neutral-800 text-neutral-400 hover:text-white grid place-items-center transition cursor-pointer"
+              onClick={handleClose}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-neutral-500 hover:text-neutral-900 grid place-items-center transition cursor-pointer"
             >
-              <Icon name="close" size={16} strokeWidth={2} />
+              <Icon name="close" size={15} strokeWidth={2.2} />
             </button>
           )}
         </div>
 
         {locationError && (
-          <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold text-center">
+          <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold text-center">
             ⚠️ {locationError}
           </div>
         )}
 
         {gpsSuccessMessage && (
-          <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold text-center flex items-center justify-center gap-1.5">
+          <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold text-center flex items-center justify-center gap-1.5">
             <span>✓</span>
             <span>{gpsSuccessMessage}</span>
           </div>
@@ -219,16 +228,16 @@ export function LocationDialog() {
           type="button"
           onClick={handleUseCurrentLocation}
           disabled={isLocatingGPS}
-          className="w-full mt-4 py-3 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-750 text-white font-bold text-xs uppercase tracking-wider transition border border-neutral-700 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          className="w-full mt-4 py-3 px-4 rounded-2xl bg-slate-50 hover:bg-slate-100 text-neutral-900 font-bold text-xs uppercase tracking-wider transition border border-slate-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-2xs"
         >
           <span>🎯</span>
           <span>{isLocatingGPS ? "Locating via GPS..." : "Use My Current Location"}</span>
         </button>
 
         <div className="flex items-center my-4">
-          <div className="flex-grow border-t border-neutral-800"></div>
-          <span className="px-3 text-[10px] font-black uppercase text-neutral-500">or choose sector</span>
-          <div className="flex-grow border-t border-neutral-800"></div>
+          <div className="flex-grow border-t border-neutral-100"></div>
+          <span className="px-3 text-[10px] font-black uppercase text-neutral-400">or choose sector</span>
+          <div className="flex-grow border-t border-neutral-100"></div>
         </div>
 
         {/* City Buttons */}
@@ -242,10 +251,10 @@ export function LocationDialog() {
                 setChosenAreaId("");
                 setGpsSuccessMessage("");
               }}
-              className={`py-2.5 px-2 rounded-xl border-2 transition text-xs font-black uppercase tracking-wider cursor-pointer ${
+              className={`py-2.5 px-2 rounded-2xl border-2 transition text-xs font-black uppercase tracking-wider cursor-pointer ${
                 activeCity.toLowerCase() === city.toLowerCase()
-                  ? "border-[#F4C61A] bg-[#F4C61A]/10 text-[#F4C61A]"
-                  : "border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-700 hover:text-white"
+                  ? "border-[#F4C61A] bg-[#F4C61A]/15 text-neutral-950 font-extrabold shadow-2xs"
+                  : "border-slate-100 bg-slate-50/70 text-neutral-500 hover:border-slate-200 hover:text-neutral-900"
               }`}
             >
               {city}
@@ -256,11 +265,11 @@ export function LocationDialog() {
         {/* Neighborhood Sector Dropdown */}
         <div className="space-y-1.5 mb-5">
           {isLoading ? (
-            <div className="py-3 px-4 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-500">
+            <div className="py-3 px-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-neutral-400">
               Loading sectors...
             </div>
           ) : cityAreas.length === 0 ? (
-            <div className="py-3 px-4 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-500">
+            <div className="py-3 px-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-neutral-500">
               No delivery sectors mapped for {activeCity}.
             </div>
           ) : (
@@ -270,11 +279,11 @@ export function LocationDialog() {
                 setChosenAreaId(e.target.value);
                 setGpsSuccessMessage("");
               }}
-              className="w-full h-11 px-3.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white text-sm font-semibold focus:outline-none focus:border-[#F4C61A] cursor-pointer"
+              className="w-full h-11 px-3.5 rounded-2xl bg-white border border-neutral-200/90 text-neutral-900 text-xs sm:text-sm font-semibold focus:outline-none focus:border-[#F4C61A] focus:ring-2 focus:ring-[#F4C61A]/20 cursor-pointer shadow-2xs"
             >
               <option value="" disabled>Select your sector</option>
               {cityAreas.map((area) => (
-                <option key={area._id} value={area._id} className="bg-neutral-900 text-white">
+                <option key={area._id} value={area._id} className="text-neutral-900">
                   {area.name} {area.deliveryFee === 0 ? "(Free Delivery)" : `(Delivery: Rs. ${area.deliveryFee})`}
                 </option>
               ))}
@@ -286,7 +295,7 @@ export function LocationDialog() {
           type="button"
           onClick={handleConfirm}
           disabled={!chosenAreaId || cityAreas.length === 0}
-          className="w-full h-12 rounded-xl bg-[#F4C61A] hover:bg-[#e5b713] text-black font-extrabold text-sm uppercase tracking-wider transition disabled:opacity-50 shadow-md flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full h-12 rounded-2xl bg-[#F4C61A] hover:bg-[#e5b713] text-neutral-950 font-black text-xs sm:text-sm uppercase tracking-wider transition disabled:opacity-40 shadow-xs flex items-center justify-center gap-2 cursor-pointer"
         >
           Confirm Location
         </button>

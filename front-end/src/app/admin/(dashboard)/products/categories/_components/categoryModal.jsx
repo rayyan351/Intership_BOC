@@ -1,4 +1,4 @@
-// front-end/src/app/admin/products/categories/_components/CategoryModal.jsx
+// src/app/admin/(dashboard)/products/categories/_components/CategoryModal.jsx
 'use client';
 
 import React, { useEffect } from 'react';
@@ -44,8 +44,8 @@ export default function CategoryModal({ open, onClose, onSubmit, loading, initia
 
   const handleFormSubmit = (data) => {
     const formData = new FormData();
-    formData.append('label', data.label);
-    formData.append('name', data.label.toLowerCase().replace(/[\s_-]+/g, ''));
+    formData.append('label', data.label.trim());
+    formData.append('name', data.label.trim().toLowerCase().replace(/[\s_-]+/g, ''));
 
     if (data.banner) {
       formData.append('banner', data.banner);
@@ -56,12 +56,12 @@ export default function CategoryModal({ open, onClose, onSubmit, loading, initia
 
   return (
     <CustomModal
-      title={initialValues ? 'Edit Category' : 'Add New Category'}
+      title={initialValues ? 'Edit Menu Category' : 'Add New Category'}
       open={open}
       onCancel={onClose}
-      width={560}
+      width={540}
     >
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="mt-4 space-y-4">
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
         <FormInput
           name="label"
           label="Category Name"
@@ -70,19 +70,25 @@ export default function CategoryModal({ open, onClose, onSubmit, loading, initia
         />
 
         {/* Section Divider Banner Upload */}
-        <FormImageUpload
-          name="banner"
-          label="Section Divider Banner (Wide Artwork displayed directly above category items)"
-          control={control}
-        />
+        <div className="space-y-1">
+          <FormImageUpload
+            name="banner"
+            label="Section Divider Banner (Optional Artwork)"
+            control={control}
+          />
+          <span className="text-[11px] text-neutral-400 block pl-1">
+            Wide banner displayed directly above this category on the live customer menu.
+          </span>
+        </div>
 
-        <div className="flex justify-end pt-4 border-t border-gray-100 mt-5">
-          <Space>
+        {/* Action Controls */}
+        <div className="flex justify-end pt-3 mt-5 border-t border-neutral-100">
+          <Space size="middle">
             <CustomButton variant="secondary" onClick={onClose} type="button">
               Cancel
             </CustomButton>
             <CustomButton variant="primary" htmlType="submit" loading={loading}>
-              {initialValues ? 'Update Category' : 'Create Category'}
+              {initialValues ? 'Save Changes' : 'Create Category'}
             </CustomButton>
           </Space>
         </div>

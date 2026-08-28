@@ -1,3 +1,4 @@
+// src/app/admin/_components/layout/PageLayout.jsx
 import React from 'react';
 import CustomButton from '../formElements/button/Custombutton';
 import { PlusOutlined } from '@ant-design/icons';
@@ -14,6 +15,7 @@ export default function PageLayout({
   onSearch,
   searchPlaceholder = "Search...",
   showSearch = true,
+  extra, // Custom components (e.g. dropdown filters)
 }) {
   return (
     <div className="space-y-6">
@@ -27,8 +29,10 @@ export default function PageLayout({
           {subTitle && <p className="text-xs sm:text-sm text-gray-500">{subTitle}</p>}
         </div>
 
-        {/* Action Bar (Search Bar + Add Button side-by-side) */}
+        {/* Action Bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {extra && extra}
+
           {showSearch && onSearch && (
             <SearchBar
               value={searchValue}
@@ -52,7 +56,6 @@ export default function PageLayout({
 
       {/* Main Content Card Container */}
       <CustomCard>
-        {/* Table / Page Content */}
         {children}
       </CustomCard>
     </div>

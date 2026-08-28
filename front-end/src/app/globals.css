@@ -32,7 +32,6 @@ html {
   font-size: 16px;
 }
 
-/* src/app/globals.css */
 html[data-scroll-behavior="smooth"] {
   scroll-behavior: smooth;
 }
@@ -56,7 +55,7 @@ a {
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display), var(--font-body);
   letter-spacing: -0.015em;
-  color: #111111;
+  
 }
 
 button,
@@ -82,7 +81,7 @@ img {
 }
 
 :focus-visible {
-  outline: 3px solid #2667d8;
+  outline: 3px solid var(--color-yellow);
   outline-offset: 3px;
 }
 
@@ -381,7 +380,7 @@ img {
     letter-spacing: 0.5px;
     cursor: pointer;
     transition: background-color 0.2s, transform 0.1s;
-    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+    box-shadow: 0 4px 12px rgba(255, 196, 0, 0.3);
   }
 
   .checkoutBtn:hover {
@@ -530,7 +529,7 @@ img {
   border-bottom: 1px solid #f3f4f6 !important;
 }
 
-/* Fix Input focus black outline */
+/* Fix Input focus outline to match theme primary yellow */
 .ant-input-affix-wrapper,
 .ant-input {
   border-color: #e5e7eb !important;
@@ -539,7 +538,24 @@ img {
 }
 
 .ant-input-affix-wrapper:focus,
-.ant-input-affix-wrapper-focused {
-  border-color: #ffc400 !important;
+.ant-input-affix-wrapper-focused,
+.ant-input:focus {
+  border-color: var(--color-yellow) !important;
   box-shadow: 0 0 0 2px rgba(255, 196, 0, 0.2) !important;
+}
+
+/* Remove inner input focus rings and browser default highlights completely */
+input:focus,
+select:focus,
+textarea:focus{
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+/* Specific fix for custom search bar wrappers containing inputs */
+.search-bar-container input:focus,
+form:has(input):focus-within {
+  outline: none !important;
+  box-shadow: none !important;
 }

@@ -138,10 +138,10 @@ export function CategoryRail({
             return (
               <a
                 aria-current={isActive ? "true" : undefined}
-                className={`shrink-0 px-5 py-[9px] border rounded-full text-[0.78rem] font-extrabold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                className={`shrink-0 px-5 py-[9px] border rounded-full text-[0.78rem] font-extrabold whitespace-nowrap transition-all duration-200 cursor-pointer no-underline ${
                   isActive
-                    ? "border-[#E0B210] bg-[#F4C61A] text-black shadow-xs"
-                    : "border-black bg-transparent text-neutral-900 hover:border-[#E0B210] hover:bg-[#F4C61A] hover:text-black"
+                    ? "border-[#E0B210] bg-[#F4C61A] text-neutral-950 shadow-xs"
+                    : "border-black bg-transparent text-neutral-900 hover:border-[#E0B210] hover:bg-[#F4C61A] hover:text-neutral-950"
                 }`}
                 href={`#${category.id}`}
                 key={category.id}

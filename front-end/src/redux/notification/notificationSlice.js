@@ -1,54 +1,61 @@
 // src/redux/notification/notificationSlice.js
 import { createSlice } from '@reduxjs/toolkit';
 
-const initialState = {
-  notifications: [
-    {
-      id: 'notif-1',
-      title: 'System Initialized',
-      message: 'Branch inventory tracking and kitchen feeds are live.',
-      type: 'SYSTEM',
-      read: true,
-      timestamp: new Date().toISOString(),
-    },
-  ],
-  unreadCount: 0,
+const loadSavedNotifications = () => {
+  if (typeof window === 'undefined') return { notifications: [], unreadCount: 0 };
+  try {
+    const data = localStorage.getItem('admin_notifications');
+    if (data) {
+      const parsed = JSON.parse(data);
+      const unreadCount = parsed.filter((n) => !n.read).length;
+      return { notifications: parsed, unreadCount };
+    }
+  } catch (e) {
+    console.error('Failed to load notifications from storage', e);
+  }
+  return { notifications: [], unreadCount: 0 };
 };
+
+const initialState = loadSavedNotifications();
 
 const notificationSlice = createSlice({
   name: 'notifications',
   initialState,
   reducers: {
     addNotification: (state, action) => {
-      const newNotification = {
-        id: `notif-${Date.now()}`,
-        timestamp: new Date().toISOString(),
+      const newNotif = {
+        id: action.payload.id || Date.now().toString(),
+        title: action.payload.title,
+        message: action.payload.message,
+        type: action.payload.type || 'INFO',
+        timestamp: action.payload.timestamp || new Date().toISOString(),
         read: false,
-        ...action.payload,
       };
-      state.notifications.unshift(newNotification);
-      state.unreadCount += 1;
+
+      // Keep maximum 30 notifications in memory
+      state.notifications = [newNotif, ...state.notifications].slice(0, 30);
+      state.unreadCount = state.notifications.filter((n) => !n.read).length;
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('admin_notifications', JSON.stringify(state.notifications));
+      }
     },
     markAllAsRead: (state) => {
-      state.notifications.forEach((n) => {
-        n.read = true;
-      });
+      state.notifications = state.notifications.map((n) => ({ ...n, read: true }));
       state.unreadCount = 0;
-    },
-    markAsRead: (state, action) => {
-      const target = state.notifications.find((n) => n.id === action.payload);
-      if (target && !target.read) {
-        target.read = true;
-        state.unreadCount = Math.max(0, state.unreadCount - 1);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('admin_notifications', JSON.stringify(state.notifications));
       }
     },
     clearNotifications: (state) => {
       state.notifications = [];
       state.unreadCount = 0;
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('admin_notifications');
+      }
     },
   },
 });
 
-export const { addNotification, markAllAsRead, markAsRead, clearNotifications } =
-  notificationSlice.actions;
+export const { addNotification, markAllAsRead, clearNotifications } = notificationSlice.actions;
 export default notificationSlice.reducer;

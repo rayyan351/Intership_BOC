@@ -2,6 +2,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import cartReducer from './cart/cartSlice';
 import locationReducer from './location/locationSlice';
+import notificationReducer from './notification/notificationSlice';
 
 import { authApi } from '@/services/authApi';
 import { productApi } from '@/services/productApi';
@@ -25,6 +26,7 @@ export const store = configureStore({
   reducer: {
     cart: cartReducer,
     location: locationReducer,
+    notifications: notificationReducer,
     [authApi.reducerPath]: authApi.reducer,
     [productApi.reducerPath]: productApi.reducer,
     [categoryApi.reducerPath]: categoryApi.reducer,

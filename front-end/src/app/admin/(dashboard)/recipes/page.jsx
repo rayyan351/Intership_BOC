@@ -2,31 +2,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  Table,
-  Tag,
-  Button,
-  Modal,
-  Drawer,
-  Input,
-  InputNumber,
-  Select,
-  Row,
-  Col,
-  Tabs,
-  Popconfirm,
-  Progress,
-} from 'antd';
+import { Table, Select, Drawer, Progress, Space } from 'antd';
 import {
   PlusOutlined,
   ExperimentOutlined,
   AppstoreOutlined,
   FireOutlined,
-  DollarCircleOutlined,
-  EditOutlined,
   DeleteOutlined,
 } from '@ant-design/icons';
 import PageLayout from '@/app/admin/_components/layout/PageLayout';
+import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
+import CustomModal from '@/app/admin/_components/modal/CustomModal';
+import TableActions from '@/app/admin/_components/table/TableActions';
 import {
   useGetAllRecipesQuery,
   useSaveRecipeMutation,
@@ -49,10 +36,10 @@ const PREP_CATEGORIES = [
 
 export default function RecipesAndPrepPage() {
   const { contextHolder, showSuccess, showError } = useToast();
-  const [activeTab, setActiveTab] = useState('PRODUCT_RECIPES'); // 'PRODUCT_RECIPES' | 'SUB_RECIPES'
+  const [activeTab, setActiveTab] = useState('PRODUCT_RECIPES');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Drawers & Modals
+  // Modals & Drawers
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [producingRecipe, setProducingRecipe] = useState(null);
@@ -114,15 +101,16 @@ export default function RecipesAndPrepPage() {
       prepCategory: r.prepCategory || 'Sauces & Dressings',
       batchYieldQuantity: r.batchYieldQuantity || 1,
       yieldUnit: r.yieldUnit || 'g',
-      outputInventoryItem: r.outputInventoryItem?._id || '',
+      outputInventoryItem: r.outputInventoryItem?._id || r.outputInventoryItem || '',
       preparationNotes: r.preparationNotes || '',
       assemblyTimeMinutes: r.assemblyTimeMinutes || 5,
-      ingredients: r.ingredients?.map((i) => ({
-        inventoryItem: i._id,
-        quantityRequired: i.quantityRequired,
-        unit: i.unit,
-        notes: i.notes || '',
-      })) || [],
+      ingredients:
+        r.ingredients?.map((i) => ({
+          inventoryItem: i._id || i.inventoryItem?._id || i.inventoryItem,
+          quantityRequired: i.quantityRequired,
+          unit: i.unit,
+          notes: i.notes || '',
+        })) || [],
     });
     setIsDrawerOpen(true);
   };
@@ -166,6 +154,10 @@ export default function RecipesAndPrepPage() {
 
   const handleSaveRecipeSubmit = async (e) => {
     e.preventDefault();
+    if (formState.type === 'SUB_RECIPE_PREP' && !formState.outputInventoryItem) {
+      return showError('Please select an inventory item destination to credit batch output.');
+    }
+
     try {
       await saveRecipe(formState).unwrap();
       showSuccess(editingRecipe ? 'Recipe formulation updated.' : 'Recipe registered.');
@@ -176,7 +168,7 @@ export default function RecipesAndPrepPage() {
   };
 
   const handleExecuteBatchProduction = async () => {
-    if (!selectedBranch) return showError('Please select a branch outlet.');
+    if (!selectedBranch) return showError('Please select a kitchen outlet.');
     try {
       await produceBatch({
         id: producingRecipe._id,
@@ -190,9 +182,22 @@ export default function RecipesAndPrepPage() {
     }
   };
 
+  const handleDelete = async (id) => {
+    try {
+      await deleteRecipe(id).unwrap();
+      showSuccess('Recipe formulation removed.');
+    } catch (err) {
+      showError(err?.data?.message || 'Failed to delete recipe');
+    }
+  };
+
   // Filtered lists
-  const productRecipes = recipes.filter((r) => r.type === 'PRODUCT_RECIPE' && (!searchTerm || r.name?.toLowerCase().includes(searchTerm.toLowerCase())));
-  const subRecipes = recipes.filter((r) => r.type === 'SUB_RECIPE_PREP' && (!searchTerm || r.name?.toLowerCase().includes(searchTerm.toLowerCase())));
+  const productRecipes = recipes.filter(
+    (r) => r.type === 'PRODUCT_RECIPE' && (!searchTerm || r.name?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+  const subRecipes = recipes.filter(
+    (r) => r.type === 'SUB_RECIPE_PREP' && (!searchTerm || r.name?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   // Product Recipe Columns
   const productRecipeColumns = [
@@ -200,11 +205,12 @@ export default function RecipesAndPrepPage() {
       title: 'Menu Product',
       dataIndex: 'name',
       key: 'name',
+      width: '28%',
       render: (name, r) => (
         <div>
-          <strong className="text-xs text-neutral-900 block">{name}</strong>
-          <span className="text-[10px] text-neutral-400 font-mono">
-            {r.ingredients.length} BOM components
+          <span className="font-semibold text-neutral-900 text-xs block">{name}</span>
+          <span className="text-[11px] text-neutral-400 font-normal">
+            {r.ingredients.length} BOM raw components
           </span>
         </div>
       ),
@@ -213,26 +219,37 @@ export default function RecipesAndPrepPage() {
       title: 'Plate Cost (COGS)',
       dataIndex: 'totalCost',
       key: 'totalCost',
-      render: (cost) => <strong className="text-xs font-mono text-neutral-900">{formatPrice(cost)}</strong>,
+      width: '18%',
+      render: (cost) => (
+        <span className="font-mono font-bold text-xs text-neutral-900">
+          {formatPrice(cost)}
+        </span>
+      ),
     },
     {
       title: 'Selling Price',
       dataIndex: 'sellingPrice',
       key: 'sellingPrice',
-      render: (price) => <span className="text-xs font-mono font-bold text-neutral-700">{formatPrice(price)}</span>,
+      width: '18%',
+      render: (price) => (
+        <span className="text-xs font-mono font-semibold text-neutral-700">
+          {formatPrice(price)}
+        </span>
+      ),
     },
     {
       title: 'Profit Margin',
       key: 'margin',
+      width: '24%',
       render: (_, r) => {
         const isHealthy = r.marginPercent >= 65;
         return (
           <div className="w-36">
-            <div className="flex justify-between text-[11px] font-mono font-bold mb-0.5">
+            <div className="flex justify-between text-[11px] font-mono font-semibold mb-1">
               <span className={isHealthy ? 'text-emerald-600' : 'text-amber-600'}>
                 {r.marginPercent}%
               </span>
-              <span className="text-neutral-500 font-normal">+{formatPrice(r.grossMargin)}</span>
+              <span className="text-neutral-400 font-normal">+{formatPrice(r.grossMargin)}</span>
             </div>
             <Progress
               percent={Math.min(100, Math.max(0, r.marginPercent))}
@@ -245,22 +262,17 @@ export default function RecipesAndPrepPage() {
       },
     },
     {
-      title: 'Action',
+      title: 'Actions',
       key: 'action',
       align: 'right',
+      width: '12%',
       render: (_, r) => (
-        <div className="flex items-center justify-end gap-1">
-          <Button size="small" type="text" icon={<EditOutlined />} onClick={() => handleOpenEditDrawer(r)} />
-          <Popconfirm
-            title="Delete this product BOM recipe?"
-            onConfirm={() => deleteRecipe(r._id)}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{ danger: true, size: 'small' }}
-          >
-            <Button size="small" type="text" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
-        </div>
+        <TableActions
+          onEdit={() => handleOpenEditDrawer(r)}
+          onDelete={() => handleDelete(r._id)}
+          deleteTitle="Delete Product BOM?"
+          deleteDescription={`Permanently delete BOM formulation for "${r.name}"? Ingredient auto-deductions will halt.`}
+        />
       ),
     },
   ];
@@ -271,64 +283,66 @@ export default function RecipesAndPrepPage() {
       title: 'Prep Formulation (Sauce/Marinade)',
       dataIndex: 'name',
       key: 'name',
+      width: '32%',
       render: (name, r) => (
         <div>
-          <strong className="text-xs text-neutral-900 block">{name}</strong>
-          <Tag className="text-[9px] font-bold border-none bg-neutral-100 mt-0.5">{r.prepCategory}</Tag>
+          <span className="font-semibold text-neutral-900 text-xs block">{name}</span>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 inline-block mt-1">
+            {r.prepCategory}
+          </span>
         </div>
       ),
     },
     {
       title: 'Standard Batch Yield',
       key: 'yield',
+      width: '22%',
       render: (_, r) => (
-        <span className="text-xs font-mono font-bold text-neutral-800">
+        <span className="text-xs font-mono font-semibold text-neutral-800">
           {r.batchYieldQuantity.toLocaleString()} {r.yieldUnit}
         </span>
       ),
     },
     {
-      title: 'Total Batch Cost',
+      title: 'Batch Costing',
       dataIndex: 'totalCost',
       key: 'totalCost',
+      width: '26%',
       render: (cost, r) => (
         <div>
-          <strong className="text-xs font-mono text-neutral-900 block">{formatPrice(cost)}</strong>
-          <span className="text-[10px] text-neutral-400 font-mono">
+          <span className="font-mono font-bold text-xs text-neutral-900 block">
+            {formatPrice(cost)}
+          </span>
+          <span className="text-[11px] text-neutral-400 font-mono">
             (Rs. {r.costPerYieldUnit.toFixed(4)} / {r.yieldUnit})
           </span>
         </div>
       ),
     },
     {
-      title: 'Action',
+      title: 'Actions',
       key: 'action',
       align: 'right',
+      width: '20%',
       render: (_, r) => (
         <div className="flex items-center justify-end gap-1.5">
-          <Button
-            size="small"
-            type="primary"
-            icon={<FireOutlined />}
+          <button
+            type="button"
             onClick={() => {
               setProducingRecipe(r);
               setBatchMultiplier(1);
               setSelectedBranch(branches[0]?._id || '');
             }}
-            className="!bg-amber-500 hover:!bg-amber-600 text-black font-bold text-[11px] border-none flex items-center gap-1"
+            className="px-2.5 py-1 text-xs font-bold rounded-lg text-neutral-900 bg-[#F4C61A] hover:bg-[#e5b713] transition cursor-pointer flex items-center gap-1 shadow-2xs"
           >
-            Produce Batch
-          </Button>
-          <Button size="small" type="text" icon={<EditOutlined />} onClick={() => handleOpenEditDrawer(r)} />
-          <Popconfirm
-            title="Archive this sub-recipe?"
-            onConfirm={() => deleteRecipe(r._id)}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{ danger: true, size: 'small' }}
-          >
-            <Button size="small" type="text" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+            <FireOutlined className="text-xs" /> Produce
+          </button>
+          <TableActions
+            onEdit={() => handleOpenEditDrawer(r)}
+            onDelete={() => handleDelete(r._id)}
+            deleteTitle="Archive Sub-Recipe?"
+            deleteDescription={`Permanently remove prep formulation for "${r.name}"?`}
+          />
         </div>
       ),
     },
@@ -341,150 +355,194 @@ export default function RecipesAndPrepPage() {
         title="Recipes & Batch Prep"
         subTitle="Product Bill-of-Materials (BOM), in-house sauce formulations, and live COGS margins"
         onAdd={() => handleOpenCreateDrawer(activeTab === 'PRODUCT_RECIPES' ? 'PRODUCT_RECIPE' : 'SUB_RECIPE_PREP')}
-        addText={activeTab === 'PRODUCT_RECIPES' ? 'New Product BOM' : 'Create Sauce / Sub-Recipe'}
+        addText={activeTab === 'PRODUCT_RECIPES' ? 'New Product BOM' : 'Create Sub-Recipe'}
         searchValue={searchTerm}
         onSearch={setSearchTerm}
         searchPlaceholder="Search recipes or sauces..."
       >
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={[
-            {
-              key: 'PRODUCT_RECIPES',
-              label: (
-                <span className="flex items-center gap-2 font-bold text-xs">
-                  <AppstoreOutlined /> Menu Product Assembly ({productRecipes.length})
-                </span>
-              ),
-              children: (
-                <Table
-                  columns={productRecipeColumns}
-                  dataSource={productRecipes}
-                  rowKey="_id"
-                  loading={isLoading}
-                  pagination={{ pageSize: 8 }}
-                  size="middle"
-                />
-              ),
-            },
-            {
-              key: 'SUB_RECIPES',
-              label: (
-                <span className="flex items-center gap-2 font-bold text-xs">
-                  <ExperimentOutlined /> In-House Sauces & Batch Preps ({subRecipes.length})
-                </span>
-              ),
-              children: (
-                <Table
-                  columns={subRecipeColumns}
-                  dataSource={subRecipes}
-                  rowKey="_id"
-                  loading={isLoading}
-                  pagination={{ pageSize: 8 }}
-                  size="middle"
-                />
-              ),
-            },
-          ]}
-        />
+        <div className="space-y-7 font-['Plus_Jakarta_Sans',sans-serif]">
+          {/* Custom Pill Tabs */}
+          <div className="flex gap-1.5 p-1 bg-neutral-100/80 rounded-xl w-fit">
+            <button
+              onClick={() => setActiveTab('PRODUCT_RECIPES')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                activeTab === 'PRODUCT_RECIPES'
+                  ? 'bg-white text-neutral-900 shadow-xs font-bold'
+                  : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+            >
+              <AppstoreOutlined className={activeTab === 'PRODUCT_RECIPES' ? 'text-amber-500' : ''} />
+              <span>Product Assembly BOM ({productRecipes.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('SUB_RECIPES')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                activeTab === 'SUB_RECIPES'
+                  ? 'bg-white text-neutral-900 shadow-xs font-bold'
+                  : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+            >
+              <ExperimentOutlined className={activeTab === 'SUB_RECIPES' ? 'text-amber-500' : ''} />
+              <span>In-House Sauces & Preps ({subRecipes.length})</span>
+            </button>
+          </div>
+
+          {/* Table Container */}
+          <div className="overflow-hidden">
+            {activeTab === 'PRODUCT_RECIPES' ? (
+              <Table
+                columns={productRecipeColumns}
+                dataSource={productRecipes}
+                rowKey="_id"
+                loading={isLoading}
+                pagination={{ pageSize: 8 }}
+                size="middle"
+              />
+            ) : (
+              <Table
+                columns={subRecipeColumns}
+                dataSource={subRecipes}
+                rowKey="_id"
+                loading={isLoading}
+                pagination={{ pageSize: 8 }}
+                size="middle"
+              />
+            )}
+          </div>
+        </div>
 
         {/* DRAWER: Create / Edit Formulation */}
         <Drawer
           open={isDrawerOpen}
           onClose={() => setIsDrawerOpen(false)}
-          size={540}
+          size={560}
           title={
-            editingRecipe
-              ? `Edit Recipe: ${formState.name || 'BOM'}`
-              : formState.type === 'PRODUCT_RECIPE'
-              ? 'New Product BOM Formulation'
-              : 'Create In-House Sauce / Prep Formulation'
+            <span className="text-sm font-bold text-neutral-900">
+              {editingRecipe
+                ? `Edit Recipe: ${formState.name || 'BOM'}`
+                : formState.type === 'PRODUCT_RECIPE'
+                ? 'New Product BOM Formulation'
+                : 'Create In-House Prep Formulation'}
+            </span>
           }
           className="font-['Plus_Jakarta_Sans',sans-serif]"
         >
           <form onSubmit={handleSaveRecipeSubmit} className="space-y-4">
             {formState.type === 'PRODUCT_RECIPE' ? (
               <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                  Menu Product *
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Menu Product <span className="text-red-500">*</span>
                 </label>
                 <Select
-                  className="w-full h-10"
+                  className="w-full h-10 staff-modern-select"
                   value={formState.productId || undefined}
                   onChange={(val) => setFormState({ ...formState, productId: val })}
-                  options={productsList.map((p) => ({ value: p._id, label: `${p.name} (${formatPrice(p.price)})` }))}
+                  options={productsList.map((p) => ({
+                    value: p._id,
+                    label: `${p.name} (${formatPrice(p.price)})`,
+                  }))}
                   placeholder="Select Product"
                 />
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                    Sauce / Prep Name *
-                  </label>
-                  <Input
-                    required
-                    placeholder="e.g. House Chipotle Sauce"
-                    value={formState.name}
-                    onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                    className="h-10 rounded-xl"
-                  />
+              <div className="space-y-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                      Sauce / Prep Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. House Chipotle Sauce"
+                      value={formState.name}
+                      onChange={(e) => setFormState({ ...formState, name: e.target.value })}
+                      className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white text-xs font-semibold text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                      Category
+                    </label>
+                    <Select
+                      className="w-full h-10 staff-modern-select"
+                      value={formState.prepCategory}
+                      onChange={(val) => setFormState({ ...formState, prepCategory: val })}
+                      options={PREP_CATEGORIES.map((c) => ({ value: c, label: c }))}
+                    />
+                  </div>
                 </div>
+
+                {/* Target Stock Item Selector to Credit Output */}
                 <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                    Category
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                    Credit Yield To Inventory Item <span className="text-red-500">*</span>
                   </label>
                   <Select
-                    className="w-full h-10"
-                    value={formState.prepCategory}
-                    onChange={(val) => setFormState({ ...formState, prepCategory: val })}
-                    options={PREP_CATEGORIES.map((c) => ({ value: c, label: c }))}
+                    className="w-full h-10 staff-modern-select"
+                    value={formState.outputInventoryItem || undefined}
+                    onChange={(val) => setFormState({ ...formState, outputInventoryItem: val })}
+                    options={inventoryItems.map((inv) => ({
+                      value: inv._id,
+                      label: `${inv.name} (${inv.sku || 'SKU'} • ${inv.recipeUnit})`,
+                    }))}
+                    placeholder="Select inventory stock item to deposit produced batch"
                   />
+                  <span className="text-[11px] text-neutral-400 block mt-1">
+                    When this batch is produced, inventory stock for this item will automatically increase.
+                  </span>
                 </div>
               </div>
             )}
 
             {formState.type === 'SUB_RECIPE_PREP' && (
-              <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 grid grid-cols-2 gap-3">
+              <div className="p-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-neutral-600 mb-1">Standard Batch Output</label>
-                  <InputNumber
-                    className="w-full"
+                  <label className="block text-[11px] font-semibold text-neutral-600 mb-1">Standard Batch Output</label>
+                  <input
+                    type="number"
                     min={1}
                     value={formState.batchYieldQuantity}
-                    onChange={(val) => setFormState({ ...formState, batchYieldQuantity: val || 1000 })}
+                    onChange={(e) => setFormState({ ...formState, batchYieldQuantity: Number(e.target.value) || 1000 })}
+                    className="w-full h-9 px-2.5 rounded-xl border border-neutral-200 bg-white font-mono font-bold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-neutral-600 mb-1">Yield Unit</label>
-                  <Select
-                    className="w-full"
+                  <label className="block text-[11px] font-semibold text-neutral-600 mb-1">Yield Unit</label>
+                  <select
                     value={formState.yieldUnit}
-                    onChange={(val) => setFormState({ ...formState, yieldUnit: val })}
-                    options={['g', 'ml', 'piece', 'portion'].map((u) => ({ value: u, label: u }))}
-                  />
+                    onChange={(e) => setFormState({ ...formState, yieldUnit: e.target.value })}
+                    className="w-full h-9 px-2.5 rounded-xl border border-neutral-200 bg-white text-xs font-semibold text-neutral-900 focus:outline-none focus:border-[#F4C61A] cursor-pointer"
+                  >
+                    {['g', 'ml', 'piece', 'portion'].map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             )}
 
             {/* Dynamic Ingredient Table */}
-            <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200 space-y-3">
+            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-100 space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-black text-neutral-900 uppercase tracking-wider">
+                <span className="text-xs font-semibold text-neutral-800">
                   Raw Ingredients Required
                 </span>
-                <Button size="small" type="link" icon={<PlusOutlined />} onClick={handleAddIngredientRow} className="text-xs font-bold">
-                  Add Ingredient
-                </Button>
+                <button
+                  type="button"
+                  onClick={handleAddIngredientRow}
+                  className="text-xs font-semibold text-neutral-700 hover:text-black flex items-center gap-1 cursor-pointer"
+                >
+                  <PlusOutlined className="text-[10px]" /> Add Item
+                </button>
               </div>
 
               <div className="space-y-2">
                 {formState.ingredients.map((line, idx) => (
-                  <div key={idx} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-neutral-200">
+                  <div key={idx} className="flex gap-2 items-center bg-white p-2.5 rounded-xl border border-neutral-200">
                     <div className="flex-1">
                       <Select
-                        className="w-full"
+                        className="w-full h-9 staff-modern-select"
                         value={line.inventoryItem || undefined}
                         onChange={(val) => handleIngredientChange(idx, 'inventoryItem', val)}
                         options={inventoryItems.map((inv) => ({
@@ -495,116 +553,122 @@ export default function RecipesAndPrepPage() {
                       />
                     </div>
                     <div className="w-24">
-                      <InputNumber
-                        className="w-full"
+                      <input
+                        type="number"
                         min={0.01}
+                        step="any"
                         placeholder="Qty"
                         value={line.quantityRequired}
-                        onChange={(val) => handleIngredientChange(idx, 'quantityRequired', val || 1)}
+                        onChange={(e) => handleIngredientChange(idx, 'quantityRequired', Number(e.target.value) || 1)}
+                        className="w-full h-9 px-2.5 border border-neutral-200 rounded-xl bg-white font-mono font-bold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
                       />
                     </div>
-                    <span className="text-xs font-bold text-neutral-500 w-8">{line.unit}</span>
+                    <span className="text-xs font-semibold text-neutral-500 w-8">{line.unit}</span>
                     {formState.ingredients.length > 1 && (
-                      <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => handleRemoveIngredientRow(idx)} />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveIngredientRow(idx)}
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                      >
+                        <DeleteOutlined className="text-xs" />
+                      </button>
                     )}
                   </div>
                 ))}
               </div>
 
-              <div className="pt-2 border-t border-neutral-200 flex justify-between items-center text-xs font-bold">
-                <span>Calculated COGS:</span>
-                <strong className="text-sm font-black font-mono text-neutral-900">
+              <div className="pt-2 border-t border-neutral-200/60 flex justify-between items-center text-xs">
+                <span className="text-neutral-500 font-medium">Calculated COGS:</span>
+                <span className="text-base font-bold font-mono text-neutral-900">
                   {formatPrice(calculateLiveFormCOGS())}
-                </strong>
+                </span>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
                 Preparation & Assembly Notes
               </label>
-              <Input.TextArea
+              <textarea
                 rows={2}
                 placeholder="e.g. Toast bun on flat top for 45s, apply 25g sauce on top crown"
                 value={formState.preparationNotes}
                 onChange={(e) => setFormState({ ...formState, preparationNotes: e.target.value })}
-                className="rounded-xl text-xs"
+                className="w-full p-3 rounded-xl border border-neutral-200 bg-white text-xs font-normal text-neutral-900 focus:outline-none focus:border-[#F4C61A] transition"
               />
             </div>
 
-            <div className="pt-4 border-t border-neutral-100 flex gap-2 justify-end">
-              <Button onClick={() => setIsDrawerOpen(false)}>Cancel</Button>
-              <Button type="primary" htmlType="submit" loading={isSaving} className="!bg-[#ffc400] !text-black font-bold border-none">
-                Save Recipe Specification
-              </Button>
+            <div className="flex justify-end pt-3 mt-4 border-t border-neutral-100">
+              <Space size="middle">
+                <CustomButton variant="secondary" type="button" onClick={() => setIsDrawerOpen(false)}>
+                  Cancel
+                </CustomButton>
+                <CustomButton variant="primary" htmlType="submit" loading={isSaving}>
+                  Save Formulation
+                </CustomButton>
+              </Space>
             </div>
           </form>
         </Drawer>
 
         {/* MODAL: Produce Batch (Sauce Preparation) */}
-        <Modal
+        <CustomModal
           open={!!producingRecipe}
           onCancel={() => setProducingRecipe(null)}
-          footer={null}
-          title={null}
-          centered
-          size={420}
-          className="font-['Plus_Jakarta_Sans',sans-serif]"
+          title={`Produce Batch: ${producingRecipe?.name || ''}`}
+          width={440}
         >
           {producingRecipe && (
-            <div className="pt-2">
-              <h3 className="text-base font-black text-neutral-900 uppercase tracking-wide mb-1 flex items-center gap-2">
-                <FireOutlined className="text-amber-500" />
-                Produce Batch: {producingRecipe.name}
-              </h3>
-              <p className="text-xs text-neutral-500 mb-4">
-                Cook and mix sauce batch. Raw condiments will be automatically deducted from inventory.
-              </p>
-
-              <div className="space-y-3 mb-5">
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                    Preparation Kitchen Outlet *
-                  </label>
-                  <Select
-                    className="w-full h-10"
-                    value={selectedBranch}
-                    onChange={(val) => setSelectedBranch(val)}
-                    options={branches.map((b) => ({ value: b._id, label: `${b.name} (${b.city})` }))}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                    Batch Multiplier
-                  </label>
-                  <InputNumber
-                    className="w-full h-10 flex items-center"
-                    min={1}
-                    max={20}
-                    value={batchMultiplier}
-                    onChange={(val) => setBatchMultiplier(val || 1)}
-                  />
-                  <span className="text-[11px] text-neutral-400 mt-1 block">
-                    = {(producingRecipe.batchYieldQuantity * batchMultiplier).toLocaleString()} {producingRecipe.yieldUnit} of sauce produced
-                  </span>
-                </div>
+            <div className="mt-4 space-y-4 font-['Plus_Jakarta_Sans',sans-serif]">
+              <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200/60 flex items-start gap-2.5">
+                <FireOutlined className="text-amber-600 mt-0.5" />
+                <p className="text-xs text-amber-900 m-0 leading-relaxed font-normal">
+                  Preparing this batch will deduct raw condiments from the chosen branch and credit fresh <strong className="font-semibold">{producingRecipe.name}</strong> inventory.
+                </p>
               </div>
 
-              <div className="flex gap-2 justify-end pt-3 border-t border-neutral-100">
-                <Button onClick={() => setProducingRecipe(null)}>Cancel</Button>
-                <Button
-                  type="primary"
-                  loading={isProducing}
-                  onClick={handleExecuteBatchProduction}
-                  className="!bg-amber-500 hover:!bg-amber-600 text-black font-bold border-none"
-                >
-                  Confirm & Deduct Stock
-                </Button>
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Preparation Kitchen Outlet <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  className="w-full h-10 staff-modern-select"
+                  value={selectedBranch}
+                  onChange={(val) => setSelectedBranch(val)}
+                  options={branches.map((b) => ({ value: b._id, label: `${b.name} (${b.city})` }))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Batch Multiplier
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={batchMultiplier}
+                  onChange={(e) => setBatchMultiplier(Number(e.target.value) || 1)}
+                  className="w-full h-10 px-3.5 rounded-xl border border-neutral-200 bg-white font-mono font-bold text-xs text-neutral-900 focus:outline-none focus:border-[#F4C61A]"
+                />
+                <span className="text-[11px] text-neutral-400 mt-1 block">
+                  = {(producingRecipe.batchYieldQuantity * batchMultiplier).toLocaleString()} {producingRecipe.yieldUnit} of sauce produced
+                </span>
+              </div>
+
+              <div className="flex justify-end pt-3 mt-4 border-t border-neutral-100">
+                <Space size="middle">
+                  <CustomButton variant="secondary" type="button" onClick={() => setProducingRecipe(null)}>
+                    Cancel
+                  </CustomButton>
+                  <CustomButton variant="primary" loading={isProducing} onClick={handleExecuteBatchProduction}>
+                    Confirm & Deduct Stock
+                  </CustomButton>
+                </Space>
               </div>
             </div>
           )}
-        </Modal>
+        </CustomModal>
       </PageLayout>
     </>
   );
