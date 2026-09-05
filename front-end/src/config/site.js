@@ -11,27 +11,35 @@ export const ORDER_PHONE = "021111432532";
 export const DISPLAY_PHONE = "021 111 432 532";
 export const FEEDBACK_EMAIL = "feedback@burgeroclock.pk";
 
+export const DEFAULT_IMAGE = "/images/brand/BurgerO'clock logo.webp";
+
 /**
- * Universal image URL resolver that fixes localhost/relative paths for production
+ * Resolves any stored image reference to a URL the browser can load.
+ *
+ * Everything backend-hosted is returned HOST-RELATIVE (`/uploads/...`) on
+ * purpose. `next.config.mjs` rewrites `/uploads/*` to the backend, so the
+ * browser only ever talks to its own origin. That means:
+ *   - no CORS on images
+ *   - no `remotePatterns` entry needed for whichever host the backend is on
+ *   - the same DB row works in dev and production, with no data migration
+ *
+ * Historical rows in Mongo contain absolute `http://localhost:5000/uploads/...`
+ * URLs, written by an older version of the backend. Those are normalized back
+ * down to a relative path here rather than being rewritten host-for-host.
+ * External URLs (Cloudinary, Unsplash) are passed through untouched.
  */
 export const getImageUrl = (path) => {
-  if (!path) return "/images/brand/BurgerO'clock logo.webp";
-  
-  // If it's already an external absolute URL (like Cloudinary or another host)
+  if (!path) return DEFAULT_IMAGE;
+
   if (path.startsWith("http://") || path.startsWith("https://")) {
-    // If it's pointing to old local backend, replace with live Render URL
-    if (path.includes("localhost:5000")) {
-      return path.replace("http://localhost:5000", "https://burgeroclock.onrender.com");
-    }
+    // Any absolute URL that points at an /uploads path is backend-hosted,
+    // whatever host it names. Strip the origin and let the rewrite handle it.
+    const uploadsAt = path.indexOf("/uploads/");
+    if (uploadsAt !== -1) return path.slice(uploadsAt);
+
+    // Genuinely external (Cloudinary, Unsplash, etc.)
     return path;
   }
 
-  // Derive root backend domain from NEXT_PUBLIC_API_URL (removes trailing '/api')
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-  const backendHost = apiUrl.replace(/\/api\/?$/, '');
-
-  // Ensure proper leading slash for relative paths
-  const cleanPath = path.startsWith("/") ? path : `/${path}`;
-
-  return `${backendHost}${cleanPath}`;
+  return path.startsWith("/") ? path : `/${path}`;
 };

@@ -1,6 +1,5 @@
 // back-end/controllers/dealController.js
 const Deal = require('../models/Deal');
-const path = require('path');
 
 // GET all deals
 const getDeals = async (req, res) => {
@@ -50,8 +49,10 @@ const createDeal = async (req, res) => {
 
     let imagePath = '/placeholder.png';
     if (req.file) {
-      const ext = path.extname(req.file.originalname);
-      imagePath = `http://localhost:5000/uploads/images/products/${generatedId}${ext}`;
+      // Store a host-relative path. The absolute URL is built at render time by
+      // the frontend, so the same DB row works in dev and in production.
+      // The filename must match what multer actually wrote to disk.
+      imagePath = `/uploads/products/${req.file.filename}`;
     }
 
     const newDeal = new Deal({
@@ -126,8 +127,7 @@ const updateDeal = async (req, res) => {
     }
 
     if (req.file) {
-      const ext = path.extname(req.file.originalname);
-      deal.image = `http://localhost:5000/uploads/images/products/${deal.id}${ext}`;
+      deal.image = `/uploads/products/${req.file.filename}`;
     }
 
     const updatedDeal = await deal.save();

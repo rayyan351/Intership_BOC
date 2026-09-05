@@ -10,6 +10,7 @@ import { setIsCartOpen } from "@/redux/cart/cartSlice";
 import { useLocation } from "@/context/LocationContext";
 import { openLocationModal } from "@/redux/location/locationSlice";
 import { DISPLAY_PHONE, ORDER_PHONE } from "@/lib/site";
+import { getImageUrl } from "@/config/site";
 
 const drawerLinks = [
   { label: "Blogs", href: "#blogs", icon: "document" },
@@ -99,9 +100,7 @@ export function SiteHeader({
   }, [closeMenu, menuOpen]);
 
 const resolvedLogo = storeLogo
-    ? storeLogo.startsWith("http")
-      ? storeLogo
-      : `${process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : 'http://localhost:5000'}${storeLogo.startsWith("/") ? "" : "/"}${storeLogo}`
+    ? getImageUrl(storeLogo)
     : "/images/brand/BurgerO'clock logo.webp";
 
   return (

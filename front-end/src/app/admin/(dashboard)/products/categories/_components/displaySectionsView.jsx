@@ -9,6 +9,7 @@ import TableActions from '@/app/admin/_components/table/TableActions';
 import SectionModal from './SectionModal';
 import { useToast } from '@/utils/toast';
 import { formatRelativeTime } from '@/utils/formatDate';
+import { getImageUrl } from '@/config/site';
 import {
   useGetSectionsQuery,
   useCreateSectionMutation,
@@ -124,7 +125,7 @@ export default function DisplaySectionsView({ searchTerm = '', createTrigger }) 
       render: (banner) =>
         banner ? (
           <Image
-            src={banner.startsWith('http') ? banner : `http://localhost:5000${banner}`}
+            src={getImageUrl(banner)}
             alt="Section Banner"
             width={96}
             height={36}

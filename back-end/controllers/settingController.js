@@ -4,7 +4,8 @@ const Setting = require('../models/Setting');
 const getUploadedFileUrl = (req, fieldname) => {
   if (!req.files || !req.files[fieldname]) return null;
   const file = req.files[fieldname][0];
-  return `http://localhost:5000/uploads/settings/${file.filename}`;
+  // Host-relative: the frontend resolves it against the current backend origin.
+  return `/uploads/settings/${file.filename}`;
 };
 
 // GET global settings (creates default if none exists)

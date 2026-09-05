@@ -6,6 +6,7 @@ import { App as AntApp } from 'antd';
 import { dbConnect } from "@/lib/dbConnect";
 import "@/models/Setting";
 import Setting from "@/models/Setting";
+import { getImageUrl } from "@/config/site";
 
 export const revalidate = 3600;
 
@@ -25,11 +26,7 @@ export async function generateMetadata() {
   const settings = await getGlobalSettings();
 
   const title = settings?.siteTitle || settings?.storeName || "Burger O'Clock";
-  const favicon = settings?.favicon
-    ? settings.favicon.startsWith('http')
-      ? settings.favicon
-      : `http://localhost:5000${settings.favicon.startsWith('/') ? '' : '/'}${settings.favicon}`
-    : "/favicon.ico";
+  const favicon = settings?.favicon ? getImageUrl(settings.favicon) : "/favicon.ico";
 
   return {
     // 💡 Setting title directly without a template removes the unwanted " | Burger O'Clock"

@@ -2,15 +2,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { DISPLAY_PHONE, FEEDBACK_EMAIL, ORDER_PHONE } from "@/lib/site";
+import { getImageUrl } from "@/config/site";
 
 export function SiteFooter({
   storeLogo,
   storeName = "Burger O'Clock",
 }) {
 const resolvedLogo = storeLogo
-    ? storeLogo.startsWith("http")
-      ? storeLogo
-      : `${process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : 'http://localhost:5000'}${storeLogo.startsWith("/") ? "" : "/"}${storeLogo}`
+    ? getImageUrl(storeLogo)
     : "/images/brand/BurgerO'clock logo.webp";
 
   return (

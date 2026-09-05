@@ -9,7 +9,7 @@ import FormInput from '@/app/admin/_components/formElements/inputfield/Forminput
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
 import NotificationDropdown from '@/app/admin/_components/notifications/NotificationDropdown';
 import { useGetSettingsQuery } from '@/services/settingApi';
-import { getImageUrl } from '@/config/site';
+import { getImageUrl, siteConfig } from '@/config/site';
 
 const { Header: AntHeader } = Layout;
 
@@ -64,12 +64,8 @@ export default function AdminHeader() {
     const token = localStorage.getItem('adminToken');
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL 
-        ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') 
-        : 'http://localhost:5000';
-
       const response = await fetch(
-        `${apiBaseUrl}/api/auth/profile`,
+        `${siteConfig.baseUrl}/auth/profile`,
         {
           method: 'PUT',
           headers: {

@@ -1,8 +1,14 @@
 // src/scripts/seed.js
 import mongoose from "mongoose";
 
-// Connection string
-const MONGODB_URI = "mongodb://Rayyan0:Rayyan123@buyclonedb-shard-00-02.kft0q.mongodb.net:27017,buyclonedb-shard-00-00.kft0q.mongodb.net:27017,buyclonedb-shard-00-01.kft0q.mongodb.net:27017/burger_oclock?ssl=true&authSource=admin&retryWrites=true&w=majority";
+// Connection string comes from the environment. Never hardcode credentials here —
+// this file is committed, and anything written in it is public the moment it is pushed.
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  console.error("MONGODB_URI is not set. Add it to .env.local before running the seed script.");
+  process.exit(1);
+}
 
 // Schemas
 const Category = mongoose.models.Category || mongoose.model("Category", new mongoose.Schema({

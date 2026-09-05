@@ -13,6 +13,7 @@ import FormImageUpload from '@/app/admin/_components/formElements/imageUpload/Fo
 import CustomButton from '@/app/admin/_components/formElements/button/Custombutton';
 import CustomModal from '@/app/admin/_components/modal/CustomModal';
 import { useGetProductsQuery } from '@/services/productApi';
+import { getImageUrl } from '@/config/site';
 import { useGetDealsQuery } from '@/services/dealApi';
 
 const schema = yup.object().shape({
@@ -94,11 +95,7 @@ export default function SectionModal({ open, onClose, onSubmit, loading, initial
     onSubmit(formData);
   };
 
-  const getPreviewUrl = (url) => {
-    if (!url) return '';
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    return `http://localhost:5000${url.startsWith('/') ? '' : '/'}${url}`;
-  };
+  const getPreviewUrl = (url) => (url ? getImageUrl(url) : '');
 
   return (
     <CustomModal

@@ -20,7 +20,8 @@ const parseArrayField = (val) => {
 const getUploadedFileUrl = (req) => {
   if (!req.file) return null;
   const folder = req.file.fieldname === 'banner' ? 'sections' : 'products';
-  return `http://localhost:5000/uploads/${folder}/${req.file.filename}`;
+  // Host-relative: the frontend resolves it against the current backend origin.
+  return `/uploads/${folder}/${req.file.filename}`;
 };
 
 // GET all display sections

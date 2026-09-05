@@ -14,19 +14,33 @@ connectDB();
 
 const app = express();
 
+// Allowed origins come from FRONTEND_URL (comma-separated for more than one).
+// localhost:3000 is always permitted so local development works without config.
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://burger-o-clock-gamma.vercel.app'
+  ...(process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/$/, ''))
+    .filter(Boolean),
 ];
+
+// Vercel builds a fresh subdomain for every preview deploy, so those are
+// matched by pattern rather than listed one by one.
+const isVercelPreview = (origin) => /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+      // No Origin header: same-origin requests, curl, health checks.
+      if (!origin) return callback(null, true);
+
+      const normalized = origin.replace(/\/$/, '');
+      if (allowedOrigins.includes(normalized) || isVercelPreview(normalized)) {
+        return callback(null, true);
       }
+
+      console.warn(`CORS blocked origin: ${origin}`);
+      return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
   })
