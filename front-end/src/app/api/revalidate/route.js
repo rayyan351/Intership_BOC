@@ -6,9 +6,10 @@ export async function POST(request) {
   try {
     const { path, tag, secret } = await request.json();
 
-    // Verify a shared secret to prevent unauthorized cache purging
-    const revalidateSecret = process.env.REVALIDATION_SECRET || 'my_super_secret_token_123';
-    if (secret !== revalidateSecret) {
+    // Verify a shared secret to prevent unauthorized cache purging. No fallback:
+    // an unset secret must reject every request, not accept a public default.
+    const revalidateSecret = process.env.REVALIDATION_SECRET;
+    if (!revalidateSecret || secret !== revalidateSecret) {
       return NextResponse.json({ message: 'Invalid revalidation token' }, { status: 401 });
     }
 

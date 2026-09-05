@@ -1,4 +1,5 @@
 const Setting = require('../models/Setting');
+const { triggerRevalidation } = require('../utils/revalidate');
 
 // Helper to resolve uploaded image file URL
 const getUploadedFileUrl = (req, fieldname) => {
@@ -22,23 +23,6 @@ const getSettings = async (req, res) => {
     res.status(200).json(settings);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching settings', error: error.message });
-  }
-};
-
-const triggerNextRevalidation = async () => {
-  try {
-    const storefrontUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    await fetch(`${storefrontUrl}/api/revalidate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        path: '/',
-        tag: 'settings',
-        secret: process.env.REVALIDATION_SECRET || 'my_super_secret_token_123',
-      }),
-    });
-  } catch (err) {
-    console.error('ISR Revalidation Error:', err.message);
   }
 };
 
@@ -87,6 +71,7 @@ const updateSettings = async (req, res) => {
 
     const updatedSettings = await settings.save();
     res.status(200).json(updatedSettings);
+    triggerRevalidation();
   } catch (error) {
     res.status(500).json({ message: 'Error updating settings', error: error.message });
   }

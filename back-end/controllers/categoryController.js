@@ -1,5 +1,6 @@
 // back-end/controllers/categoryController.js
 const Category = require('../models/Category');
+const { triggerRevalidation } = require('../utils/revalidate');
 
 // GET all categories
 const getCategories = async (req, res) => {
@@ -44,6 +45,7 @@ const createCategory = async (req, res) => {
 
     const savedCategory = await newCategory.save();
     res.status(201).json(savedCategory);
+    triggerRevalidation();
   } catch (error) {
     res.status(500).json({ message: 'Error creating category', error: error.message });
   }
@@ -75,6 +77,7 @@ const updateCategory = async (req, res) => {
 
     const updatedCategory = await category.save();
     res.status(200).json(updatedCategory);
+    triggerRevalidation();
   } catch (error) {
     console.error('Category update error:', error);
     res.status(500).json({ message: 'Error updating category', error: error.message });
@@ -87,6 +90,7 @@ const deleteCategory = async (req, res) => {
     const { id } = req.params;
     await Category.findByIdAndDelete(id);
     res.status(200).json({ message: 'Category deleted successfully' });
+    triggerRevalidation();
   } catch (error) {
     res.status(500).json({ message: 'Error deleting category', error: error.message });
   }

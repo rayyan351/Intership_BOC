@@ -1,6 +1,7 @@
 // controllers/productController.js
 const Product = require('../models/Product');
 const path = require('path');
+const { triggerRevalidation } = require('../utils/revalidate');
 
 // Helper to safely parse categories array from FormData/JSON
 const parseCategories = (input) => {
@@ -86,6 +87,7 @@ const createProduct = async (req, res) => {
 
     const savedProduct = await newProduct.save();
     res.status(201).json(savedProduct);
+    triggerRevalidation();
   } catch (error) {
     if (error.code === 11000) {
       return res.status(400).json({ message: 'An item with this name already exists.' });
@@ -137,6 +139,7 @@ const updateProduct = async (req, res) => {
 
     const updatedProduct = await product.save();
     res.status(200).json(updatedProduct);
+    triggerRevalidation();
   } catch (error) {
     console.error('Server Error on Update:', error);
     res.status(500).json({ message: 'Error updating product', error: error.message });
@@ -154,6 +157,7 @@ const deleteProduct = async (req, res) => {
     }
 
     res.status(200).json({ message: 'Product deleted successfully' });
+    triggerRevalidation();
   } catch (error) {
     console.error('Server Error on Delete:', error);
     res.status(500).json({ message: 'Error deleting product', error: error.message });

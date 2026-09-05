@@ -1,5 +1,6 @@
 // back-end/controllers/sectionController.js
 const Section = require('../models/Section');
+const { triggerRevalidation } = require('../utils/revalidate');
 
 // Helper to safely parse array strings from FormData
 const parseArrayField = (val) => {
@@ -73,6 +74,7 @@ const createSection = async (req, res) => {
       .populate('deals', 'title dealPrice image isShown');
 
     res.status(201).json(populatedSection);
+    triggerRevalidation();
   } catch (error) {
     res.status(500).json({ message: 'Error creating section', error: error.message });
   }
@@ -115,6 +117,7 @@ const updateSection = async (req, res) => {
       .populate('deals', 'title dealPrice image isShown');
 
     res.status(200).json(populatedSection);
+    triggerRevalidation();
   } catch (error) {
     res.status(500).json({ message: 'Error updating section', error: error.message });
   }
@@ -126,6 +129,7 @@ const deleteSection = async (req, res) => {
     const { id } = req.params;
     await Section.findByIdAndDelete(id);
     res.status(200).json({ message: 'Section deleted successfully' });
+    triggerRevalidation();
   } catch (error) {
     res.status(500).json({ message: 'Error deleting section', error: error.message });
   }

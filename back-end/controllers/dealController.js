@@ -1,5 +1,6 @@
 // back-end/controllers/dealController.js
 const Deal = require('../models/Deal');
+const { triggerRevalidation } = require('../utils/revalidate');
 
 // GET all deals
 const getDeals = async (req, res) => {
@@ -74,6 +75,7 @@ const createDeal = async (req, res) => {
       .populate('choiceGroups.options.product', 'name price image categories');
 
     res.status(201).json(populatedDeal);
+    triggerRevalidation();
   } catch (error) {
     console.error('Error creating deal:', error);
     res.status(500).json({ message: 'Error creating deal', error: error.message });
@@ -136,6 +138,7 @@ const updateDeal = async (req, res) => {
       .populate('choiceGroups.options.product', 'name price image categories');
 
     res.status(200).json(populatedDeal);
+    triggerRevalidation();
   } catch (error) {
     console.error('Error updating deal:', error);
     res.status(500).json({ message: 'Error updating deal', error: error.message });
@@ -148,6 +151,7 @@ const deleteDeal = async (req, res) => {
     const { id } = req.params;
     await Deal.findByIdAndDelete(id);
     res.status(200).json({ message: 'Deal deleted successfully' });
+    triggerRevalidation();
   } catch (error) {
     res.status(500).json({ message: 'Error deleting deal', error: error.message });
   }
