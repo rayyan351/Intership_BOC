@@ -55,7 +55,6 @@ export function ChoiceOptionCard({
                 src={rawImg}
                 alt={option.name || "Option"}
                 fill
-                unoptimized
                 sizes="40px"
                 className="object-cover"
                 onError={() => setImgError(true)}
@@ -93,7 +92,6 @@ export function ChoiceOptionCard({
               src={rawImg}
               alt={option.name || "Option"}
               fill
-              unoptimized
               sizes="40px"
               className="object-cover"
               onError={() => setImgError(true)}

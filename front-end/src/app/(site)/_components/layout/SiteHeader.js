@@ -119,7 +119,6 @@ const resolvedLogo = storeLogo
                   alt={storeName}
                   fill
                   priority
-                  unoptimized
                   src={resolvedLogo}
                   sizes="(max-width: 640px) 100px, 120px"
                   className="object-contain object-left"

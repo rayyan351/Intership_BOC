@@ -143,7 +143,6 @@ export function HeroCarousel({ banners = [] }) {
                   alt={slide.title}
                   fill
                   priority={index === 0}
-                  unoptimized
                   sizes="(max-width: 768px) 100vw, 1680px"
                   src={slide.image}
                   className="object-cover object-center pointer-events-none"

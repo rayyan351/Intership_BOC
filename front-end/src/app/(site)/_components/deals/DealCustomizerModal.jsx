@@ -150,7 +150,6 @@ export function DealCustomizerModal({ deal, open, onClose }) {
               src={dealImg}
               alt={dealTitle}
               fill
-              unoptimized
               sizes="(max-width: 768px) 100vw, 50vw"
               className="object-cover object-center"
               priority

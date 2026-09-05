@@ -14,7 +14,10 @@ export function MenuSection({ category, categoryIndex = 0 }) {
   const mongoId = String(category._id || "");
   const slug = String(category.slug || "");
 
-  const bannerSrc = getImageUrl(category.banner);
+  // getImageUrl() falls back to the brand logo for an empty path — correct for
+  // logos/favicons, wrong here. No banner uploaded must mean no divider at all,
+  // not the logo standing in as one. Only resolve a URL when a banner exists.
+  const bannerSrc = category.banner ? getImageUrl(category.banner) : null;
 
   return (
     <section
@@ -31,7 +34,6 @@ export function MenuSection({ category, categoryIndex = 0 }) {
           <Image
             alt={`${sectionTitle} section banner`}
             fill
-            unoptimized
             sizes="(max-width: 1440px) 100vw, 1280px"
             src={bannerSrc}
             className="object-cover object-center"

@@ -81,7 +81,6 @@ export function ProductDetailModal({ product, open, onClose }) {
               src={productImg}
               alt={product.name}
               fill
-              unoptimized
               sizes="(max-width: 768px) 100vw, 52vw"
               className="object-cover object-center"
               priority

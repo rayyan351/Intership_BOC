@@ -23,7 +23,6 @@ const resolvedLogo = storeLogo
             <Image
               alt={storeName}
               fill
-              unoptimized
               sizes="(max-width: 640px) 200px, 240px"
               src={resolvedLogo}
               className="object-contain object-left"

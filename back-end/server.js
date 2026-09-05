@@ -1,6 +1,7 @@
 // Cleaned back-end/server.js
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const path = require('path');
@@ -45,10 +46,23 @@ app.use(
     credentials: true,
   })
 );
+// Gzip/Brotli-compress JSON and static responses. Cheap CPU cost, large win
+// on payload size for menu/section responses under concurrent load.
+app.use(compression());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/uploads', express.static(path.join(__dirname, 'assets/uploads')));
+// Uploaded filenames are timestamp-suffixed by multer and never reused, so a
+// given URL's content never changes — safe to cache aggressively and skip
+// revalidation entirely.
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, 'assets/uploads'), {
+    maxAge: '7d',
+    immutable: true,
+  })
+);
 
 // API Routes
 app.use('/api/auth', authRoutes);

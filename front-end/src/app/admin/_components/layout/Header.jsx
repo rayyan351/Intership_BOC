@@ -140,7 +140,6 @@ export default function AdminHeader() {
               alt="Admin Logo"
               fill
               priority
-              unoptimized
               sizes="128px"
               className="object-contain object-left"
             />

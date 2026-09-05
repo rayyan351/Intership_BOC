@@ -52,7 +52,6 @@ export function DealCard({ deal }) {
             <Image
               alt={dealTitle}
               fill
-              unoptimized
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               src={dealImg}
               className="object-contain p-2 transition-transform duration-300 group-hover:scale-105"
