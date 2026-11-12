@@ -12,6 +12,7 @@
 const path = require('path');
 const readline = require('readline');
 const mongoose = require('mongoose');
+const dns = require('dns');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const User = require('../models/User');
 
@@ -37,6 +38,8 @@ async function main() {
     console.error('MONGO_URI is not set. Add it to back-end/.env (the same value Render uses).');
     process.exit(1);
   }
+  // Same as config/db.js: some ISPs fail the Atlas SRV lookup, so use Google DNS.
+  dns.setServers(['8.8.8.8', '8.8.4.4']);
   await mongoose.connect(process.env.MONGO_URI);
 
   const login = (process.argv[2] || '').trim();
