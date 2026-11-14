@@ -1,5 +1,6 @@
 // back-end/controllers/orderController.js
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const Order = require('../models/Order');
 const axios = require('axios');
 const Branch = require('../models/Branch');
@@ -93,6 +94,42 @@ const getOrders = async (req, res) => {
   }
 };
 
+// The order's own tracking token, compared in constant time.
+const tokenMatches = (order, token) => {
+  if (!order.trackingToken || typeof token !== 'string' || token.length !== order.trackingToken.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(order.trackingToken), Buffer.from(token));
+};
+
+// What the public tracking page may see. With the token: the order as the customer placed it,
+// minus the map coordinates. Without it: status and timing only, nothing about the customer.
+const trackingView = (order, withDetails) => {
+  const o = order.toObject ? order.toObject() : order;
+  const branch = o.branch && typeof o.branch === 'object' ? { name: o.branch.name, city: o.branch.city } : undefined;
+  const base = {
+    orderNumber: o.orderNumber,
+    orderStatus: o.orderStatus,
+    orderType: o.orderType,
+    createdAt: o.createdAt,
+    estimatedDeliveryMinutes: o.estimatedDeliveryMinutes,
+    branch,
+  };
+  if (!withDetails) return { ...base, limited: true };
+  return {
+    ...base,
+    branch: o.branch && typeof o.branch === 'object' ? { ...branch, phone: o.branch.phone } : undefined,
+    customer: o.customer ? { name: o.customer.name, phone: o.customer.phone, address: o.customer.address } : undefined,
+    items: (o.items || []).map((i) => ({
+      name: i.name, price: i.price, quantity: i.quantity, itemTotal: i.itemTotal,
+      customizations: i.customizations, image: i.image,
+    })),
+    subtotal: o.subtotal, tax: o.tax, taxRate: o.taxRate, taxAmount: o.taxAmount,
+    deliveryFee: o.deliveryFee, discountAmount: o.discountAmount, couponCode: o.couponCode,
+    totalAmount: o.totalAmount, paymentMethod: o.paymentMethod, paymentStatus: o.paymentStatus,
+    cancellationReason: o.cancellationReason, cancelledBy: o.cancelledBy,
+    limited: false,
+  };
+};
+
 // @desc    Get single order details by ID or orderNumber
 // @route   GET /api/orders/:id
 // @access  Public / Private
@@ -102,14 +139,17 @@ const getOrderById = async (req, res) => {
     const query = mongoose.Types.ObjectId.isValid(id) ? { _id: id } : { orderNumber: id.toUpperCase() };
 
     const order = await Order.findOne(query)
-      .populate('branch', 'name city branchCode address phone')
-      .populate('items.product', 'name price image');
+      .select('+trackingToken')
+      .populate('branch', 'name city phone');
 
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    res.status(200).json(order);
+    // Public route: full details only with the tracking token from checkout.
+    const verified = tokenMatches(order, req.query.t);
+    res.locals.trackingVerified = verified;
+    res.status(200).json(trackingView(order, verified));
   } catch (error) {
     res.status(500).json({ message: 'Error fetching order details', error: error.message });
   }
@@ -218,6 +258,7 @@ const createOrder = async (req, res) => {
 
     const newOrder = new Order({
       orderNumber,
+      trackingToken: crypto.randomBytes(16).toString('hex'),
       customer,
       branch: targetBranchId,
       orderType: orderType || 'DELIVERY',
@@ -341,16 +382,24 @@ const cancelCustomerOrder = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { reason } = req.body;
+    const { reason, token } = req.body;
 
     const query = mongoose.Types.ObjectId.isValid(id) ? { _id: id } : { orderNumber: id.toUpperCase() };
-    const order = await Order.findOne(query).session(session);
+    const order = await Order.findOne(query).select('+trackingToken').session(session);
 
     if (!order) {
       await session.abortTransaction();
       session.endSession();
       return res.status(404).json({ message: 'Order not found.' });
     }
+
+    // Only the person holding the tracking link from checkout may cancel.
+    if (!tokenMatches(order, token)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({ message: 'Open the tracking link from your order confirmation to cancel this order.' });
+    }
+    res.locals.trackingVerified = true;
 
     if (order.orderStatus !== 'PENDING') {
       await session.abortTransaction();
@@ -395,7 +444,7 @@ const cancelCustomerOrder = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Order cancelled successfully.',
-      order,
+      order: trackingView(order, true),
     });
   } catch (error) {
     await session.abortTransaction();

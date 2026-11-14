@@ -47,6 +47,11 @@ const orderSchema = new mongoose.Schema(
       uppercase: true,
       trim: true,
     },
+    // Secret for the customer's tracking link. Without it, the public lookup shows status only.
+    trackingToken: {
+      type: String,
+      select: false,
+    },
     customer: {
       name: { type: String, required: true },
       phone: { type: String, required: true },

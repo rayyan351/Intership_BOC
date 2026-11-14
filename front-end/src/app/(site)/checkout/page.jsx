@@ -127,7 +127,14 @@ export default function CheckoutPage() {
     try {
       const res = await createOrder(payload).unwrap();
       dispatch(clearCart());
-      setPlacedOrder(res.order || res);
+      const placed = res.order || res;
+      // Keep the tracking token on this device so the tracking page opens with full details.
+      if (placed?.trackingToken) {
+        try {
+          localStorage.setItem(`boc-track-${placed.orderNumber}`, placed.trackingToken);
+        } catch {}
+      }
+      setPlacedOrder(placed);
     } catch (err) {
       isOrderSubmittedRef.current = false;
       if (err?.data?.shortages) {
@@ -324,7 +331,10 @@ export default function CheckoutPage() {
 
           <div className="space-y-2.5">
             <button
-              onClick={() => router.push(`/track-order?id=${placedOrder.orderNumber}`)}
+              onClick={() => router.push(
+                  `/track-order?id=${placedOrder.orderNumber}` +
+                    (placedOrder.trackingToken ? `&t=${placedOrder.trackingToken}` : '')
+                )}
               className="w-full bg-[#F4C61A] hover:bg-[#E0B210] text-black font-black py-4 rounded-xl shadow-sm transition uppercase tracking-wider text-xs sm:text-sm cursor-pointer"
             >
               TRACK MY ORDER LIVE

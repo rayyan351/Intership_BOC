@@ -21,9 +21,11 @@ function TrackOrderContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const initialId = searchParams.get('id') || '';
+  const linkToken = searchParams.get('t') || '';
 
   const [inputVal, setInputVal] = useState(initialId);
   const [activeQueryId, setActiveQueryId] = useState(initialId);
+  const [token, setToken] = useState(linkToken);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('Placed by mistake');
   const [remainingSeconds, setRemainingSeconds] = useState(0);
@@ -38,11 +40,27 @@ function TrackOrderContent() {
     }
   }, [initialId]);
 
+  // The tracking token comes from the checkout link, or from this device if the order was placed here.
+  useEffect(() => {
+    if (!activeQueryId) return;
+    const key = `boc-track-${activeQueryId.toUpperCase()}`;
+    try {
+      if (linkToken && activeQueryId === initialId) {
+        localStorage.setItem(key, linkToken);
+        setToken(linkToken);
+      } else {
+        setToken(localStorage.getItem(key) || '');
+      }
+    } catch {
+      setToken(activeQueryId === initialId ? linkToken : '');
+    }
+  }, [activeQueryId, initialId, linkToken]);
+
   const {
     data: order,
     isLoading,
     isError,
-  } = useTrackOrderQuery(activeQueryId, {
+  } = useTrackOrderQuery({ id: activeQueryId, token }, {
     skip: !activeQueryId,
     pollingInterval: 6000,
   });
@@ -98,6 +116,7 @@ function TrackOrderContent() {
     const clean = inputVal.trim().toUpperCase();
     if (!clean) return;
     setActiveQueryId(clean);
+    // Leave the token out of the address bar; it is read from this device instead.
     router.replace(`/track-order?id=${clean}`);
   };
 
@@ -106,6 +125,7 @@ function TrackOrderContent() {
       await cancelOrder({
         id: order.orderNumber,
         reason: cancelReason,
+        token,
       }).unwrap();
       setShowCancelModal(false);
     } catch (err) {
@@ -123,7 +143,7 @@ function TrackOrderContent() {
   const currentStageIdx = getStageIndex(order?.orderStatus);
   const isCancelled = order?.orderStatus === 'CANCELLED';
   const isDelivered = order?.orderStatus === 'DELIVERED';
-  const canCancel = order?.orderStatus === 'PENDING' && remainingSeconds > 0;
+  const canCancel = !order?.limited && order?.orderStatus === 'PENDING' && remainingSeconds > 0;
 
   const formatTimer = (sec) => {
     const m = Math.floor(sec / 60);
@@ -343,7 +363,18 @@ function TrackOrderContent() {
               )}
             </div>
 
-            {/* Receipt Summary */}
+            {/* Receipt Summary: only for the person holding the tracking link */}
+            {order.limited ? (
+              <div className="p-6 sm:p-7 rounded-3xl bg-white border border-neutral-200/90 shadow-sm text-center">
+                <h3 className="font-display text-lg font-black text-neutral-900 uppercase tracking-wide mb-2">
+                  Order details are private
+                </h3>
+                <p className="text-xs text-neutral-500 max-w-md mx-auto">
+                  To see your items, delivery address and payment, or to cancel, open the tracking link from your
+                  order confirmation on the device you ordered from.
+                </p>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
               <div className="md:col-span-7 p-6 sm:p-7 rounded-3xl bg-white border border-neutral-200/90 shadow-sm">
                 <h3 className="font-display text-lg font-black text-neutral-900 uppercase tracking-wide mb-4 pb-3 border-b border-neutral-100">
@@ -448,6 +479,7 @@ function TrackOrderContent() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         )}
 

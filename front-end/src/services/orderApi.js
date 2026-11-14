@@ -54,16 +54,18 @@ export const orderApi = createApi({
       }),
       invalidatesTags: ['Orders', 'Inventory', 'Ledger', 'StockTransactions', 'Batches'],
     }),
+    // The token from checkout unlocks the full order; without it the API returns status only.
     trackOrder: builder.query({
-      query: (orderNumber) => `/orders/${orderNumber}`,
-      providesTags: (result, error, orderNumber) => [{ type: 'Orders', id: orderNumber }],
+      query: ({ id, token }) =>
+        token ? `/orders/${id}?t=${encodeURIComponent(token)}` : `/orders/${id}`,
+      providesTags: (result, error, { id }) => [{ type: 'Orders', id }],
     }),
     // front-end/src/services/orderApi.js
     cancelCustomerOrder: builder.mutation({
-      query: ({ id, reason }) => ({
+      query: ({ id, reason, token }) => ({
         url: `/orders/${id}/cancel-customer`,
         method: 'POST',
-        body: { reason },
+        body: { reason, token },
       }),
       invalidatesTags: ['Orders', 'Inventory', 'Ledger'],
     }),
